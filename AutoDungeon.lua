@@ -8,15 +8,12 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local localPlayer = Players.LocalPlayer
 
 local repeatWaitTime = 10 
-local stopDistance = 15 -- Studs away to stop from the monster
+local stopDistance = 15
 local isRunning = false
-local roomTextBoxes = {} 
-local configFileName = "AutoDungeonConfig.json"
-
-local defaultTimes = {5, 8, 4, 6, 10, 3, 7, 5, 4, 9, 6, 4, 8, 5, 7, 3, 12, 15}
+local configFileName = "AutoDungeonSmartConfig.json"
 
 -- ==========================================
--- 1. CREATE THE UI
+-- 1. CREATE THE UI (Compact Version)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DungeonAutoGui"
@@ -25,7 +22,7 @@ screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(0, 260, 0, 30)
-topBar.Position = UDim2.new(0.5, -130, 0.5, -180)
+topBar.Position = UDim2.new(0.5, -130, 0.5, -90)
 topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
 topBar.Active = true
@@ -36,7 +33,7 @@ titleLabel.Size = UDim2.new(1, -70, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Auto Dungeon Config"
+titleLabel.Text = "Smart Dungeon Auto"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -64,8 +61,9 @@ minimizeButton.TextSize = 20
 minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
+-- Much smaller main frame since the scroll list is gone
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 330)
+mainFrame.Size = UDim2.new(1, 0, 0, 150)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -111,50 +109,9 @@ flySpeedBox.Font = Enum.Font.SourceSans
 flySpeedBox.TextSize = 16
 flySpeedBox.Parent = mainFrame
 
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -20, 0, 180)
-scrollFrame.Position = UDim2.new(0, 10, 0, 85)
-scrollFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-scrollFrame.BorderSizePixel = 0
-scrollFrame.ScrollBarThickness = 6
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 18 * 35)
-scrollFrame.Parent = mainFrame
-
-local listLayout = Instance.new("UIListLayout")
-listLayout.Padding = UDim.new(0, 5)
-listLayout.Parent = scrollFrame
-
-for i = 1, 18 do
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, -10, 0, 30)
-    row.BackgroundTransparency = 1
-    row.Parent = scrollFrame
-    
-    local stageLabel = Instance.new("TextLabel")
-    stageLabel.Size = UDim2.new(0, 120, 1, 0)
-    stageLabel.BackgroundTransparency = 1
-    stageLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    stageLabel.Text = "Stage " .. i .. " Wait:"
-    stageLabel.Font = Enum.Font.SourceSans
-    stageLabel.TextSize = 16
-    stageLabel.Parent = row
-    
-    local stageBox = Instance.new("TextBox")
-    stageBox.Size = UDim2.new(0, 60, 1, 0)
-    stageBox.Position = UDim2.new(0, 130, 0, 0)
-    stageBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    stageBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    stageBox.Text = tostring(defaultTimes[i] or 5)
-    stageBox.Font = Enum.Font.SourceSans
-    stageBox.TextSize = 16
-    stageBox.Parent = row
-    
-    roomTextBoxes[i] = stageBox
-end
-
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 150, 0, 40)
-toggleButton.Position = UDim2.new(0, 10, 1, -75)
+toggleButton.Position = UDim2.new(0, 10, 0, 85)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
@@ -164,7 +121,7 @@ toggleButton.Parent = mainFrame
 
 local saveButton = Instance.new("TextButton")
 saveButton.Size = UDim2.new(0, 80, 0, 40)
-saveButton.Position = UDim2.new(0, 170, 1, -75)
+saveButton.Position = UDim2.new(0, 170, 0, 85)
 saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveButton.Font = Enum.Font.SourceSansBold
@@ -195,13 +152,8 @@ end
 local function saveSettings()
     local data = {
         FlyTime = tonumber(flyTimeBox.Text) or 1.5,
-        FlySpeed = tonumber(flySpeedBox.Text) or 44,
-        StageTimes = {}
+        FlySpeed = tonumber(flySpeedBox.Text) or 44
     }
-    
-    for i = 1, 18 do
-        data.StageTimes[i] = tonumber(roomTextBoxes[i].Text) or defaultTimes[i]
-    end
     
     if writefile then
         local jsonData = HttpService:JSONEncode(data)
@@ -222,13 +174,6 @@ local function loadSettings()
         if success and data then
             if data.FlyTime then flyTimeBox.Text = tostring(data.FlyTime) end
             if data.FlySpeed then flySpeedBox.Text = tostring(data.FlySpeed) end
-            if data.StageTimes then
-                for i = 1, 18 do
-                    if data.StageTimes[i] and roomTextBoxes[i] then
-                        roomTextBoxes[i].Text = tostring(data.StageTimes[i])
-                    end
-                end
-            end
         end
     end
 end
@@ -237,7 +182,7 @@ loadSettings()
 saveButton.MouseButton1Click:Connect(saveSettings)
 
 -- ==========================================
--- 3. GUI FUNCTIONALITY (DRAG, MINIMIZE, CLOSE)
+-- 3. GUI FUNCTIONALITY
 -- ==========================================
 local minimized = false
 minimizeButton.MouseButton1Click:Connect(function()
@@ -287,7 +232,7 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 -- ==========================================
--- 4. DUNGEON LOGIC & MONSTER DETECTION
+-- 4. DUNGEON LOGIC & SMART DETECTION
 -- ==========================================
 local function setAntiKnockback(isLocked)
     local character = localPlayer.Character
@@ -360,17 +305,13 @@ local function flyToNextArea(duration, flySpeed)
             local direction = (monster.Position - hrp.Position).Unit
             
             if distance > stopDistance then
-                -- Fly towards the monster
                 bv.Velocity = direction * flySpeed
             else
-                -- Stop just out of reach
                 bv.Velocity = Vector3.zero
             end
             
-            -- Lock rotation to face the target
             hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(monster.Position.X, hrp.Position.Y, monster.Position.Z))
         else
-            -- No targets detected. Glide forward.
             bv.Velocity = hrp.CFrame.LookVector * flySpeed
         end
         
@@ -382,6 +323,22 @@ local function flyToNextArea(duration, flySpeed)
     
     hrp.Velocity = Vector3.zero
     hrp.RotVelocity = Vector3.zero
+end
+
+local function waitForRoomClear()
+    -- Wait 1 second to allow monsters to render/spawn just in case you arrived early
+    task.wait(1)
+    
+    -- Continuously check the radar while the script is running
+    while isRunning do
+        local monster = getClosestMonster()
+        if not monster then
+            -- No monsters found, the room is completely clear
+            break
+        end
+        -- Wait half a second before checking the radar again to save performance
+        task.wait(0.5)
+    end
 end
 
 local function clickRepeatButton()
@@ -414,8 +371,6 @@ local function runDungeonLoop()
         for stageNumber = 1, 18 do
             if not isRunning then break end
             
-            local currentWaitTime = tonumber(roomTextBoxes[stageNumber].Text) or 5
-            
             updateStatus("Flying to Stage " .. stageNumber .. " at " .. currentFlySpeed .. " SPD...")
             setAntiKnockback(false)
             
@@ -425,7 +380,9 @@ local function runDungeonLoop()
             
             updateStatus("Clearing Stage " .. stageNumber .. "...")
             setAntiKnockback(true)
-            task.wait(currentWaitTime)
+            
+            -- Call the smart detection function instead of a hardcoded timer
+            waitForRoomClear()
         end
         
         if not isRunning then break end
