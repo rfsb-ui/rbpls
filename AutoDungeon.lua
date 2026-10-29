@@ -13,12 +13,18 @@ local isRunning = false
 local configFileName = "AutoDungeonSmartConfig.json"
 
 -- ==========================================
--- 1. CREATE THE UI
+-- 1. CREATE THE UI (V3)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DungeonAutoGui"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+local success = pcall(function()
+    screenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+end)
+if not success then
+    screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+end
 
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(0, 260, 0, 30)
@@ -151,15 +157,27 @@ saveButton.Text = "Save"
 saveButton.Parent = mainFrame
 
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -20, 0, 20)
+statusLabel.Size = UDim2.new(1, -60, 0, 20)
 statusLabel.Position = UDim2.new(0, 10, 1, -20)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 statusLabel.Text = "Status: Idle"
 statusLabel.Font = Enum.Font.SourceSansItalic
 statusLabel.TextSize = 15
-statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.Parent = mainFrame
+
+-- Version text placed in the bottom right corner of the UI
+local versionLabel = Instance.new("TextLabel")
+versionLabel.Size = UDim2.new(0, 40, 0, 20)
+versionLabel.Position = UDim2.new(1, -45, 1, -20)
+versionLabel.BackgroundTransparency = 1
+versionLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
+versionLabel.Text = "V3"
+versionLabel.Font = Enum.Font.SourceSansBold
+versionLabel.TextSize = 14
+versionLabel.TextXAlignment = Enum.TextXAlignment.Right
+versionLabel.Parent = mainFrame
 
 local function updateStatus(text)
     if statusLabel then
@@ -177,35 +195,40 @@ local function saveSettings()
         TargetMobs = monsterBox.Text
     }
     
-    if writefile then
-        local jsonData = HttpService:JSONEncode(data)
-        writefile(configFileName, jsonData)
-        saveButton.Text = "Saved!"
-        task.wait(1)
-        saveButton.Text = "Save"
-    end
+    pcall(function()
+        if writefile then
+            local jsonData = HttpService:JSONEncode(data)
+            writefile(configFileName, jsonData)
+        end
+    end)
+    
+    saveButton.Text = "Saved!"
+    task.wait(1)
+    saveButton.Text = "Save"
 end
 
 local function loadSettings()
-    if isfile and isfile(configFileName) then
-        local jsonData = readfile(configFileName)
-        local success, data = pcall(function()
-            return HttpService:JSONDecode(jsonData)
-        end)
-        
-        if success and data then
-            if data.FlyTime then flyTimeBox.Text = tostring(data.FlyTime) end
-            if data.FlySpeed then flySpeedBox.Text = tostring(data.FlySpeed) end
-            if data.TargetMobs then monsterBox.Text = tostring(data.TargetMobs) end
+    pcall(function()
+        if isfile and isfile(configFileName) then
+            local jsonData = readfile(configFileName)
+            local success, data = pcall(function()
+                return HttpService:JSONDecode(jsonData)
+            end)
+            
+            if success and data then
+                if data.FlyTime then flyTimeBox.Text = tostring(data.FlyTime) end
+                if data.FlySpeed then flySpeedBox.Text = tostring(data.FlySpeed) end
+                if data.TargetMobs then monsterBox.Text = tostring(data.TargetMobs) end
+            end
         end
-    end
+    end)
 end
 
 loadSettings()
 saveButton.MouseButton1Click:Connect(saveSettings)
 
 -- ==========================================
--- 3. GUI FUNCTIONALITY 
+-- 3. GUI FUNCTIONALITY
 -- ==========================================
 local minimized = false
 minimizeButton.MouseButton1Click:Connect(function()
@@ -217,8 +240,9 @@ end)
 closeButton.MouseButton1Click:Connect(function()
     isRunning = false 
     local character = localPlayer.Character
-    if character and character.PrimaryPart then
-        character.PrimaryPart.Anchored = false
+    local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    if rootPart then
+        rootPart.Anchored = false
     end
     screenGui:Destroy() 
 end)
@@ -255,12 +279,13 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 -- ==========================================
--- 4. DUNGEON LOGIC & TARGET FILTERING
+-- 4. DUNGEON LOGIC & NOTIFICATION SCANNER
 -- ==========================================
 local function setAntiKnockback(isLocked)
     local character = localPlayer.Character
-    if character and character.PrimaryPart then
-        character.PrimaryPart.Anchored = isLocked
+    local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    if rootPart then
+        rootPart.Anchored = isLocked
     end
 end
 
@@ -279,27 +304,29 @@ local function getParsedMonsterNames()
 end
 
 local currentTarget = nil
-
 local function getClosestMonster()
     local character = localPlayer.Character
-    if not character or not character.PrimaryPart then return nil end
-    local myPos = character.PrimaryPart.Position
+    local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    if not myRoot then return nil end
+    local myPos = myRoot.Position
     
     if currentTarget and currentTarget.Parent then
         local hum = currentTarget.Parent:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health > 0 then
             return currentTarget
+        elseif not hum then
+            return currentTarget
         end
     end
     
     local closest = nil
-    local shortestDistance = 10000 
+    local shortestDistance = 100000 
     
     local validNames = getParsedMonsterNames()
     local useFilter = #validNames > 0
     
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj ~= character then
+        if (obj:IsA("Model") or obj:IsA("BasePart")) and obj ~= character and not Players:GetPlayerFromCharacter(obj) then
             
             local nameMatches = false
             if useFilter then
@@ -311,18 +338,33 @@ local function getClosestMonster()
                     end
                 end
             else
-                nameMatches = true 
+                if obj:FindFirstChildOfClass("Humanoid") then
+                    nameMatches = true
+                end
             end
             
             if nameMatches then
                 local humanoid = obj:FindFirstChildOfClass("Humanoid")
-                local root = obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("UpperTorso")
+                local isAlive = true
                 
-                if humanoid and humanoid.Health > 0 and root and not Players:GetPlayerFromCharacter(obj) then
-                    local distance = (root.Position - myPos).Magnitude
-                    if distance < shortestDistance then
-                        shortestDistance = distance
-                        closest = root
+                if humanoid then
+                    isAlive = humanoid.Health > 0
+                end
+                
+                if isAlive then
+                    local root = nil
+                    if obj:IsA("BasePart") then
+                        root = obj
+                    else
+                        root = obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("UpperTorso") or obj:FindFirstChildWhichIsA("BasePart")
+                    end
+                    
+                    if root then
+                        local distance = (root.Position - myPos).Magnitude
+                        if distance < shortestDistance then
+                            shortestDistance = distance
+                            closest = root
+                        end
                     end
                 end
             end
@@ -335,9 +377,8 @@ end
 
 local function flyToNextArea(duration, flySpeed)
     local character = localPlayer.Character
-    if not character or not character.PrimaryPart then return end
-    
-    local rootPart = character.PrimaryPart
+    local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    if not rootPart then return end
     
     local bv = Instance.new("BodyVelocity")
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -345,16 +386,13 @@ local function flyToNextArea(duration, flySpeed)
     
     local noclipConnection = RunService.Stepped:Connect(function()
         for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
+            if part:IsA("BasePart") then part.CanCollide = false end
         end
     end)
     
     local endTime = os.clock() + duration
     while os.clock() < endTime and isRunning do
         local monster = getClosestMonster()
-        
         if monster then
             local distance = (monster.Position - rootPart.Position).Magnitude
             local direction = (monster.Position - rootPart.Position).Unit
@@ -364,31 +402,61 @@ local function flyToNextArea(duration, flySpeed)
             else
                 bv.Velocity = Vector3.zero
             end
-            
             rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(monster.Position.X, rootPart.Position.Y, monster.Position.Z))
         else
             bv.Velocity = rootPart.CFrame.LookVector * flySpeed
         end
-        
         task.wait(0.1) 
     end
     
     if bv then bv:Destroy() end
     if noclipConnection then noclipConnection:Disconnect() end
-    
     rootPart.Velocity = Vector3.zero
     rootPart.RotVelocity = Vector3.zero
+end
+
+-- NEW: Advanced UI Notification Scanner
+local function checkNotification()
+    local gui = localPlayer:FindFirstChild("PlayerGui")
+    if not gui then return false end
+    
+    for _, obj in ipairs(gui:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("TextBox") or obj:IsA("TextButton") then
+            if obj.Text then
+                -- Strips out any hidden RichText tags before checking
+                local cleanText = string.gsub(obj.Text, "<[^>]+>", "")
+                if string.find(string.lower(cleanText), "room cleared %- the gate unseals") or string.find(string.lower(cleanText), "room cleared - the gate unseals", 1, true) then
+                    
+                    -- Verify the UI element isn't hidden or fully transparent
+                    local current = obj
+                    local isVisible = true
+                    while current and current:IsA("GuiObject") do
+                        if not current.Visible then
+                            isVisible = false
+                            break
+                        end
+                        current = current.Parent
+                    end
+                    
+                    if isVisible and obj.TextTransparency < 1 then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
 end
 
 local function waitForRoomClear()
     task.wait(1) 
     
+    -- Replaced Mob Radar check with Notification Reader
     while isRunning do
-        local monster = getClosestMonster()
-        if not monster then
+        if checkNotification() then
             break 
         end
-        task.wait(0.5)
+        task.wait(0.2) -- Polls the UI 5 times a second
     end
 end
 
@@ -400,15 +468,16 @@ local function clickRepeatButton()
             if uiElement:IsA("TextLabel") and uiElement.Parent:IsA("GuiButton") then
                 targetButton = uiElement.Parent
             end
-
-            local centerX = targetButton.AbsolutePosition.X + (targetButton.AbsoluteSize.X / 2)
-            local centerY = targetButton.AbsolutePosition.Y + (targetButton.AbsoluteSize.Y / 2)
             
-            local guiInset = GuiService:GetGuiInset()
-            VirtualInputManager:SendMouseButtonEvent(centerX + guiInset.X, centerY + guiInset.Y, 0, true, game, 0)
-            task.wait(0.1)
-            VirtualInputManager:SendMouseButtonEvent(centerX + guiInset.X, centerY + guiInset.Y, 0, false, game, 0)
-            return true
+            local success = pcall(function()
+                local centerX = targetButton.AbsolutePosition.X + (targetButton.AbsoluteSize.X / 2)
+                local centerY = targetButton.AbsolutePosition.Y + (targetButton.AbsoluteSize.Y / 2)
+                local guiInset = GuiService:GetGuiInset()
+                VirtualInputManager:SendMouseButtonEvent(centerX + guiInset.X, centerY + guiInset.Y, 0, true, game, 0)
+                task.wait(0.1)
+                VirtualInputManager:SendMouseButtonEvent(centerX + guiInset.X, centerY + guiInset.Y, 0, false, game, 0)
+            end)
+            return success
         end
     end
     return false
@@ -424,7 +493,6 @@ local function runDungeonLoop()
             
             updateStatus("Flying to next area...")
             setAntiKnockback(false)
-            
             flyToNextArea(currentFlyTime, currentFlySpeed)
             
             if not isRunning then break end
@@ -434,9 +502,7 @@ local function runDungeonLoop()
             
             waitForRoomClear()
             
-            if clickRepeatButton() then
-                break
-            end
+            if clickRepeatButton() then break end
         end
         
         if not isRunning then break end
@@ -454,7 +520,6 @@ end
 
 toggleButton.MouseButton1Click:Connect(function()
     isRunning = not isRunning
-    
     if isRunning then
         toggleButton.Text = "Stop Auto"
         toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
