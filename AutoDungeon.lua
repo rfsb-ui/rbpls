@@ -61,7 +61,6 @@ minimizeButton.TextSize = 20
 minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
--- Much smaller main frame since the scroll list is gone
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(1, 0, 0, 150)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
@@ -236,57 +235,62 @@ end)
 -- ==========================================
 local function setAntiKnockback(isLocked)
     local character = localPlayer.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        character.HumanoidRootPart.Anchored = isLocked
+    if character and character.PrimaryPart then
+        character.PrimaryPart.Anchored = isLocked
     end
 end
 
+-- NEW: Optimized Deep Scan Target Lock
+local currentTarget = nil
+
 local function getClosestMonster()
     local character = localPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
-    local hrpPos = character.HumanoidRootPart.Position
+    if not character or not character.PrimaryPart then return nil end
+    local myPos = character.PrimaryPart.Position
     
-    local closest = nil
-    local shortestDistance = 2000 
-    
-    local containers = {workspace}
-    local commonFolders = {"Enemies", "Mobs", "NPCs", "Monsters", "Live"}
-    for _, name in ipairs(commonFolders) do
-        local folder = workspace:FindFirstChild(name)
-        if folder then
-            table.insert(containers, folder)
+    -- 1. Target Locking: If we already have a living target, keep returning it
+    if currentTarget and currentTarget.Parent then
+        local hum = currentTarget.Parent:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health > 0 then
+            return currentTarget
         end
     end
     
-    for _, container in ipairs(containers) do
-        for _, obj in ipairs(container:GetChildren()) do
-            if obj:IsA("Model") and obj ~= character then
-                local humanoid = obj:FindFirstChildOfClass("Humanoid")
-                local root = obj:FindFirstChild("HumanoidRootPart")
-                
-                if humanoid and humanoid.Health > 0 and root and not Players:GetPlayerFromCharacter(obj) then
-                    local distance = (root.Position - hrpPos).Magnitude
-                    if distance < shortestDistance then
-                        shortestDistance = distance
-                        closest = root
-                    end
+    -- 2. If the previous target died or we entered a new room, perform a deep map scan
+    local closest = nil
+    local shortestDistance = 10000 -- Massive detection range
+    
+    -- GetDescendants scans EVERY folder, no matter how deeply hidden
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj ~= character then
+            local humanoid = obj:FindFirstChildOfClass("Humanoid")
+            
+            -- Look for any physical body part, since some games delete the HumanoidRootPart
+            local root = obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("UpperTorso")
+            
+            if humanoid and humanoid.Health > 0 and root and not Players:GetPlayerFromCharacter(obj) then
+                local distance = (root.Position - myPos).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closest = root
                 end
             end
         end
     end
     
-    return closest
+    currentTarget = closest
+    return currentTarget
 end
 
 local function flyToNextArea(duration, flySpeed)
     local character = localPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    if not character or not character.PrimaryPart then return end
     
-    local hrp = character.HumanoidRootPart
+    local rootPart = character.PrimaryPart
     
     local bv = Instance.new("BodyVelocity")
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Parent = hrp
+    bv.Parent = rootPart
     
     local noclipConnection = RunService.Stepped:Connect(function()
         for _, part in ipairs(character:GetDescendants()) do
@@ -301,8 +305,8 @@ local function flyToNextArea(duration, flySpeed)
         local monster = getClosestMonster()
         
         if monster then
-            local distance = (monster.Position - hrp.Position).Magnitude
-            local direction = (monster.Position - hrp.Position).Unit
+            local distance = (monster.Position - rootPart.Position).Magnitude
+            local direction = (monster.Position - rootPart.Position).Unit
             
             if distance > stopDistance then
                 bv.Velocity = direction * flySpeed
@@ -310,9 +314,9 @@ local function flyToNextArea(duration, flySpeed)
                 bv.Velocity = Vector3.zero
             end
             
-            hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(monster.Position.X, hrp.Position.Y, monster.Position.Z))
+            rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(monster.Position.X, rootPart.Position.Y, monster.Position.Z))
         else
-            bv.Velocity = hrp.CFrame.LookVector * flySpeed
+            bv.Velocity = rootPart.CFrame.LookVector * flySpeed
         end
         
         task.wait(0.1) 
@@ -321,22 +325,18 @@ local function flyToNextArea(duration, flySpeed)
     if bv then bv:Destroy() end
     if noclipConnection then noclipConnection:Disconnect() end
     
-    hrp.Velocity = Vector3.zero
-    hrp.RotVelocity = Vector3.zero
+    rootPart.Velocity = Vector3.zero
+    rootPart.RotVelocity = Vector3.zero
 end
 
 local function waitForRoomClear()
-    -- Wait 1 second to allow monsters to render/spawn just in case you arrived early
-    task.wait(1)
+    task.wait(1) -- Buffer to allow monsters to render
     
-    -- Continuously check the radar while the script is running
     while isRunning do
         local monster = getClosestMonster()
         if not monster then
-            -- No monsters found, the room is completely clear
-            break
+            break -- Room clear, break the wait loop
         end
-        -- Wait half a second before checking the radar again to save performance
         task.wait(0.5)
     end
 end
@@ -381,7 +381,6 @@ local function runDungeonLoop()
             updateStatus("Clearing Stage " .. stageNumber .. "...")
             setAntiKnockback(true)
             
-            -- Call the smart detection function instead of a hardcoded timer
             waitForRoomClear()
         end
         
