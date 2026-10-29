@@ -13,7 +13,7 @@ local isRunning = false
 local configFileName = "AutoDungeonSmartConfig.json"
 
 -- ==========================================
--- 1. CREATE THE UI (V4)
+-- 1. CREATE THE UI (V5)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DungeonAutoGui"
@@ -173,7 +173,7 @@ versionLabel.Size = UDim2.new(0, 40, 0, 20)
 versionLabel.Position = UDim2.new(1, -45, 1, -20)
 versionLabel.BackgroundTransparency = 1
 versionLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
-versionLabel.Text = "V4"
+versionLabel.Text = "V5"
 versionLabel.Font = Enum.Font.SourceSansBold
 versionLabel.TextSize = 14
 versionLabel.TextXAlignment = Enum.TextXAlignment.Right
@@ -279,7 +279,7 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 -- ==========================================
--- 4. DUNGEON LOGIC & NOTIFICATION SCANNER
+-- 4. DUNGEON LOGIC & V5 DEBUGGER RADAR
 -- ==========================================
 local function setAntiKnockback(isLocked)
     local character = localPlayer.Character
@@ -304,6 +304,7 @@ local function getParsedMonsterNames()
 end
 
 local currentTarget = nil
+
 local function getClosestMonster()
     local character = localPlayer.Character
     local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
@@ -321,6 +322,7 @@ local function getClosestMonster()
     
     local closest = nil
     local shortestDistance = 100000 
+    local scannedCount = 0
     
     local validNames = getParsedMonsterNames()
     local useFilter = #validNames > 0
@@ -344,6 +346,7 @@ local function getClosestMonster()
             end
             
             if nameMatches then
+                scannedCount = scannedCount + 1
                 local humanoid = obj:FindFirstChildOfClass("Humanoid")
                 local isAlive = true
                 
@@ -369,6 +372,11 @@ local function getClosestMonster()
                 end
             end
         end
+    end
+    
+    -- Debugging update: Shows how many valid matching objects the radar sees right now
+    if scannedCount > 0 and not currentTarget then
+        updateStatus("Radar: Found " .. scannedCount .. " targets.")
     end
     
     currentTarget = closest
@@ -402,7 +410,7 @@ local function flyToNextArea(duration, flySpeed)
             else
                 bv.Velocity = Vector3.zero
             end
-            rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(monster.Position.X, rootPart.Position.Y, monster.Position.Z))
+            rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(monster.Position.X, monster.Position.Y, monster.Position.Z))
         else
             bv.Velocity = rootPart.CFrame.LookVector * flySpeed
         end
@@ -415,7 +423,6 @@ local function flyToNextArea(duration, flySpeed)
     rootPart.RotVelocity = Vector3.zero
 end
 
--- V4: Broadened UI Notification Scanner
 local function checkNotification()
     local gui = localPlayer:FindFirstChild("PlayerGui")
     if not gui then return false end
@@ -423,13 +430,8 @@ local function checkNotification()
     for _, obj in ipairs(gui:GetDescendants()) do
         if obj:IsA("TextLabel") or obj:IsA("TextBox") or obj:IsA("TextButton") then
             if obj.Text then
-                -- Strips out any hidden RichText tags before checking
                 local cleanText = string.gsub(obj.Text, "<[^>]+>", "")
-                
-                -- V4 Change: Now it just looks for "room cleared" anywhere in the text
                 if string.find(string.lower(cleanText), "room cleared") then
-                    
-                    -- Verify the UI element isn't hidden or fully transparent
                     local current = obj
                     local isVisible = true
                     while current and current:IsA("GuiObject") do
@@ -498,7 +500,7 @@ local function runDungeonLoop()
             
             if not isRunning then break end
             
-            updateStatus("Clearing Room " .. stageNumber .. "...")
+            updateStatus("Clearing Room " + stageNumber + "...")
             setAntiKnockback(true)
             
             waitForRoomClear()
