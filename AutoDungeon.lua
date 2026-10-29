@@ -12,11 +12,8 @@ local stopDistance = 15
 local isRunning = false
 local configFileName = "AutoDungeonSmartConfig.json"
 
--- This table will store which mobs you have toggled ON
-local selectedMobs = {}
-
 -- ==========================================
--- 1. CREATE THE UI (With Mob Scanner)
+-- 1. CREATE THE UI
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DungeonAutoGui"
@@ -25,7 +22,7 @@ screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(0, 260, 0, 30)
-topBar.Position = UDim2.new(0.5, -130, 0.5, -150)
+topBar.Position = UDim2.new(0.5, -130, 0.5, -100)
 topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
 topBar.Active = true
@@ -65,7 +62,7 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 300) -- Expanded to fit the scanner
+mainFrame.Size = UDim2.new(1, 0, 0, 180)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -111,33 +108,31 @@ flySpeedBox.Font = Enum.Font.SourceSans
 flySpeedBox.TextSize = 16
 flySpeedBox.Parent = mainFrame
 
--- Scanner Button
-local refreshButton = Instance.new("TextButton")
-refreshButton.Size = UDim2.new(1, -20, 0, 30)
-refreshButton.Position = UDim2.new(0, 10, 0, 85)
-refreshButton.BackgroundColor3 = Color3.fromRGB(150, 100, 0)
-refreshButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-refreshButton.Font = Enum.Font.SourceSansBold
-refreshButton.TextSize = 16
-refreshButton.Text = "Scan Map for Mobs"
-refreshButton.Parent = mainFrame
+local targetLabel = Instance.new("TextLabel")
+targetLabel.Size = UDim2.new(0, 140, 0, 30)
+targetLabel.Position = UDim2.new(0, 10, 0, 80)
+targetLabel.BackgroundTransparency = 1
+targetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+targetLabel.Text = "Target Mobs:"
+targetLabel.Font = Enum.Font.SourceSansBold
+targetLabel.TextSize = 16
+targetLabel.Parent = mainFrame
 
--- Mob List Container
-local mobScrollFrame = Instance.new("ScrollingFrame")
-mobScrollFrame.Size = UDim2.new(1, -20, 0, 100)
-mobScrollFrame.Position = UDim2.new(0, 10, 0, 120)
-mobScrollFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-mobScrollFrame.BorderSizePixel = 0
-mobScrollFrame.ScrollBarThickness = 6
-mobScrollFrame.Parent = mainFrame
-
-local mobListLayout = Instance.new("UIListLayout")
-mobListLayout.Padding = UDim.new(0, 5)
-mobListLayout.Parent = mobScrollFrame
+local monsterBox = Instance.new("TextBox")
+monsterBox.Size = UDim2.new(0, 90, 0, 30)
+monsterBox.Position = UDim2.new(0, 150, 0, 80)
+monsterBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+monsterBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+monsterBox.Text = ""
+monsterBox.PlaceholderText = "Goblin, Orc"
+monsterBox.Font = Enum.Font.SourceSans
+monsterBox.TextSize = 14
+monsterBox.ClipsDescendants = true
+monsterBox.Parent = mainFrame
 
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 160, 0, 40)
-toggleButton.Position = UDim2.new(0, 10, 1, -75)
+toggleButton.Position = UDim2.new(0, 10, 0, 120)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
@@ -147,7 +142,7 @@ toggleButton.Parent = mainFrame
 
 local saveButton = Instance.new("TextButton")
 saveButton.Size = UDim2.new(0, 70, 0, 40)
-saveButton.Position = UDim2.new(0, 180, 1, -75)
+saveButton.Position = UDim2.new(0, 180, 0, 120)
 saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveButton.Font = Enum.Font.SourceSansBold
@@ -157,406 +152,10 @@ saveButton.Parent = mainFrame
 
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 20)
-statusLabel.Position = UDim2.new(0, 10, 1, -25)
+statusLabel.Position = UDim2.new(0, 10, 1, -20)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 statusLabel.Text = "Status: Idle"
 statusLabel.Font = Enum.Font.SourceSansItalic
 statusLabel.TextSize = 15
-statusLabel.TextXAlignment = Enum.TextXAlignment.Center
-statusLabel.Parent = mainFrame
-
-local function updateStatus(text)
-    if statusLabel then
-        statusLabel.Text = "Status: " .. text
-    end
-end
-
--- ==========================================
--- 2. MOB SCANNER SYSTEM
--- ==========================================
-local function populateMobList(mobNamesArray)
-    -- Clear out old UI buttons
-    for _, child in ipairs(mobScrollFrame:GetChildren()) do
-        if child:IsA("Frame") then child:Destroy() end
-    end
-    
-    local yOffset = 0
-    for _, mobName in ipairs(mobNamesArray) do
-        local row = Instance.new("Frame")
-        row.Size = UDim2.new(1, -10, 0, 25)
-        row.BackgroundTransparency = 1
-        row.Parent = mobScrollFrame
-        
-        local mLabel = Instance.new("TextLabel")
-        mLabel.Size = UDim2.new(0, 150, 1, 0)
-        mLabel.BackgroundTransparency = 1
-        mLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        mLabel.Text = mobName
-        mLabel.Font = Enum.Font.SourceSans
-        mLabel.TextSize = 14
-        mLabel.TextXAlignment = Enum.TextXAlignment.Left
-        mLabel.Parent = row
-        
-        local mToggle = Instance.new("TextButton")
-        mToggle.Size = UDim2.new(0, 60, 1, 0)
-        mToggle.Position = UDim2.new(1, -60, 0, 0)
-        mToggle.Font = Enum.Font.SourceSansBold
-        mToggle.TextSize = 14
-        mToggle.Parent = row
-        
-        -- Check our saved data to see if it should be ON or OFF
-        if selectedMobs[mobName] then
-            mToggle.Text = "ON"
-            mToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-        else
-            mToggle.Text = "OFF"
-            mToggle.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-        end
-        
-        mToggle.MouseButton1Click:Connect(function()
-            selectedMobs[mobName] = not selectedMobs[mobName]
-            if selectedMobs[mobName] then
-                mToggle.Text = "ON"
-                mToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-            else
-                mToggle.Text = "OFF"
-                mToggle.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-            end
-        end)
-        
-        yOffset = yOffset + 30
-    end
-    
-    mobScrollFrame.CanvasSize = UDim2.new(0, 0, 0, yOffset)
-end
-
-local function scanForMobs()
-    updateStatus("Scanning map for mobs...")
-    refreshButton.Text = "Scanning..."
-    task.wait(0.1)
-    
-    local foundNames = {}
-    local uniqueChecker = {}
-    
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj ~= localPlayer.Character then
-            local humanoid = obj:FindFirstChildOfClass("Humanoid")
-            if humanoid and not Players:GetPlayerFromCharacter(obj) then
-                local mobName = obj.Name
-                -- Make sure we don't add the same name to the list 50 times
-                if not uniqueChecker[mobName] then
-                    uniqueChecker[mobName] = true
-                    table.insert(foundNames, mobName)
-                end
-            end
-        end
-    end
-    
-    -- Also include any mobs we previously saved, in case they haven't spawned yet
-    for savedName, _ in pairs(selectedMobs) do
-        if not uniqueChecker[savedName] then
-            uniqueChecker[savedName] = true
-            table.insert(foundNames, savedName)
-        end
-    end
-    
-    table.sort(foundNames) -- Alphabetize the list
-    populateMobList(foundNames)
-    
-    refreshButton.Text = "Scan Map for Mobs"
-    updateStatus("Scan complete. Found " .. #foundNames .. " unique mobs.")
-end
-
-refreshButton.MouseButton1Click:Connect(scanForMobs)
-
--- ==========================================
--- 3. FILE SAVING & LOADING
--- ==========================================
-local function saveSettings()
-    local data = {
-        FlyTime = tonumber(flyTimeBox.Text) or 1.5,
-        FlySpeed = tonumber(flySpeedBox.Text) or 44,
-        SelectedMobs = selectedMobs
-    }
-    
-    if writefile then
-        local jsonData = HttpService:JSONEncode(data)
-        writefile(configFileName, jsonData)
-        saveButton.Text = "Saved!"
-        task.wait(1)
-        saveButton.Text = "Save"
-    end
-end
-
-local function loadSettings()
-    if isfile and isfile(configFileName) then
-        local jsonData = readfile(configFileName)
-        local success, data = pcall(function()
-            return HttpService:JSONDecode(jsonData)
-        end)
-        
-        if success and data then
-            if data.FlyTime then flyTimeBox.Text = tostring(data.FlyTime) end
-            if data.FlySpeed then flySpeedBox.Text = tostring(data.FlySpeed) end
-            if data.SelectedMobs then 
-                selectedMobs = data.SelectedMobs 
-                
-                -- Rebuild the UI list with our loaded memory
-                local savedNames = {}
-                for name, _ in pairs(selectedMobs) do
-                    table.insert(savedNames, name)
-                end
-                table.sort(savedNames)
-                populateMobList(savedNames)
-            end
-        end
-    end
-end
-
-loadSettings()
-saveButton.MouseButton1Click:Connect(saveSettings)
-
--- ==========================================
--- 4. GUI FUNCTIONALITY 
--- ==========================================
-local minimized = false
-minimizeButton.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    mainFrame.Visible = not minimized
-    minimizeButton.Text = minimized and "+" or "-"
-end)
-
-closeButton.MouseButton1Click:Connect(function()
-    isRunning = false 
-    local character = localPlayer.Character
-    if character and character.PrimaryPart then
-        character.PrimaryPart.Anchored = false
-    end
-    screenGui:Destroy() 
-end)
-
-local dragging, dragInput, dragStart, startPos
-topBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = topBar.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-topBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInput = input
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        topBar.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-        )
-    end
-end)
-
--- ==========================================
--- 5. DUNGEON LOGIC & TARGET FILTERING
--- ==========================================
-local function setAntiKnockback(isLocked)
-    local character = localPlayer.Character
-    if character and character.PrimaryPart then
-        character.PrimaryPart.Anchored = isLocked
-    end
-end
-
-local currentTarget = nil
-
-local function getClosestMonster()
-    local character = localPlayer.Character
-    if not character or not character.PrimaryPart then return nil end
-    local myPos = character.PrimaryPart.Position
-    
-    if currentTarget and currentTarget.Parent then
-        local hum = currentTarget.Parent:FindFirstChildOfClass("Humanoid")
-        if hum and hum.Health > 0 then
-            return currentTarget
-        end
-    end
-    
-    local closest = nil
-    local shortestDistance = 10000 
-    
-    -- Check if the user has actually toggled any mobs on
-    local hasFilter = false
-    for _, isSelected in pairs(selectedMobs) do
-        if isSelected then hasFilter = true break end
-    end
-    
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj ~= character then
-            
-            -- If we have filters turned ON, ignore mobs that aren't selected
-            local isValidTarget = true
-            if hasFilter and not selectedMobs[obj.Name] then
-                isValidTarget = false
-            end
-            
-            if isValidTarget then
-                local humanoid = obj:FindFirstChildOfClass("Humanoid")
-                local root = obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("UpperTorso")
-                
-                if humanoid and humanoid.Health > 0 and root and not Players:GetPlayerFromCharacter(obj) then
-                    local distance = (root.Position - myPos).Magnitude
-                    if distance < shortestDistance then
-                        shortestDistance = distance
-                        closest = root
-                    end
-                end
-            end
-        end
-    end
-    
-    currentTarget = closest
-    return currentTarget
-end
-
-local function flyToNextArea(duration, flySpeed)
-    local character = localPlayer.Character
-    if not character or not character.PrimaryPart then return end
-    
-    local rootPart = character.PrimaryPart
-    
-    local bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Parent = rootPart
-    
-    local noclipConnection = RunService.Stepped:Connect(function()
-        for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
-        end
-    end)
-    
-    local endTime = os.clock() + duration
-    while os.clock() < endTime and isRunning do
-        local monster = getClosestMonster()
-        
-        if monster then
-            local distance = (monster.Position - rootPart.Position).Magnitude
-            local direction = (monster.Position - rootPart.Position).Unit
-            
-            if distance > stopDistance then
-                bv.Velocity = direction * flySpeed
-            else
-                bv.Velocity = Vector3.zero
-            end
-            
-            rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(monster.Position.X, rootPart.Position.Y, monster.Position.Z))
-        else
-            bv.Velocity = rootPart.CFrame.LookVector * flySpeed
-        end
-        
-        task.wait(0.1) 
-    end
-    
-    if bv then bv:Destroy() end
-    if noclipConnection then noclipConnection:Disconnect() end
-    
-    rootPart.Velocity = Vector3.zero
-    rootPart.RotVelocity = Vector3.zero
-end
-
-local function waitForRoomClear()
-    task.wait(1) 
-    
-    while isRunning do
-        local monster = getClosestMonster()
-        if not monster then
-            break 
-        end
-        task.wait(0.5)
-    end
-end
-
-local function clickRepeatButton()
-    local playerGui = localPlayer:WaitForChild("PlayerGui")
-    for _, uiElement in ipairs(playerGui:GetDescendants()) do
-        if (uiElement:IsA("TextButton") or uiElement:IsA("TextLabel")) and uiElement.Text == "Repeat Dungeon" then
-            local targetButton = uiElement
-            if uiElement:IsA("TextLabel") and uiElement.Parent:IsA("GuiButton") then
-                targetButton = uiElement.Parent
-            end
-
-            local centerX = targetButton.AbsolutePosition.X + (targetButton.AbsoluteSize.X / 2)
-            local centerY = targetButton.AbsolutePosition.Y + (targetButton.AbsoluteSize.Y / 2)
-            
-            local guiInset = GuiService:GetGuiInset()
-            VirtualInputManager:SendMouseButtonEvent(centerX + guiInset.X, centerY + guiInset.Y, 0, true, game, 0)
-            task.wait(0.1)
-            VirtualInputManager:SendMouseButtonEvent(centerX + guiInset.X, centerY + guiInset.Y, 0, false, game, 0)
-            return true
-        end
-    end
-    return false
-end
-
-local function runDungeonLoop()
-    while isRunning do
-        local currentFlyTime = tonumber(flyTimeBox.Text) or 1.5 
-        local currentFlySpeed = tonumber(flySpeedBox.Text) or 44
-
-        for stageNumber = 1, 50 do
-            if not isRunning then break end
-            
-            updateStatus("Flying to next area...")
-            setAntiKnockback(false)
-            
-            flyToNextArea(currentFlyTime, currentFlySpeed)
-            
-            if not isRunning then break end
-            
-            updateStatus("Clearing Room " .. stageNumber .. "...")
-            setAntiKnockback(true)
-            
-            waitForRoomClear()
-            
-            if clickRepeatButton() then
-                break
-            end
-        end
-        
-        if not isRunning then break end
-        
-        updateStatus("Restarting dungeon...")
-        setAntiKnockback(false)
-        task.wait(repeatWaitTime)
-    end
-    
-    setAntiKnockback(false)
-    if screenGui.Parent then
-        updateStatus("Idle")
-    end
-end
-
-toggleButton.MouseButton1Click:Connect(function()
-    isRunning = not isRunning
-    
-    if isRunning then
-        toggleButton.Text = "Stop Auto"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        task.spawn(runDungeonLoop)
-    else
-        toggleButton.Text = "Start Auto"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-        updateStatus("Stopping...")
-    end
-end)
+status
