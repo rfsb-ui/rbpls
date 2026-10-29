@@ -13,7 +13,7 @@ local isRunning = false
 local configFileName = "AutoDungeonSmartConfig.json"
 
 -- ==========================================
--- 1. CREATE THE UI (V3)
+-- 1. CREATE THE UI (V4)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DungeonAutoGui"
@@ -173,7 +173,7 @@ versionLabel.Size = UDim2.new(0, 40, 0, 20)
 versionLabel.Position = UDim2.new(1, -45, 1, -20)
 versionLabel.BackgroundTransparency = 1
 versionLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
-versionLabel.Text = "V3"
+versionLabel.Text = "V4"
 versionLabel.Font = Enum.Font.SourceSansBold
 versionLabel.TextSize = 14
 versionLabel.TextXAlignment = Enum.TextXAlignment.Right
@@ -415,7 +415,7 @@ local function flyToNextArea(duration, flySpeed)
     rootPart.RotVelocity = Vector3.zero
 end
 
--- NEW: Advanced UI Notification Scanner
+-- V4: Broadened UI Notification Scanner
 local function checkNotification()
     local gui = localPlayer:FindFirstChild("PlayerGui")
     if not gui then return false end
@@ -425,7 +425,9 @@ local function checkNotification()
             if obj.Text then
                 -- Strips out any hidden RichText tags before checking
                 local cleanText = string.gsub(obj.Text, "<[^>]+>", "")
-                if string.find(string.lower(cleanText), "room cleared %- the gate unseals") or string.find(string.lower(cleanText), "room cleared - the gate unseals", 1, true) then
+                
+                -- V4 Change: Now it just looks for "room cleared" anywhere in the text
+                if string.find(string.lower(cleanText), "room cleared") then
                     
                     -- Verify the UI element isn't hidden or fully transparent
                     local current = obj
@@ -451,12 +453,11 @@ end
 local function waitForRoomClear()
     task.wait(1) 
     
-    -- Replaced Mob Radar check with Notification Reader
     while isRunning do
         if checkNotification() then
             break 
         end
-        task.wait(0.2) -- Polls the UI 5 times a second
+        task.wait(0.2) 
     end
 end
 
