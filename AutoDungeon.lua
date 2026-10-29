@@ -138,3 +138,336 @@ for i = 1, 18 do
     stageLabel.Font = Enum.Font.SourceSans
     stageLabel.TextSize = 16
     stageLabel.Parent = row
+    
+    local stageBox = Instance.new("TextBox")
+    stageBox.Size = UDim2.new(0, 60, 1, 0)
+    stageBox.Position = UDim2.new(0, 130, 0, 0)
+    stageBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    stageBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    stageBox.Text = tostring(defaultTimes[i] or 5)
+    stageBox.Font = Enum.Font.SourceSans
+    stageBox.TextSize = 16
+    stageBox.Parent = row
+    
+    roomTextBoxes[i] = stageBox
+end
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 150, 0, 40)
+toggleButton.Position = UDim2.new(0, 10, 1, -75)
+toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.TextSize = 16
+toggleButton.Text = "Start Auto"
+toggleButton.Parent = mainFrame
+
+local saveButton = Instance.new("TextButton")
+saveButton.Size = UDim2.new(0, 80, 0, 40)
+saveButton.Position = UDim2.new(0, 170, 1, -75)
+saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveButton.Font = Enum.Font.SourceSansBold
+saveButton.TextSize = 16
+saveButton.Text = "Save"
+saveButton.Parent = mainFrame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 20)
+statusLabel.Position = UDim2.new(0, 10, 1, -25)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+statusLabel.Text = "Status: Idle"
+statusLabel.Font = Enum.Font.SourceSansItalic
+statusLabel.TextSize = 15
+statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+statusLabel.Parent = mainFrame
+
+local function updateStatus(text)
+    if statusLabel then
+        statusLabel.Text = "Status: " .. text
+    end
+end
+
+-- ==========================================
+-- 2. FILE SAVING & LOADING
+-- ==========================================
+local function saveSettings()
+    local data = {
+        FlyTime = tonumber(flyTimeBox.Text) or 1.5,
+        FlySpeed = tonumber(flySpeedBox.Text) or 44,
+        StageTimes = {}
+    }
+    
+    for i = 1, 18 do
+        data.StageTimes[i] = tonumber(roomTextBoxes[i].Text) or defaultTimes[i]
+    end
+    
+    if writefile then
+        local jsonData = HttpService:JSONEncode(data)
+        writefile(configFileName, jsonData)
+        saveButton.Text = "Saved!"
+        task.wait(1)
+        saveButton.Text = "Save"
+    end
+end
+
+local function loadSettings()
+    if isfile and isfile(configFileName) then
+        local jsonData = readfile(configFileName)
+        local success, data = pcall(function()
+            return HttpService:JSONDecode(jsonData)
+        end)
+        
+        if success and data then
+            if data.FlyTime then flyTimeBox.Text = tostring(data.FlyTime) end
+            if data.FlySpeed then flySpeedBox.Text = tostring(data.FlySpeed) end
+            if data.StageTimes then
+                for i = 1, 18 do
+                    if data.StageTimes[i] and roomTextBoxes[i] then
+                        roomTextBoxes[i].Text = tostring(data.StageTimes[i])
+                    end
+                end
+            end
+        end
+    end
+end
+
+loadSettings()
+saveButton.MouseButton1Click:Connect(saveSettings)
+
+-- ==========================================
+-- 3. GUI FUNCTIONALITY (DRAG, MINIMIZE, CLOSE)
+-- ==========================================
+local minimized = false
+minimizeButton.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    mainFrame.Visible = not minimized
+    minimizeButton.Text = minimized and "+" or "-"
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+    isRunning = false 
+    local character = localPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.Anchored = false
+    end
+    screenGui:Destroy() 
+end)
+
+local dragging, dragInput, dragStart, startPos
+topBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = topBar.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+topBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        topBar.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- ==========================================
+-- 4. DUNGEON LOGIC & MONSTER DETECTION
+-- ==========================================
+local function setAntiKnockback(isLocked)
+    local character = localPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.Anchored = isLocked
+    end
+end
+
+local function getClosestMonster()
+    local character = localPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+    local hrpPos = character.HumanoidRootPart.Position
+    
+    local closest = nil
+    local shortestDistance = 2000 
+    
+    local containers = {workspace}
+    local commonFolders = {"Enemies", "Mobs", "NPCs", "Monsters", "Live"}
+    for _, name in ipairs(commonFolders) do
+        local folder = workspace:FindFirstChild(name)
+        if folder then
+            table.insert(containers, folder)
+        end
+    end
+    
+    for _, container in ipairs(containers) do
+        for _, obj in ipairs(container:GetChildren()) do
+            if obj:IsA("Model") and obj ~= character then
+                local humanoid = obj:FindFirstChildOfClass("Humanoid")
+                local root = obj:FindFirstChild("HumanoidRootPart")
+                
+                if humanoid and humanoid.Health > 0 and root and not Players:GetPlayerFromCharacter(obj) then
+                    local distance = (root.Position - hrpPos).Magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closest = root
+                    end
+                end
+            end
+        end
+    end
+    
+    return closest
+end
+
+local function flyToNextArea(duration, flySpeed)
+    local character = localPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local hrp = character.HumanoidRootPart
+    
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Parent = hrp
+    
+    local noclipConnection = RunService.Stepped:Connect(function()
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+    
+    local endTime = os.clock() + duration
+    while os.clock() < endTime and isRunning do
+        local monster = getClosestMonster()
+        
+        if monster then
+            local distance = (monster.Position - hrp.Position).Magnitude
+            local direction = (monster.Position - hrp.Position).Unit
+            
+            if distance > stopDistance then
+                -- Fly towards the monster
+                bv.Velocity = direction * flySpeed
+            else
+                -- Stop just out of reach
+                bv.Velocity = Vector3.zero
+            end
+            
+            -- Lock rotation to face the target
+            hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(monster.Position.X, hrp.Position.Y, monster.Position.Z))
+        else
+            -- No targets detected. Glide forward.
+            bv.Velocity = hrp.CFrame.LookVector * flySpeed
+        end
+        
+        task.wait(0.1) 
+    end
+    
+    if bv then bv:Destroy() end
+    if noclipConnection then noclipConnection:Disconnect() end
+    
+    hrp.Velocity = Vector3.zero
+    hrp.RotVelocity = Vector3.zero
+end
+
+local function clickRepeatButton()
+    local playerGui = localPlayer:WaitForChild("PlayerGui")
+    for _, uiElement in ipairs(playerGui:GetDescendants()) do
+        if (uiElement:IsA("TextButton") or uiElement:IsA("TextLabel")) and uiElement.Text == "Repeat Dungeon" then
+            local targetButton = uiElement
+            if uiElement:IsA("TextLabel") and uiElement.Parent:IsA("GuiButton") then
+                targetButton = uiElement.Parent
+            end
+
+            local centerX = targetButton.AbsolutePosition.X + (targetButton.AbsoluteSize.X / 2)
+            local centerY = targetButton.AbsolutePosition.Y + (targetButton.AbsoluteSize.Y / 2)
+            
+            local guiInset = GuiService:GetGuiInset()
+            VirtualInputManager:SendMouseButtonEvent(centerX + guiInset.X, centerY + guiInset.Y, 0, true, game, 0)
+            task.wait(0.1)
+            VirtualInputManager:SendMouseButtonEvent(centerX + guiInset.X, centerY + guiInset.Y, 0, false, game, 0)
+            return true
+        end
+    end
+    return false
+end
+
+local function runDungeonLoop()
+    while isRunning do
+        local currentFlyTime = tonumber(flyTimeBox.Text) or 1.5 
+        local currentFlySpeed = tonumber(flySpeedBox.Text) or 44
+
+        for stageNumber = 1, 18 do
+            if not isRunning then break end
+            
+            local currentWaitTime = tonumber(roomTextBoxes[stageNumber].Text) or 5
+            
+            updateStatus("Flying to Stage " .. stageNumber .. " at " .. currentFlySpeed .. " SPD...")
+            setAntiKnockback(false)
+            
+            flyToNextArea(currentFlyTime, currentFlySpeed)
+            
+            if not isRunning then break end
+            
+            updateStatus("Clearing Stage " .. stageNumber .. "...")
+            setAntiKnockback(true)
+            task.wait(currentWaitTime)
+        end
+        
+        if not isRunning then break end
+        
+        updateStatus("Searching for Repeat button...")
+        setAntiKnockback(false)
+        
+        local buttonClicked = false
+        for i = 1, 10 do
+            if not isRunning then break end
+            if clickRepeatButton() then
+                buttonClicked = true
+                break
+            end
+            task.wait(1)
+        end
+        
+        if buttonClicked and isRunning then
+            updateStatus("Restarting dungeon...")
+            task.wait(repeatWaitTime)
+        else
+            updateStatus("Failed to find Repeat button.")
+            break 
+        end
+    end
+    
+    setAntiKnockback(false)
+    if screenGui.Parent then
+        updateStatus("Idle")
+    end
+end
+
+toggleButton.MouseButton1Click:Connect(function()
+    isRunning = not isRunning
+    
+    if isRunning then
+        toggleButton.Text = "Stop Auto"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        task.spawn(runDungeonLoop)
+    else
+        toggleButton.Text = "Start Auto"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        updateStatus("Stopping...")
+    end
+end)
