@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonWaypointConfigV2.json"
+local configFileName = "DungeonWaypointConfigV21.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE WAYPOINT ROUTER UI (V2.0)
+-- CREATE WAYPOINT ROUTER UI (V2.1)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonWaypointGui_V20"
+screenGui.Name = "DungeonWaypointGui_V21"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -55,11 +55,11 @@ toggleOpenButton.MouseButton1Click:Connect(function()
 end)
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(0, 260, 0, 20)
+titleLabel.Size = UDim2.new(0, 280, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Waypoint Router [V2.0 - Import & Zigzag]"
+titleLabel.Text = "Waypoint Router [V2.1 - 6s Backward Step]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -165,7 +165,6 @@ copyButton.TextSize = 14
 copyButton.Text = "Copy Log"
 copyButton.Parent = mainFrame
 
--- Import Waypoints Input Box & Button
 local importBox = Instance.new("TextBox")
 importBox.Size = UDim2.new(0, 175, 0, 30)
 importBox.Position = UDim2.new(0, 15, 0, 110)
@@ -202,7 +201,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Waypoint Router V2.0 Ready...\nWalk to each room and click 'Save Waypoint', or paste JSON and click 'Import'."
+logLabel.Text = "Waypoint Router V2.1 Ready...\nWalk to each room and click 'Save Waypoint', or paste JSON and click 'Import'."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -231,7 +230,6 @@ end)
 
 local waypoints = {}
 
--- Save Waypoint
 saveButton.MouseButton1Click:Connect(function()
     local character = localPlayer.Character
     local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
@@ -252,7 +250,6 @@ saveButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Import JSON Waypoints
 importButton.MouseButton1Click:Connect(function()
     local rawText = importBox.Text
     local success, result = pcall(function()
@@ -271,7 +268,6 @@ importButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Clear Waypoints & Logs
 clearButton.MouseButton1Click:Connect(function()
     waypoints = {}
     logLines = {}
@@ -282,7 +278,6 @@ clearButton.MouseButton1Click:Connect(function()
     end)
 end)
 
--- Load saved waypoints on startup
 pcall(function()
     if readfile and isfile and isfile(configFileName) then
         local data = HttpService:JSONDecode(readfile(configFileName))
@@ -326,8 +321,9 @@ end)
 local currentWaypointIndex = 1
 local roomWaitTimer = 0
 local waitingInRoom = false
-local zigzagTimer = tick()
-local zigzagState = 1
+local backwardStepTimer = tick()
+local isSteppingBack = false
+local backwardStepDuration = 0
 
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -358,39 +354,39 @@ RunService.RenderStepped:Connect(function(dt)
         if tick() - roomWaitTimer >= roomWaitDuration then
             waitingInRoom = false
             currentWaypointIndex = currentWaypointIndex + 1
+            backwardStepTimer = tick() -- Reset timer for next room leg
             logMessage(string.format("Advancing to Waypoint #%d...", currentWaypointIndex))
         end
         return
     end
     
-    statusLabel.Text = string.format("Status: Moving (Zigzag) | Target: Waypoint #%d", currentWaypointIndex)
     local distance = (targetPos - rootPart.Position).Magnitude
     
     if distance > stopDistance then
+        -- Check if it's time to take a 2-stud backward step every 6 seconds
+        if not isSteppingBack and (tick() - backwardStepTimer >= 6.0) then
+            isSteppingBack = true
+            backwardStepDuration = tick()
+            logMessage("Taking anti-stuck 2 stud backward step...")
+        end
+        
         local direction = (targetPos - rootPart.Position).Unit
-        
-        -- Zigzag anti-stuck calculation every 0.8 seconds
-        if tick() - zigzagTimer >= 0.8 then
-            zigzagTimer = tick()
-            zigzagState = zigzagState + 1
-        end
-        
-        local sideOffset = Vector3.new(0, 0, 0)
-        local rightVector = rootPart.CFrame.RightVector
-        
-        if zigzagState % 4 == 1 then
-            sideOffset = rightVector * 1.5 -- sidestep right
-        elseif zigzagState % 4 == 2 then
-            sideOffset = -rightVector * 1.5 -- sidestep left
-        elseif zigzagState % 4 == 3 then
-            sideOffset = -direction * 1.0 -- brief step backward to clear corners
-        end
-        
-        local adjustedTarget = targetPos + sideOffset
-        local adjDirection = (adjustedTarget - rootPart.Position).Unit
         local step = math.min(distance, travelSpeed * dt)
         
-        rootPart.CFrame = CFrame.new(rootPart.Position + (adjDirection * step))
+        if isSteppingBack then
+            statusLabel.Text = string.format("Status: Stepping Back | Target: Waypoint #%d", currentWaypointIndex)
+            -- Move backward (-direction) for roughly 0.25 seconds or until 2 studs covered
+            rootPart.CFrame = rootPart.CFrame - (direction * (travelSpeed * dt))
+            
+            if tick() - backwardStepDuration >= 0.25 then
+                isSteppingBack = false
+                backwardStepTimer = tick() -- Reset 6s timer
+            end
+        else
+            statusLabel.Text = string.format("Status: Moving Forward | Target: Waypoint #%d", currentWaypointIndex)
+            rootPart.CFrame = CFrame.new(rootPart.Position + (direction * step))
+        end
+        
         rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z))
     else
         logMessage(string.format("Reached Waypoint #%d! Pausing...", currentWaypointIndex))
