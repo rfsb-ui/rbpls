@@ -4,9 +4,11 @@ local localPlayer = Players.LocalPlayer
 
 local isRunning = false
 local autoApproach = false
+local lastMobTarget = nil
+local mobApproachStartTime = 0
 
 -- ==========================================
--- CREATE TEST UI (V5.16 - Explicit Taller Window)
+-- CREATE TEST UI (V5.17 - Configurable Mob Timeout)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -33,7 +35,7 @@ titleLabel.Size = UDim2.new(1, -70, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.16]"
+titleLabel.Text = "Radar & Approach [V5.17]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -51,7 +53,7 @@ closeButton.BorderSizePixel = 0
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 360) -- Generous height to guarantee everything fits
+mainFrame.Size = UDim2.new(1, 0, 0, 400) -- Expanded height to fit the new timeout row
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -83,16 +85,17 @@ local function createRow(name, posY, defaultValue)
     return box
 end
 
--- Generate rows dynamically so no elements get missed
+-- Generate rows dynamically
 local monsterBox = createRow("Target Prefix:", 15, "A_")
 local radiusBox = createRow("Stud Radius:", 55, "500")
 local stopBox = createRow("Stop Distance:", 95, "5")
 local speedBox = createRow("Fly Speed:", 135, "44")
+local timeoutBox = createRow("Mob Timeout (s):", 175, "1.0") -- New configurable timeout row
 
 -- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -30, 0, 35)
-toggleButton.Position = UDim2.new(0, 15, 0, 180)
+toggleButton.Position = UDim2.new(0, 15, 0, 220)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
@@ -103,7 +106,7 @@ toggleButton.Parent = mainFrame
 -- Auto Approach Toggle Button
 local approachButton = Instance.new("TextButton")
 approachButton.Size = UDim2.new(1, -30, 0, 35)
-approachButton.Position = UDim2.new(0, 15, 0, 225)
+approachButton.Position = UDim2.new(0, 15, 0, 265)
 approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 approachButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 approachButton.Font = Enum.Font.SourceSansBold
@@ -114,7 +117,7 @@ approachButton.Parent = mainFrame
 -- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -30, 0, 65)
-statusLabel.Position = UDim2.new(0, 15, 0, 270)
+statusLabel.Position = UDim2.new(0, 15, 0, 310)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 statusLabel.Text = "Status: Idle\nDetected: None"
@@ -130,6 +133,7 @@ statusLabel.Parent = mainFrame
 closeButton.MouseButton1Click:Connect(function()
     isRunning = false
     autoApproach = false
+    lastMobTarget = nil
     local character = localPlayer.Character
     local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
     if rootPart then
@@ -147,6 +151,7 @@ toggleButton.MouseButton1Click:Connect(function()
         toggleButton.Text = "Start Radar Test"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
         autoApproach = false
+        lastMobTarget = nil
         approachButton.Text = "Auto Approach: OFF"
         approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         statusLabel.Text = "Status: Idle\nDetected: None"
@@ -159,9 +164,11 @@ approachButton.MouseButton1Click:Connect(function()
     if autoApproach then
         approachButton.Text = "Auto Approach: ON"
         approachButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+        lastMobTarget = nil
     else
         approachButton.Text = "Auto Approach: OFF"
         approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        lastMobTarget = nil
     end
 end)
 
@@ -183,6 +190,7 @@ RunService.RenderStepped:Connect(function(dt)
     local maxRadius = tonumber(radiusBox.Text) or 500
     local stopDistance = tonumber(stopBox.Text) or 5
     local flySpeed = tonumber(speedBox.Text) or 44
+    local mobTimeout = tonumber(timeoutBox.Text) or 1.0
     local targetPrefix = monsterBox.Text:lower()
     
     local closestPart = nil
@@ -203,6 +211,19 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     if closestPart then
+        -- Check if we just targeted a new mob or if timeout expired
+        if closestPart ~= lastMobTarget then
+            lastMobTarget = closestPart
+            mobApproachStartTime = os.clock()
+        end
+        
+        local timeElapsed = os.clock() - mobApproachStartTime
+        
+        if autoApproach and timeElapsed < mobTimeout then
+            statusLabel.Text = string.format("Status: Waiting Timeout (%.1fs)\nDetected: [%s]", mobTimeout - timeElapsed, closestPart.Name)
+            return
+        end
+        
         statusLabel.Text = string.format("Status: %s\nDetected: [%s] (Dist: %.1f)", autoApproach and "Approaching" or "Locked", closestPart.Name, shortestDistance)
         
         if autoApproach then
@@ -220,6 +241,7 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
+        lastMobTarget = nil
         statusLabel.Text = "Status: Searching...\nDetected: None"
     end
 end)
