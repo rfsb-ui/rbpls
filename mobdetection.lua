@@ -16,13 +16,13 @@ local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.46 - Diagnostic Trace)
+-- CREATE TEST UI (V5.47 - Nil Call Fix)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
 screenGui.ResetOnSpawn = false
 
-local success = pcall(function()
+local success, err = pcall(function()
     screenGui.Parent = game:GetService("CoreGui")
 end)
 if not success then
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.46]"
+titleLabel.Text = "Radar & Approach [V5.47]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -227,7 +227,7 @@ local function loadSettings()
                 if data.TargetName then monsterBox.Text = tostring(data.TargetName) end
                 if data.StudRadius then radiusBox.Text = tostring(data.StudRadius) end
                 if data.StopDistance then stopBox.Text = tostring(data.StopDistance) end
-                if data.FlySpeed then flySpeedBox.Text = tostring(data.FlySpeed) end
+                if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
                 if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
                 if data.HeightOffset then heightBox.Text = tostring(data.HeightOffset) end
                 if data.ItemPrefix then itemBox.Text = tostring(data.ItemPrefix) end
@@ -408,7 +408,6 @@ RunService.RenderStepped:Connect(function(dt)
                 local model = obj.Parent
                 local modelName = model and model.Name:lower() or ""
                 
-                -- DIAGNOSTIC TRACE: Prints every scanned object and whether it matches target name input
                 if mobDebugEnabled and distance <= 100 then
                     local matchesTarget = (targetNameInput ~= "" and (string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true)))
                     if matchesTarget and not loggedPartsCache[obj] then
