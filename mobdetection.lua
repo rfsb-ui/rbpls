@@ -10,7 +10,7 @@ local mobApproachStartTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
 -- ==========================================
--- CREATE TEST UI (V5.20 - Height Offset Above Mobs)
+-- CREATE TEST UI (V5.22 - Console Logging & Items)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -37,7 +37,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.20]"
+titleLabel.Text = "Radar & Approach [V5.22]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -68,7 +68,7 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 470) -- Expanded height to fit the new height offset row
+mainFrame.Size = UDim2.new(1, 0, 0, 510)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -106,12 +106,13 @@ local radiusBox = createRow("Stud Radius:", 55, "500")
 local stopBox = createRow("Stop Distance:", 95, "5")
 local speedBox = createRow("Fly Speed:", 135, "44")
 local timeoutBox = createRow("Mob Timeout (s):", 175, "1.0")
-local heightBox = createRow("Height Offset:", 215, "4") -- New height offset row (defaults to 4 studs above)
+local heightBox = createRow("Height Offset:", 215, "4")
+local itemBox = createRow("Item Prefix:", 255, "Drop_")
 
 -- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -30, 0, 35)
-toggleButton.Position = UDim2.new(0, 15, 0, 260)
+toggleButton.Position = UDim2.new(0, 15, 0, 300)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
@@ -122,7 +123,7 @@ toggleButton.Parent = mainFrame
 -- Auto Approach Toggle Button
 local approachButton = Instance.new("TextButton")
 approachButton.Size = UDim2.new(1, -30, 0, 35)
-approachButton.Position = UDim2.new(0, 15, 0, 305)
+approachButton.Position = UDim2.new(0, 15, 0, 345)
 approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 approachButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 approachButton.Font = Enum.Font.SourceSansBold
@@ -133,7 +134,7 @@ approachButton.Parent = mainFrame
 -- Save Button
 local saveButton = Instance.new("TextButton")
 saveButton.Size = UDim2.new(1, -30, 0, 35)
-saveButton.Position = UDim2.new(0, 15, 0, 350)
+saveButton.Position = UDim2.new(0, 15, 0, 390)
 saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveButton.Font = Enum.Font.SourceSansBold
@@ -143,8 +144,8 @@ saveButton.Parent = mainFrame
 
 -- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -30, 0, 60)
-statusLabel.Position = UDim2.new(0, 15, 0, 395)
+statusLabel.Size = UDim2.new(1, -30, 0, 65)
+statusLabel.Position = UDim2.new(0, 15, 0, 435)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 statusLabel.Text = "Status: Idle\nDetected: None"
@@ -164,7 +165,8 @@ local function saveSettings()
         StopDistance = stopBox.Text,
         FlySpeed = speedBox.Text,
         MobTimeout = timeoutBox.Text,
-        HeightOffset = heightBox.Text
+        HeightOffset = heightBox.Text,
+        ItemPrefix = itemBox.Text
     }
     
     pcall(function()
@@ -194,6 +196,7 @@ local function loadSettings()
                 if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
                 if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
                 if data.HeightOffset then heightBox.Text = tostring(data.HeightOffset) end
+                if data.ItemPrefix then itemBox.Text = tostring(data.ItemPrefix) end
             end
         end
     end)
@@ -254,6 +257,9 @@ approachButton.MouseButton1Click:Connect(function()
     end
 end)
 
+-- Track last printed items to avoid spamming the console every frame
+local lastLoggedItem = nil
+
 -- ==========================================
 -- REAL-TIME RADAR & APPROACH LOOP
 -- ==========================================
@@ -275,42 +281,80 @@ RunService.RenderStepped:Connect(function(dt)
     local mobTimeout = tonumber(timeoutBox.Text) or 1.0
     local heightOffset = tonumber(heightBox.Text) or 4
     local targetPrefix = monsterBox.Text:lower()
+    local itemPrefix = itemBox.Text:lower()
     
-    local closestPart = nil
-    local shortestDistance = math.huge
+    local closestMonster = nil
+    local shortestMonsterDist = math.huge
+    
+    local closestItem = nil
+    local shortestItemDist = math.huge
     
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
             local objName = obj.Name:lower()
+            local distance = (obj.Position - myPos).Magnitude
             
-            if targetPrefix == "" or string.find(objName, targetPrefix, 1, true) then
-                local distance = (obj.Position - myPos).Magnitude
-                if distance <= maxRadius and distance < shortestDistance then
-                    shortestDistance = distance
-                    closestPart = obj
+            if distance <= maxRadius then
+                -- Check Monster Match
+                if targetPrefix ~= "" and string.find(objName, targetPrefix, 1, true) then
+                    if distance < shortestMonsterDist then
+                        shortestMonsterDist = distance
+                        closestMonster = obj
+                    end
+                end
+                
+                -- Check Item Drop Match & Print to Console
+                if itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
+                    if obj ~= lastLoggedItem then
+                        print(string.format("[ITEM RADAR DETECTED] Name: %s | Parent: %s | Distance: %.1f", obj.Name, obj.Parent.Name, distance))
+                        lastLoggedItem = obj
+                    end
+                    
+                    if distance < shortestItemDist then
+                        shortestItemDist = distance
+                        closestItem = obj
+                    end
                 end
             end
         end
     end
     
-    if closestPart then
-        if closestPart ~= lastMobTarget then
-            lastMobTarget = closestPart
+    local targetPart = nil
+    local isLooting = false
+    
+    if closestMonster then
+        if closestMonster ~= lastMobTarget then
+            lastMobTarget = closestMonster
             mobApproachStartTime = os.clock()
         end
         
         local timeElapsed = os.clock() - mobApproachStartTime
         
-        if autoApproach and timeElapsed < mobTimeout then
-            statusLabel.Text = string.format("Status: Waiting Timeout (%.1fs)\nDetected: [%s]", mobTimeout - timeElapsed, closestPart.Name)
-            return
+        if autoApproach and timeElapsed < mobTimeout and closestItem then
+            targetPart = closestItem
+            isLooting = true
+        else
+            targetPart = closestMonster
         end
-        
-        statusLabel.Text = string.format("Status: %s\nDetected: [%s] (Dist: %.1f)", autoApproach and "Approaching" or "Locked", closestPart.Name, shortestDistance)
+    elseif closestItem then
+        targetPart = closestItem
+        isLooting = true
+    else
+        lastMobTarget = nil
+        lastLoggedItem = nil
+    end
+    
+    if targetPart then
+        statusLabel.Text = string.format("Status: %s [%s]\nDetected: [%s] (Dist: %.1f)", 
+            autoApproach and (isLooting and "Looting Drop" or "Approaching Mob") else "Locked", 
+            isLooting and "Item" or "Mob", 
+            targetPart.Name, 
+            (targetPart.Position - myPos).Magnitude
+        )
         
         if autoApproach then
-            -- Apply height offset to target position so we hover above uphill/sloped mobs
-            local targetPos = closestPart.Position + Vector3.new(0, heightOffset, 0)
+            local currentOffset = isLooting and 0 or heightOffset
+            local targetPos = targetPart.Position + Vector3.new(0, currentOffset, 0)
             local distance = (targetPos - myRoot.Position).Magnitude
             local direction = (targetPos - myRoot.Position).Unit
             
@@ -326,6 +370,7 @@ RunService.RenderStepped:Connect(function(dt)
         end
     else
         lastMobTarget = nil
+        lastLoggedItem = nil
         statusLabel.Text = "Status: Searching...\nDetected: None"
     end
 end)
