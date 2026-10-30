@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonWaypointConfigV33.json"
+local configFileName = "DungeonWaypointConfigV34.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE WAYPOINT ROUTER UI (V3.3 - Fix Reset)
+-- CREATE WAYPOINT ROUTER UI (V3.4 - Log Import & Fix)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonWaypointGui_V33"
+screenGui.Name = "DungeonWaypointGui_V34"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 310, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Waypoint Router [V3.3 - Fixed Reset]"
+titleLabel.Text = "Waypoint Router [V3.4 - Log Import]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -206,7 +206,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Waypoint Router V3.3 Ready...\nFixed boss lock reset on loop restart."
+logLabel.Text = "Waypoint Router V3.4 Ready...\nImport logs waypoints instantly."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -217,7 +217,7 @@ logLabel.Parent = logScrollingFrame
 local logLines = {}
 local function logMessage(msg)
     table.insert(logLines, msg)
-    if #logLines > 300 then table.remove(logLines, 1) end
+    if #logLines > 400 then table.remove(logLines, 1) end
     logLabel.Text = table.concat(logLines, "\n")
     print(msg)
     logScrollingFrame.CanvasPosition = Vector2.new(0, logLabel.AbsoluteSize.Y)
@@ -264,6 +264,12 @@ importButton.MouseButton1Click:Connect(function()
     if success and type(result) == "table" and #result > 0 then
         waypoints = result
         logMessage(string.format("Successfully imported %d waypoints!", #waypoints))
+        
+        -- Log out each imported waypoint into the UI window
+        for i, wp in ipairs(waypoints) do
+            logMessage(string.format("[Room #%d Imported] X: %.1f, Y: %.1f, Z: %.1f", i, wp.X, wp.Y, wp.Z))
+        end
+        
         statusLabel.Text = string.format("Status: Idle | Waypoints: %d | Target: None", #waypoints)
         pcall(function()
             if writefile then writefile(configFileName, HttpService:JSONEncode(waypoints)) end
@@ -289,6 +295,9 @@ pcall(function()
         if type(data) == "table" then
             waypoints = data
             logMessage(string.format("Loaded %d saved waypoints from file.", #waypoints))
+            for i, wp in ipairs(waypoints) do
+                logMessage(string.format("[Room #%d] X: %.1f, Y: %.1f, Z: %.1f", i, wp.X, wp.Y, wp.Z))
+            end
             statusLabel.Text = string.format("Status: Idle | Waypoints: %d | Target: None", #waypoints)
         end
     end
@@ -442,7 +451,7 @@ RunService.RenderStepped:Connect(function(dt)
         return
     end
     
-    -- Final Boss Waypoint Check (Only triggers if strictly on the final index)
+    -- Final Boss Waypoint Check (Strictly on final index)
     local isFinalBossWaypoint = (#waypoints > 0 and currentWaypointIndex == #waypoints)
     
     if isFinalBossWaypoint then
@@ -460,12 +469,12 @@ RunService.RenderStepped:Connect(function(dt)
             currentWaypointIndex = 1
             waitingInRoom = false
             backwardStepTimer = tick()
-            task.wait(1.0) -- Give the game a second to load the new instance before moving
+            task.wait(1.0)
         end
         return
     end
     
-    if currentWaypointIndex > #waypoints then
+    if currentWaypointIndex > #waypoints or currentWaypointIndex < 1 then
         currentWaypointIndex = 1
     end
     
@@ -484,6 +493,7 @@ RunService.RenderStepped:Connect(function(dt)
         return
     end
     
+    statusLabel.Text = string.format("Status: Moving | Target: Waypoint #%d", currentWaypointIndex)
     local distance = (targetPos - myPos).Magnitude
     
     if distance > stopDistance then
@@ -506,7 +516,6 @@ RunService.RenderStepped:Connect(function(dt)
                 backwardStepTimer = tick()
             end
         else
-            statusLabel.Text = string.format("Status: Moving Forward | Target: Waypoint #%d", currentWaypointIndex)
             rootPart.CFrame = CFrame.new(myPos + (direction * step))
         end
         
