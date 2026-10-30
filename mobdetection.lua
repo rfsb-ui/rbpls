@@ -10,7 +10,7 @@ local mobApproachStartTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
 -- ==========================================
--- CREATE TEST UI (V5.26 - DropAura Update)
+-- CREATE TEST UI (V5.27 - Two-Section Layout)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -24,8 +24,8 @@ if not success then
 end
 
 local topBar = Instance.new("Frame")
-topBar.Size = UDim2.new(0, 300, 0, 35)
-topBar.Position = UDim2.new(0.5, -150, 0.3, 0)
+topBar.Size = UDim2.new(0, 520, 0, 35)
+topBar.Position = UDim2.new(0.5, -260, 0.3, 0)
 topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
 topBar.Active = true
@@ -37,7 +37,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.26]"
+titleLabel.Text = "Radar & Approach [V5.27]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -68,170 +68,55 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 510)
+mainFrame.Size = UDim2.new(1, 0, 0, 320)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = topBar
 
--- 1. Target Prefix Row
-local label1 = Instance.new("TextLabel")
-label1.Size = UDim2.new(0, 140, 0, 30)
-label1.Position = UDim2.new(0, 15, 0, 15)
-label1.BackgroundTransparency = 1
-label1.TextColor3 = Color3.fromRGB(255, 255, 255)
-label1.Text = "Target Prefix:"
-label1.Font = Enum.Font.SourceSansBold
-label1.TextSize = 15
-label1.TextXAlignment = Enum.TextXAlignment.Left
-label1.Parent = mainFrame
+-- Helper function to create clean configuration rows on the Left Section
+local function createConfigRow(name, posY, defaultValue)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, 120, 0, 25)
+    label.Position = UDim2.new(0, 15, 0, posY)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Text = name
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = mainFrame
 
-local monsterBox = Instance.new("TextBox")
-monsterBox.Size = UDim2.new(0, 110, 0, 30)
-monsterBox.Position = UDim2.new(0, 165, 0, 15)
-monsterBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-monsterBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-monsterBox.Text = "A_"
-monsterBox.Font = Enum.Font.SourceSans
-monsterBox.TextSize = 14
-monsterBox.Parent = mainFrame
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0, 90, 0, 25)
+    box.Position = UDim2.new(0, 135, 0, posY)
+    box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    box.Text = tostring(defaultValue)
+    box.Font = Enum.Font.SourceSans
+    box.TextSize = 14
+    box.Parent = mainFrame
+    
+    return box
+end
 
--- 2. Stud Radius Row
-local label2 = Instance.new("TextLabel")
-label2.Size = UDim2.new(0, 140, 0, 30)
-label2.Position = UDim2.new(0, 15, 0, 55)
-label2.BackgroundTransparency = 1
-label2.TextColor3 = Color3.fromRGB(255, 255, 255)
-label2.Text = "Stud Radius:"
-label2.Font = Enum.Font.SourceSansBold
-label2.TextSize = 15
-label2.TextXAlignment = Enum.TextXAlignment.Left
-label2.Parent = mainFrame
+-- Left Column Inputs
+local monsterBox = createConfigRow("Target Prefix:", 15, "A_")
+local radiusBox = createConfigRow("Stud Radius:", 45, "500")
+local stopBox = createConfigRow("Stop Distance:", 75, "5")
+local speedBox = createConfigRow("Fly Speed:", 105, "44")
+local timeoutBox = createConfigRow("Mob Timeout (s):", 135, "1.0")
+local heightBox = createConfigRow("Height Offset:", 165, "4")
+local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
 
-local radiusBox = Instance.new("TextBox")
-radiusBox.Size = UDim2.new(0, 110, 0, 30)
-radiusBox.Position = UDim2.new(0, 165, 0, 55)
-radiusBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-radiusBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-radiusBox.Text = "500"
-radiusBox.Font = Enum.Font.SourceSans
-radiusBox.TextSize = 14
-radiusBox.Parent = mainFrame
-
--- 3. Stop Distance Row
-local label3 = Instance.new("TextLabel")
-label3.Size = UDim2.new(0, 140, 0, 30)
-label3.Position = UDim2.new(0, 15, 0, 95)
-label3.BackgroundTransparency = 1
-label3.TextColor3 = Color3.fromRGB(255, 255, 255)
-label3.Text = "Stop Distance:"
-label3.Font = Enum.Font.SourceSansBold
-label3.TextSize = 15
-label3.TextXAlignment = Enum.TextXAlignment.Left
-label3.Parent = mainFrame
-
-local stopBox = Instance.new("TextBox")
-stopBox.Size = UDim2.new(0, 110, 0, 30)
-stopBox.Position = UDim2.new(0, 165, 0, 95)
-stopBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-stopBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-stopBox.Text = "5"
-stopBox.Font = Enum.Font.SourceSans
-stopBox.TextSize = 14
-stopBox.Parent = mainFrame
-
--- 4. Fly Speed Row
-local label4 = Instance.new("TextLabel")
-label4.Size = UDim2.new(0, 140, 0, 30)
-label4.Position = UDim2.new(0, 15, 0, 135)
-label4.BackgroundTransparency = 1
-label4.TextColor3 = Color3.fromRGB(255, 255, 255)
-label4.Text = "Fly Speed:"
-label4.Font = Enum.Font.SourceSansBold
-label4.TextSize = 15
-label4.TextXAlignment = Enum.TextXAlignment.Left
-label4.Parent = mainFrame
-
-local speedBox = Instance.new("TextBox")
-speedBox.Size = UDim2.new(0, 110, 0, 30)
-speedBox.Position = UDim2.new(0, 165, 0, 135)
-speedBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedBox.Text = "44"
-speedBox.Font = Enum.Font.SourceSans
-speedBox.TextSize = 14
-speedBox.Parent = mainFrame
-
--- 5. Mob Timeout Row
-local label5 = Instance.new("TextLabel")
-label5.Size = UDim2.new(0, 140, 0, 30)
-label5.Position = UDim2.new(0, 15, 0, 175)
-label5.BackgroundTransparency = 1
-label5.TextColor3 = Color3.fromRGB(255, 255, 255)
-label5.Text = "Mob Timeout (s):"
-label5.Font = Enum.Font.SourceSansBold
-label5.TextSize = 15
-label5.TextXAlignment = Enum.TextXAlignment.Left
-label5.Parent = mainFrame
-
-local timeoutBox = Instance.new("TextBox")
-timeoutBox.Size = UDim2.new(0, 110, 0, 30)
-timeoutBox.Position = UDim2.new(0, 165, 0, 175)
-timeoutBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-timeoutBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-timeoutBox.Text = "1.0"
-timeoutBox.Font = Enum.Font.SourceSans
-timeoutBox.TextSize = 14
-timeoutBox.Parent = mainFrame
-
--- 6. Height Offset Row
-local label6 = Instance.new("TextLabel")
-label6.Size = UDim2.new(0, 140, 0, 30)
-label6.Position = UDim2.new(0, 15, 0, 215)
-label6.BackgroundTransparency = 1
-label6.TextColor3 = Color3.fromRGB(255, 255, 255)
-label6.Text = "Height Offset:"
-label6.Font = Enum.Font.SourceSansBold
-label6.TextSize = 15
-label6.TextXAlignment = Enum.TextXAlignment.Left
-label6.Parent = mainFrame
-
-local heightBox = Instance.new("TextBox")
-heightBox.Size = UDim2.new(0, 110, 0, 30)
-heightBox.Position = UDim2.new(0, 165, 0, 215)
-heightBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-heightBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-heightBox.Text = "4"
-heightBox.Font = Enum.Font.SourceSans
-heightBox.TextSize = 14
-heightBox.Parent = mainFrame
-
--- 7. Item Prefix Row (Updated default to DropAura)
-local label7 = Instance.new("TextLabel")
-label7.Size = UDim2.new(0, 140, 0, 30)
-label7.Position = UDim2.new(0, 15, 0, 255)
-label7.BackgroundTransparency = 1
-label7.TextColor3 = Color3.fromRGB(255, 255, 255)
-label7.Text = "Item Prefix:"
-label7.Font = Enum.Font.SourceSansBold
-label7.TextSize = 15
-label7.TextXAlignment = Enum.TextXAlignment.Left
-label7.Parent = mainFrame
-
-local itemBox = Instance.new("TextBox")
-itemBox.Size = UDim2.new(0, 110, 0, 30)
-itemBox.Position = UDim2.new(0, 165, 0, 255)
-itemBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-itemBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-itemBox.Text = "DropAura"
-itemBox.Font = Enum.Font.SourceSans
-itemBox.TextSize = 14
-itemBox.Parent = mainFrame
+-- Right Column Buttons & Status Section (Positioned X: 250)
+local rightX = 250
+local rightWidth = 255
 
 -- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(1, -30, 0, 35)
-toggleButton.Position = UDim2.new(0, 15, 0, 300)
+toggleButton.Size = UDim2.new(0, rightWidth, 0, 35)
+toggleButton.Position = UDim2.new(0, rightX, 0, 15)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
@@ -241,8 +126,8 @@ toggleButton.Parent = mainFrame
 
 -- Auto Approach Toggle Button
 local approachButton = Instance.new("TextButton")
-approachButton.Size = UDim2.new(1, -30, 0, 35)
-approachButton.Position = UDim2.new(0, 15, 0, 345)
+approachButton.Size = UDim2.new(0, rightWidth, 0, 35)
+approachButton.Position = UDim2.new(0, rightX, 0, 55)
 approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 approachButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 approachButton.Font = Enum.Font.SourceSansBold
@@ -252,8 +137,8 @@ approachButton.Parent = mainFrame
 
 -- Save Button
 local saveButton = Instance.new("TextButton")
-saveButton.Size = UDim2.new(1, -30, 0, 35)
-saveButton.Position = UDim2.new(0, 15, 0, 390)
+saveButton.Size = UDim2.new(0, rightWidth, 0, 35)
+saveButton.Position = UDim2.new(0, rightX, 0, 95)
 saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveButton.Font = Enum.Font.SourceSansBold
@@ -263,8 +148,8 @@ saveButton.Parent = mainFrame
 
 -- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -30, 0, 65)
-statusLabel.Position = UDim2.new(0, 15, 0, 435)
+statusLabel.Size = UDim2.new(0, rightWidth, 0, 80)
+statusLabel.Position = UDim2.new(0, rightX, 0, 140)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 statusLabel.Text = "Status: Idle\nDetected: None"
@@ -419,9 +304,6 @@ RunService.RenderStepped:Connect(function(dt)
                 end
                 
                 if itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
-                    -- Print to F9 console immediately when DropAura is detected
-                    print(string.format("[ITEM FOUND!] Name: %s | Distance: %.1f", obj.Name, distance))
-                    
                     if distance < shortestItemDist then
                         shortestItemDist = distance
                         closestItem = obj
