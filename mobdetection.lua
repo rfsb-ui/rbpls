@@ -16,7 +16,7 @@ local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.45 - Target Locking)
+-- CREATE TEST UI (V5.46 - Diagnostic Trace)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.45]"
+titleLabel.Text = "Radar & Approach [V5.46]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -392,7 +392,6 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
-    -- Validate current locked target: if it no longer exists, is destroyed, or is out of range, unlock it
     if lockedTarget and (not lockedTarget.Parent or (lockedTarget.Position - myPos).Magnitude > maxRadius) then
         lockedTarget = nil
     end
@@ -400,7 +399,6 @@ RunService.RenderStepped:Connect(function(dt)
     local closestItem = nil
     local shortestItemDist = math.huge
     
-    -- Scan workspace for items and available monsters
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
             local objName = obj.Name:lower()
@@ -410,14 +408,15 @@ RunService.RenderStepped:Connect(function(dt)
                 local model = obj.Parent
                 local modelName = model and model.Name:lower() or ""
                 
-                if mobDebugEnabled and distance <= 150 then
-                    if not loggedPartsCache[obj] then
+                -- DIAGNOSTIC TRACE: Prints every scanned object and whether it matches target name input
+                if mobDebugEnabled and distance <= 100 then
+                    local matchesTarget = (targetNameInput ~= "" and (string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true)))
+                    if matchesTarget and not loggedPartsCache[obj] then
                         loggedPartsCache[obj] = true
-                        print(string.format("[DEBUGGER] Part: %s | Model: %s | Dist: %.1f", obj.Name, model.Name, distance))
+                        print(string.format("[MATCH FOUND] Part: %s | Model: %s | Dist: %.1f", obj.Name, model.Name, distance))
                     end
                 end
                 
-                -- Check Item Drop Match
                 if autoLootEnabled and itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
                     if distance < shortestItemDist then
                         shortestItemDist = distance
@@ -425,7 +424,6 @@ RunService.RenderStepped:Connect(function(dt)
                     end
                 end
                 
-                -- If we do not have a locked monster target, search for the best candidate
                 if not lockedTarget and targetNameInput ~= "" then
                     if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
                         local tooCloseToRecent = false
@@ -437,10 +435,10 @@ RunService.RenderStepped:Connect(function(dt)
                         end
                         
                         if not tooCloseToRecent then
-                            -- Lock onto this target and commit to it
                             lockedTarget = obj
                             mobApproachStartTime = os.clock()
                             table.insert(recentTargetHistory, {pos = obj.Position, time = os.clock()})
+                            print(string.format("[LOCKED TARGET] Successfully locked onto Part: %s (Model: %s) at Dist: %.1f", obj.Name, model.Name, distance))
                             break
                         end
                     end
@@ -452,7 +450,6 @@ RunService.RenderStepped:Connect(function(dt)
     local targetPart = nil
     local isLooting = false
     
-    -- Prioritize nearby item drops if auto loot is active, otherwise stick to our committed target lock
     if autoLootEnabled and closestItem and shortestItemDist <= 35 then
         targetPart = closestItem
         isLooting = true
