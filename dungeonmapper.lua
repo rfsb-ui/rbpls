@@ -8,7 +8,7 @@ local scanInterval = 0
 local configFileName = "DungeonMapperConfig.json"
 
 -- ==========================================
--- CREATE DUNGEON MAPPER UI (V1.0)
+-- CREATE DUNGEON MAPPER UI (V1.1 - With In-UI Console)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DungeonMapperGui"
@@ -35,7 +35,7 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Mapper [V1.0]"
+titleLabel.Text = "Dungeon Mapper [V1.1]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -65,7 +65,7 @@ closeButton.BorderSizePixel = 0
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 120)
+mainFrame.Size = UDim2.new(1, 0, 0, 280)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -100,7 +100,7 @@ local searchBox = createConfigRow("Search Keyword:", 15, "door")
 local radiusBox = createConfigRow("Scan Radius:", 45, "300")
 
 local scanButton = Instance.new("TextButton")
-scanButton.Size = UDim2.new(0, 175, 0, 35)
+scanButton.Size = UDim2.new(0, 175, 0, 30)
 scanButton.Position = UDim2.new(0, 230, 0, 15)
 scanButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 scanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -110,14 +110,47 @@ scanButton.Text = "Scan Surroundings"
 scanButton.Parent = mainFrame
 
 local continuousButton = Instance.new("TextButton")
-continuousButton.Size = UDim2.new(0, 175, 0, 35)
-continuousButton.Position = UDim2.new(0, 230, 0, 60)
+continuousButton.Size = UDim2.new(0, 175, 0, 30)
+continuousButton.Position = UDim2.new(0, 230, 0, 50)
 continuousButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 continuousButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 continuousButton.Font = Enum.Font.SourceSansBold
 continuousButton.TextSize = 15
 continuousButton.Text = "Continuous: OFF"
 continuousButton.Parent = mainFrame
+
+-- In-UI Console Log Window
+local logScrollingFrame = Instance.new("ScrollingFrame")
+logScrollingFrame.Size = UDim2.new(1, -30, 0, 160)
+logScrollingFrame.Position = UDim2.new(0, 15, 0, 95)
+logScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+logScrollingFrame.BorderSizePixel = 0
+logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+logScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+logScrollingFrame.Parent = mainFrame
+
+local logLabel = Instance.new("TextLabel")
+logLabel.Size = UDim2.new(1, -10, 1, 0)
+logLabel.Position = UDim2.new(0, 5, 0, 0)
+logLabel.BackgroundTransparency = 1
+logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+logLabel.Text = "Console Logs will appear here..."
+logLabel.Font = Enum.Font.Code
+logLabel.TextSize = 12
+logLabel.TextXAlignment = Enum.TextXAlignment.Left
+logLabel.TextYAlignment = Enum.TextYAlignment.Top
+logLabel.TextWrapped = true
+logLabel.Parent = logScrollingFrame
+
+local logLines = {}
+local function logMessage(msg)
+    table.insert(logLines, msg)
+    if #logLines > 30 then
+        table.remove(logLines, 1)
+    end
+    logLabel.Text = table.concat(logLines, "\n")
+    print(msg)
+end
 
 closeButton.MouseButton1Click:Connect(function()
     isScanning = false
@@ -137,8 +170,8 @@ local function performScan()
     local maxRadius = tonumber(radiusBox.Text) or 300
     local keyword = searchBox.Text:lower()
     
-    print("--------------------------------------------------")
-    print(string.format("[MAPPER SCAN] Searching for keyword '%s' within %d studs...", keyword, maxRadius))
+    logMessage("------------------------------------------")
+    logMessage(string.format("Scanning for '%s' (Radius: %d)", keyword, maxRadius))
     
     local count = 0
     pcall(function()
@@ -152,7 +185,7 @@ local function performScan()
                     local dist = (obj.Position - myPos).Magnitude
                     if dist <= maxRadius then
                         count = count + 1
-                        print(string.format("  -> Found [%d] Part: %s | Model: %s | Dist: %.1f studs", count, obj.Name, model.Name, dist))
+                        logMessage(string.format("[%d] %s (Model: %s) - %.1fm", count, obj.Name, model.Name, dist))
                     end
                 end
             end
@@ -160,8 +193,7 @@ local function performScan()
     end)
     
     statusLabel.Text = string.format("Status: Found %d matching objects", count)
-    print(string.format("[MAPPER SCAN] Complete. Total matches: %d", count))
-    print("--------------------------------------------------")
+    logMessage(string.format("Scan Complete. Found: %d", count))
 end
 
 scanButton.MouseButton1Click:Connect(performScan)
