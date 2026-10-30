@@ -10,7 +10,7 @@ local mobApproachStartTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
 -- ==========================================
--- CREATE TEST UI (V5.25 - Debug Scanner)
+-- CREATE TEST UI (V5.26 - DropAura Update)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -37,7 +37,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.25]"
+titleLabel.Text = "Radar & Approach [V5.26]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -206,7 +206,7 @@ heightBox.Font = Enum.Font.SourceSans
 heightBox.TextSize = 14
 heightBox.Parent = mainFrame
 
--- 7. Item Prefix Row
+-- 7. Item Prefix Row (Updated default to DropAura)
 local label7 = Instance.new("TextLabel")
 label7.Size = UDim2.new(0, 140, 0, 30)
 label7.Position = UDim2.new(0, 15, 0, 255)
@@ -223,7 +223,7 @@ itemBox.Size = UDim2.new(0, 110, 0, 30)
 itemBox.Position = UDim2.new(0, 165, 0, 255)
 itemBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 itemBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-itemBox.Text = "Drop_"
+itemBox.Text = "DropAura"
 itemBox.Font = Enum.Font.SourceSans
 itemBox.TextSize = 14
 itemBox.Parent = mainFrame
@@ -411,11 +411,6 @@ RunService.RenderStepped:Connect(function(dt)
             local distance = (obj.Position - myPos).Magnitude
             
             if distance <= maxRadius then
-                -- DEBUG: Print every single part name to console once per second so you can see what parts exist
-                if math.random(1, 60) == 1 then
-                    print("[SCANNER DEBUG] Found Part:", obj.Name, "Distance:", math.floor(distance))
-                end
-
                 if targetPrefix ~= "" and string.find(objName, targetPrefix, 1, true) then
                     if distance < shortestMonsterDist then
                         shortestMonsterDist = distance
@@ -424,7 +419,9 @@ RunService.RenderStepped:Connect(function(dt)
                 end
                 
                 if itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
-                    print(string.format("[ITEM FOUND!] Match: %s | Distance: %.1f", obj.Name, distance))
+                    -- Print to F9 console immediately when DropAura is detected
+                    print(string.format("[ITEM FOUND!] Name: %s | Distance: %.1f", obj.Name, distance))
+                    
                     if distance < shortestItemDist then
                         shortestItemDist = distance
                         closestItem = obj
