@@ -16,7 +16,7 @@ local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.54 - Updated FX Filter with Tide)
+-- CREATE TEST UI (V5.56 - Updated FX Filter with Guard & Bloom)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.54]"
+titleLabel.Text = "Radar & Approach [V5.56]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -92,7 +92,6 @@ mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = topBar
 
--- Helper function to create clean configuration rows on the Left Section
 local function createConfigRow(name, posY, defaultValue)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0, 120, 0, 25)
@@ -118,7 +117,6 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
--- Left Column Inputs
 local monsterBox = createConfigRow("Target Name:", 15, "CTurtleFXc")
 local radiusBox = createConfigRow("Stud Radius:", 45, "500")
 local stopBox = createConfigRow("Stop Distance:", 75, "5")
@@ -128,11 +126,9 @@ local heightBox = createConfigRow("Height Offset:", 165, "4")
 local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
 local minBlacklistDistBox = createConfigRow("Min Target Dist:", 225, "30")
 
--- Right Column Buttons Section
 local rightX = 250
 local rightWidth = 255
 
--- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, rightWidth, 0, 30)
 toggleButton.Position = UDim2.new(0, rightX, 0, 15)
@@ -143,7 +139,6 @@ toggleButton.TextSize = 15
 toggleButton.Text = "Start Radar Test"
 toggleButton.Parent = mainFrame
 
--- Auto Approach Toggle Button
 local approachButton = Instance.new("TextButton")
 approachButton.Size = UDim2.new(0, rightWidth, 0, 30)
 approachButton.Position = UDim2.new(0, rightX, 0, 55)
@@ -154,7 +149,6 @@ approachButton.TextSize = 15
 approachButton.Text = "Auto Approach: OFF"
 approachButton.Parent = mainFrame
 
--- Auto Loot Toggle Button
 local lootButton = Instance.new("TextButton")
 lootButton.Size = UDim2.new(0, rightWidth, 0, 30)
 lootButton.Position = UDim2.new(0, rightX, 0, 95)
@@ -165,7 +159,6 @@ lootButton.TextSize = 15
 lootButton.Text = "Auto Loot: ON"
 lootButton.Parent = mainFrame
 
--- Mob Debug Toggle Button
 local mobDebugButton = Instance.new("TextButton")
 mobDebugButton.Size = UDim2.new(0, rightWidth, 0, 30)
 mobDebugButton.Position = UDim2.new(0, rightX, 0, 135)
@@ -176,7 +169,6 @@ mobDebugButton.TextSize = 15
 mobDebugButton.Text = "Mob Debug: OFF"
 mobDebugButton.Parent = mainFrame
 
--- Save Button
 local saveButton = Instance.new("TextButton")
 saveButton.Size = UDim2.new(0, rightWidth, 0, 35)
 saveButton.Position = UDim2.new(0, rightX, 0, 175)
@@ -187,9 +179,6 @@ saveButton.TextSize = 15
 saveButton.Text = "Save Settings"
 saveButton.Parent = mainFrame
 
--- ==========================================
--- FILE SAVING & LOADING LOGIC
--- ==========================================
 local function saveSettings()
     local data = {
         TargetName = monsterBox.Text,
@@ -239,9 +228,6 @@ end
 loadSettings()
 saveButton.MouseButton1Click:Connect(saveSettings)
 
--- ==========================================
--- ESP HIGHLIGHT CLEANUP UTILITY
--- ==========================================
 local function clearHighlights()
     for _, item in pairs(activeHighlights) do
         if item and item.Parent then
@@ -251,27 +237,6 @@ local function clearHighlights()
     activeHighlights = {}
 end
 
-local function setHighlight(targetObj, color)
-    clearHighlights()
-    if targetObj and targetObj.Parent then
-        local model = targetObj.Parent
-        if not model:IsA("Model") then
-            model = targetObj
-        end
-        
-        local highlight = Instance.new("Highlight")
-        highlight.Adornee = model
-        highlight.FillColor = color
-        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-        highlight.FillTransparency = 0.4
-        highlight.Parent = screenGui
-        table.insert(activeHighlights, highlight)
-    end
-end
-
--- ==========================================
--- UI CONTROLS
--- ==========================================
 local minimized = false
 minimizeButton.MouseButton1Click:Connect(function()
     minimized = not minimized
@@ -349,7 +314,6 @@ mobDebugButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Anti-AFK Connection
 localPlayer.Idled:Connect(function()
     if isRunning then
         VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
@@ -360,9 +324,6 @@ end)
 
 local loggedPartsCache = {}
 
--- ==========================================
--- REAL-TIME RADAR & APPROACH LOOP (V5.54)
--- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
     
@@ -440,7 +401,7 @@ RunService.RenderStepped:Connect(function(dt)
                 if not lockedTarget and targetNameInput ~= "" then
                     if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
                         
-                        -- EXCLUSIVE COMBAT FX FILTER: Automatically ignores all combat/animation effect sub-parts including tide
+                        -- EXCLUSIVE COMBAT FX FILTER: Automatically ignores all animation/effect sub-parts including guard & bloom
                         local isCombatFX = string.find(objName, "_ring", 1, true) or
                                          string.find(objName, "_launch", 1, true) or
                                          string.find(objName, "_skid", 1, true) or
@@ -455,7 +416,9 @@ RunService.RenderStepped:Connect(function(dt)
                                          string.find(objName, "_clamp", 1, true) or
                                          string.find(objName, "_stomp", 1, true) or
                                          string.find(objName, "_glance", 1, true) or
-                                         string.find(objName, "_tide", 1, true)
+                                         string.find(objName, "_tide", 1, true) or
+                                         string.find(objName, "_guard", 1, true) or
+                                         string.find(objName, "_bloom", 1, true)
                                          
                         if not isCombatFX then
                             local tooCloseToRecent = false
@@ -504,8 +467,6 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     if targetPart then
-        setHighlight(targetPart, isLooting and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 50, 50))
-        
         local modeText = isLooting and "Item" or "Mob"
         local statusText = autoApproach and (isLooting and "Looting Drop" or "Targeting Mob") or "Locked"
         statusLabel.Text = string.format("Status: %s [%s] | Target: %s (%.0fm)", 
