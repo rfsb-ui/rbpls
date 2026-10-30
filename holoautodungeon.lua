@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonFlowConfigV44.json"
+local configFileName = "DungeonFlowConfigV45.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON BOT UI (V4.4 - Latched Center)
+-- CREATE DUNGEON BOT UI (V4.5 - Lock State)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V44"
+screenGui.Name = "DungeonFlowGui_V45"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 240, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Bot [V4.4 - Latched Center]"
+titleLabel.Text = "Dungeon Bot [V4.5 - One-Shot]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -120,7 +120,7 @@ end
 
 local mobPrefixBox = createConfigRow("Mob Prefix:", 15, "FX_")
 local radiusBox = createConfigRow("Stud Radius:", 45, "50")
-local stopBox = createConfigRow("Stop Distance:", 75, "1")
+local stopBox = createConfigRow("Stop Distance:", 75, "2")
 local speedBox = createConfigRow("Fly Speed:", 105, "12")
 local heightBox = createConfigRow("Height Offset:", 135, "4")
 local itemBox = createConfigRow("Item Prefix:", 165, "DropAura")
@@ -184,7 +184,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Dungeon Bot V4.4 Ready..."
+logLabel.Text = "Dungeon Bot V4.5 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -337,7 +337,7 @@ RunService.RenderStepped:Connect(function(dt)
     
     local myPos = myRoot.Position
     local maxRadius = tonumber(radiusBox.Text) or 50
-    local stopDistance = tonumber(stopBox.Text) or 1
+    local stopDistance = tonumber(stopBox.Text) or 2
     local flySpeed = tonumber(speedBox.Text) or 12
     local heightOffset = tonumber(heightBox.Text) or 4
     local mobPrefix = mobPrefixBox.Text:lower()
@@ -376,14 +376,11 @@ RunService.RenderStepped:Connect(function(dt)
         if #activeMobs > 0 then
             logMessage(string.format("Mobs detected (%d). Clearing room...", #activeMobs))
             currentPhase = "FarmingRoom"
-        else
-            logMessage("No mobs. Returning to saved room center...")
-            currentPhase = "ReturnToCenter"
         end
         return
     end
     
-    -- PHASE 2: Return to Saved Room Center (with strict latching)
+    -- PHASE 2: Return to Saved Room Center (One-Time Execution)
     if currentPhase == "ReturnToCenter" then
         statusLabel.Text = "Status: Returning to Center | Phase: Center | Mobs: 0"
         local targetPos = roomCenterPos + Vector3.new(0, heightOffset, 0)
@@ -395,14 +392,14 @@ RunService.RenderStepped:Connect(function(dt)
             myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
             myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(myRoot.Position.X + myRoot.CFrame.LookVector.X, myRoot.Position.Y, myRoot.Position.Z + myRoot.CFrame.LookVector.Z))
         else
-            logMessage("Reached room center latched. Starting W key walk forward...")
+            logMessage("At room center. Starting W key walk forward...")
             walkTimer = tick()
             currentPhase = "WalkForward"
         end
         return
     end
     
-    -- PHASE 3: Walk Forward via both key simulation and direct position movement
+    -- PHASE 3: Walk Forward via W key simulation and position movement
     if currentPhase == "WalkForward" then
         statusLabel.Text = "Status: Walking Forward... | Phase: Walk | Mobs: 0"
         
@@ -411,8 +408,8 @@ RunService.RenderStepped:Connect(function(dt)
         
         if tick() - walkTimer >= walkDuration then
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
-            logMessage("Walk duration complete. Updating room center and scanning new room...")
-            roomCenterPos = myRoot.Position -- Update center to new room
+            logMessage("Walk duration complete. Setting new room center and switching back to scan mode...")
+            roomCenterPos = myRoot.Position -- Save new room's center coordinate
             currentPhase = "ScanCurrentRoom"
         end
         return
@@ -423,7 +420,7 @@ RunService.RenderStepped:Connect(function(dt)
         statusLabel.Text = string.format("Status: Clearing Room | Phase: Combat | Mobs: %d", #activeMobs)
         
         if #activeMobs == 0 and #activeItems == 0 then
-            logMessage("Room cleared - the gate unseals")
+            logMessage("Room cleared - the gate unseals. Returning to center one time...")
             currentPhase = "ReturnToCenter"
             return
         end
@@ -435,7 +432,7 @@ RunService.RenderStepped:Connect(function(dt)
             local closestMob = activeMobs[1]
             local minD = (closestMob.Position - myPos).Magnitude
             for i = 2, #activeMobs do
-                local d = (closestMob.Position - myPos).Magnitude
+                local d = (activeMobs[i].Position - myPos).Magnitude
                 if d < minD then
                     minD = d
                     closestMob = activeMobs[i]
