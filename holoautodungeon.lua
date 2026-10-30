@@ -7,7 +7,7 @@ local localPlayer = Players.LocalPlayer
 local isRunning = false
 local autoApproach = true
 local autoLootEnabled = true
-local configFileName = "DungeonRadarConfig.json"
+local configFileName = "DungeonRadarConfigV23.json"
 
 local function copyToClipboard(text)
     local success = pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON RADAR & MONSTER FARMER (V2.2)
+-- CREATE DUNGEON RADAR & FARMER (V2.3)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonRadarGui_V22"
+screenGui.Name = "DungeonRadarGui_V23"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 999999
 
@@ -56,11 +56,11 @@ topBar.ZIndex = 10
 topBar.Parent = screenGui
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(0, 200, 0, 20)
+titleLabel.Size = UDim2.new(0, 220, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Monster Radar & Farmer [V2.2]"
+titleLabel.Text = "Radar & Monster Farmer [V2.3]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -73,7 +73,7 @@ statusLabel.Size = UDim2.new(1, -95, 0, 25)
 statusLabel.Position = UDim2.new(0, 10, 0, 25)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-statusLabel.Text = "Status: Idle | Target: None | Monsters: 0"
+statusLabel.Text = "Status: Idle | Target: None | Detected: 0"
 statusLabel.Font = Enum.Font.SourceSansBold
 statusLabel.TextSize = 13
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -139,7 +139,7 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
-local monsterBox = createConfigRow("Monster Name:", 15, "Goblin")
+local monsterBox = createConfigRow("Target Name:", 15, "Goblin")
 local gateBox = createConfigRow("Gate Keyword:", 45, "door")
 local radiusBox = createConfigRow("Stud Radius:", 75, "300")
 local stopBox = createConfigRow("Stop Distance:", 105, "5")
@@ -168,8 +168,8 @@ toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
 toggleButton.TextSize = 15
-toggleButton.Text = "Start Monster Bot"
-toggleButton.ZIndex, toggleButton.ZIndex = 11, 11
+toggleButton.Text = "Start Bot"
+toggleButton.ZIndex = 11
 toggleButton.Parent = mainFrame
 
 local approachButton = Instance.new("TextButton")
@@ -211,7 +211,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Radar Scanner Ready..."
+logLabel.Text = "Radar & Farmer V2.3 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -244,12 +244,12 @@ closeButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Radar Scan Execution
+-- Detailed Radar Scan with Part & Distance
 radarButton.MouseButton1Click:Connect(function()
     local character = localPlayer.Character
     local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
     if not myRoot then
-        logMessage("Error: Character root part not found for radar scan.")
+        logMessage("Error: Character root part not found.")
         return
     end
     
@@ -257,53 +257,58 @@ radarButton.MouseButton1Click:Connect(function()
     local maxRadius = tonumber(radiusBox.Text) or 300
     
     logMessage("------------------------------------------")
-    logMessage(string.format("Running Radar Scan (Radius: %d)...", maxRadius))
+    logMessage(string.format("Scanning Parts & Models (Radius: %d)...", maxRadius))
     
-    local foundModels = {}
+    local scannedResults = {}
     pcall(function()
         for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("Model") and obj ~= character and not obj:IsDescendantOf(character) then
-                local hrp = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-                if hrp then
-                    local dist = (hrp.Position - myPos).Magnitude
-                    if dist <= maxRadius then
-                        local modelName = obj.Name
-                        foundModels[modelName] = (foundModels[modelName] or 0) + 1
-                    end
+            if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
+                local dist = (obj.Position - myPos).Magnitude
+                if dist <= maxRadius then
+                    local parentName = obj.Parent and obj.Parent.Name or "Workspace"
+                    table.insert(scannedResults, {
+                        PartName = obj.Name,
+                        ParentName = parentName,
+                        Distance = dist
+                    })
                 end
             end
         end
     end)
     
-    local count = 0
-    local buffer = {"--- RADAR SCAN RESULTS ---"}
-    for name, cnt in pairs(foundModels) do
-        count = count + 1
-        local msg = string.format("[%d] Model: %s (Count: %d)", count, name, cnt)
+    -- Sort by distance closest first
+    table.sort(scannedResults, function(a, b) return a.Distance < b.Distance end)
+    
+    local buffer = {"--- RADAR PART & DISTANCE SCAN ---"}
+    local limit = math.min(#scannedResults, 60) -- limit output lines to avoid lag
+    for i = 1, limit do
+        local item = scannedResults[i]
+        local msg = string.format("[%d] Part: %s | Model: %s | Dist: %.1fm", i, item.PartName, item.ParentName, item.Distance)
         logMessage(msg)
         table.insert(buffer, msg)
     end
-    logMessage(string.format("Radar Scan Complete. Unique models found: %d", count))
+    
+    logMessage(string.format("Scan Complete. Found %d parts within radius.", #scannedResults))
     logMessage("------------------------------------------")
     
     copyToClipboard(table.concat(buffer, "\n"))
-    statusLabel.Text = string.format("Status: Radar found %d models (Copied)", count)
+    statusLabel.Text = string.format("Status: Radar found %d parts (Copied)", #scannedResults)
 end)
 
 toggleButton.MouseButton1Click:Connect(function()
     isRunning = not isRunning
     if isRunning then
-        toggleButton.Text = "Stop Monster Bot"
+        toggleButton.Text = "Stop Bot"
         toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        logMessage("Monster Bot Started. Navigating gate...")
+        logMessage("Bot Started. Navigating gate...")
     else
-        toggleButton.Text = "Start Monster Bot"
+        toggleButton.Text = "Start Bot"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-        statusLabel.Text = "Status: Idle | Target: None | Monsters: 0"
+        statusLabel.Text = "Status: Idle | Target: None | Detected: 0"
         local character = localPlayer.Character
         local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
         if rootPart then rootPart.Anchored = false end
-        logMessage("Monster Bot Stopped.")
+        logMessage("Bot Stopped.")
     end
 end)
 
@@ -331,7 +336,7 @@ local phase = "NavigatingGate"
 local targetGatePos = nil
 
 -- ==========================================
--- MAIN RUNTIME LOOP (V2.2)
+-- MAIN RUNTIME LOOP (V2.3)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -349,7 +354,7 @@ RunService.RenderStepped:Connect(function(dt)
     local stopDistance = tonumber(stopBox.Text) or 5
     local flySpeed = tonumber(speedBox.Text) or 44
     local heightOffset = tonumber(heightBox.Text) or 4
-    local monsterNameInput = monsterBox.Text:lower()
+    local targetNameInput = monsterBox.Text:lower()
     local gateKeyword = gateBox.Text:lower()
     local itemPrefix = itemBox.Text:lower()
     
@@ -374,7 +379,7 @@ RunService.RenderStepped:Connect(function(dt)
         end
         
         if targetGatePos then
-            statusLabel.Text = string.format("Status: Moving to Gate (+15 studs) | Target: Gate | Monsters: 0")
+            statusLabel.Text = string.format("Status: Moving to Gate (+15 studs) | Target: Gate | Detected: 0")
             local distance = (targetGatePos - myRoot.Position).Magnitude
             if distance > stopDistance then
                 local direction = (targetGatePos - myRoot.Position).Unit
@@ -383,18 +388,18 @@ RunService.RenderStepped:Connect(function(dt)
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetGatePos.X, myRoot.Position.Y, targetGatePos.Z))
             else
                 phase = "FarmingMonsters"
-                logMessage("Gate passed! Starting monster farming phase.")
+                logMessage("Gate passed! Starting target search phase.")
             end
         else
-            statusLabel.Text = string.format("Status: Searching for Gate... | Target: None | Monsters: 0")
+            statusLabel.Text = string.format("Status: Searching for Gate... | Target: None | Detected: 0")
         end
         return
     end
     
-    -- PHASE 2: Live Monster Detection & Targeting
-    local detectedMonsters = {}
-    local closestMonster = nil
-    local shortestMonsterDist = math.huge
+    -- PHASE 2: Target Detection & Approach
+    local detectedTargets = {}
+    local closestTarget = nil
+    local shortestTargetDist = math.huge
     
     local closestItem = nil
     local shortestItemDist = math.huge
@@ -409,20 +414,17 @@ RunService.RenderStepped:Connect(function(dt)
                 end
             end
             
-            if obj:IsA("Model") and obj ~= character and not obj:IsDescendantOf(character) then
-                local modelName = obj.Name:lower()
-                if monsterNameInput ~= "" and string.find(modelName, monsterNameInput, 1, true) then
-                    local hrp = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-                    local humanoid = obj:FindFirstChildOfClass("Humanoid")
-                    
-                    if hrp and (not humanoid or humanoid.Health > 0) then
-                        local dist = (hrp.Position - myPos).Magnitude
-                        if dist <= maxRadius then
-                            table.insert(detectedMonsters, hrp.Position)
-                            if dist < shortestMonsterDist then
-                                shortestMonsterDist = dist
-                                closestMonster = hrp
-                            end
+            if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
+                local partName = obj.Name:lower()
+                local modelName = obj.Parent and obj.Parent.Name:lower() or ""
+                
+                if targetNameInput ~= "" and (string.find(partName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true)) then
+                    local dist = (obj.Position - myPos).Magnitude
+                    if dist <= maxRadius then
+                        table.insert(detectedTargets, obj.Position)
+                        if dist < shortestTargetDist then
+                            shortestTargetDist = dist
+                            closestTarget = obj
                         end
                     end
                 end
@@ -438,17 +440,17 @@ RunService.RenderStepped:Connect(function(dt)
         targetPos = closestItem.Position
         targetNameText = closestItem.Name
         isLooting = true
-    elseif closestMonster then
-        targetPos = closestMonster.Position
-        targetNameText = closestMonster.Parent and closestMonster.Parent.Name or "Monster"
+    elseif closestTarget then
+        targetPos = closestTarget.Position
+        targetNameText = closestTarget.Name
     end
     
     if targetPos then
-        local statusText = autoApproach and (isLooting and "Looting Drop" or "Approaching Mob") or "Locked"
-        statusLabel.Text = string.format("Status: %s | Target: %s | Monsters: %d", 
+        local statusText = autoApproach and (isLooting and "Looting Drop" or "Approaching Target") or "Locked"
+        statusLabel.Text = string.format("Status: %s | Target: %s | Detected: %d", 
             statusText, 
             targetNameText, 
-            #detectedMonsters
+            #detectedTargets
         )
         
         if autoApproach then
@@ -464,6 +466,6 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        statusLabel.Text = string.format("Status: Searching for Monsters... | Target: None | Monsters: 0")
+        statusLabel.Text = string.format("Status: Searching for Target... | Target: None | Detected: 0")
     end
 end)
