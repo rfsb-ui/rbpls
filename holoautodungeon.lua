@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonWaypointConfigV1.json"
+local configFileName = "DungeonWaypointConfigV2.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE WAYPOINT ROUTER UI (V1.0)
+-- CREATE WAYPOINT ROUTER UI (V2.0)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonWaypointGui_V10"
+screenGui.Name = "DungeonWaypointGui_V20"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 260, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Waypoint Router [V1.0]"
+titleLabel.Text = "Waypoint Router [V2.0 - Import & Zigzag]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -87,7 +87,7 @@ closeButton.TextSize = 18
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 380)
+mainFrame.Size = UDim2.new(1, 0, 0, 430)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -165,9 +165,31 @@ copyButton.TextSize = 14
 copyButton.Text = "Copy Log"
 copyButton.Parent = mainFrame
 
+-- Import Waypoints Input Box & Button
+local importBox = Instance.new("TextBox")
+importBox.Size = UDim2.new(0, 175, 0, 30)
+importBox.Position = UDim2.new(0, 15, 0, 110)
+importBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+importBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+importBox.PlaceholderText = "Paste JSON Waypoints..."
+importBox.Text = ""
+importBox.Font = Enum.Font.SourceSans
+importBox.TextSize = 12
+importBox.Parent = mainFrame
+
+local importButton = Instance.new("TextButton")
+importButton.Size = UDim2.new(0, 70, 0, 30)
+importButton.Position = UDim2.new(0, 195, 0, 110)
+importButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200)
+importButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+importButton.Font = Enum.Font.SourceSansBold
+importButton.TextSize = 14
+importButton.Text = "Import"
+importButton.Parent = mainFrame
+
 local logScrollingFrame = Instance.new("ScrollingFrame")
-logScrollingFrame.Size = UDim2.new(1, -30, 0, 200)
-logScrollingFrame.Position = UDim2.new(0, 15, 0, 135)
+logScrollingFrame.Size = UDim2.new(1, -30, 0, 240)
+logScrollingFrame.Position = UDim2.new(0, 15, 0, 150)
 logScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 logScrollingFrame.BorderSizePixel = 0
 logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -180,7 +202,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Waypoint Router V1.0 Ready...\nWalk to each room and click 'Save Waypoint'."
+logLabel.Text = "Waypoint Router V2.0 Ready...\nWalk to each room and click 'Save Waypoint', or paste JSON and click 'Import'."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -209,7 +231,7 @@ end)
 
 local waypoints = {}
 
--- Save Waypoint at current location
+-- Save Waypoint
 saveButton.MouseButton1Click:Connect(function()
     local character = localPlayer.Character
     local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
@@ -220,7 +242,6 @@ saveButton.MouseButton1Click:Connect(function()
         logMessage(string.format("[Room #%d Saved] X: %.1f, Y: %.1f, Z: %.1f", #waypoints, pos.X, pos.Y, pos.Z))
         statusLabel.Text = string.format("Status: Idle | Waypoints: %d | Target: None", #waypoints)
         
-        -- Auto save to file
         pcall(function()
             if writefile then
                 writefile(configFileName, HttpService:JSONEncode(waypoints))
@@ -231,10 +252,30 @@ saveButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Clear all waypoints
+-- Import JSON Waypoints
+importButton.MouseButton1Click:Connect(function()
+    local rawText = importBox.Text
+    local success, result = pcall(function()
+        return HttpService:JSONDecode(rawText)
+    end)
+    
+    if success and type(result) == "table" and #result > 0 then
+        waypoints = result
+        logMessage(string.format("Successfully imported %d waypoints!", #waypoints))
+        statusLabel.Text = string.format("Status: Idle | Waypoints: %d | Target: None", #waypoints)
+        pcall(function()
+            if writefile then writefile(configFileName, HttpService:JSONEncode(waypoints)) end
+        end)
+    else
+        logMessage("Error: Invalid JSON waypoint format. Ensure it's a valid coordinate table.")
+    end
+end)
+
+-- Clear Waypoints & Logs
 clearButton.MouseButton1Click:Connect(function()
     waypoints = {}
-    logMessage("All waypoints cleared.")
+    logLines = {}
+    logLabel.Text = "All waypoints and logs cleared."
     statusLabel.Text = "Status: Idle | Waypoints: 0 | Target: None"
     pcall(function()
         if writefile then writefile(configFileName, "[]") end
@@ -260,7 +301,7 @@ end)
 
 toggleButton.MouseButton1Click:Connect(function()
     if #waypoints == 0 then
-        logMessage("Error: No waypoints recorded! Save at least one room waypoint first.")
+        logMessage("Error: No waypoints recorded or imported!")
         return
     end
     
@@ -285,6 +326,8 @@ end)
 local currentWaypointIndex = 1
 local roomWaitTimer = 0
 local waitingInRoom = false
+local zigzagTimer = tick()
+local zigzagState = 1
 
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -311,7 +354,7 @@ RunService.RenderStepped:Connect(function(dt)
     local targetPos = Vector3.new(targetData.X, targetData.Y, targetData.Z)
     
     if waitingInRoom then
-        statusLabel.Text = string.format("Status: Waiting in Room #%d (%s)", currentWaypointIndex, string.format("%.1fs", roomWaitDuration - (tick() - roomWaitTimer)))
+        statusLabel.Text = string.format("Status: Waiting in Room #%d", currentWaypointIndex)
         if tick() - roomWaitTimer >= roomWaitDuration then
             waitingInRoom = false
             currentWaypointIndex = currentWaypointIndex + 1
@@ -320,16 +363,37 @@ RunService.RenderStepped:Connect(function(dt)
         return
     end
     
-    statusLabel.Text = string.format("Status: Moving | Target: Waypoint #%d", currentWaypointIndex)
+    statusLabel.Text = string.format("Status: Moving (Zigzag) | Target: Waypoint #%d", currentWaypointIndex)
     local distance = (targetPos - rootPart.Position).Magnitude
     
     if distance > stopDistance then
         local direction = (targetPos - rootPart.Position).Unit
-        local step = math.min(distance - stopDistance, travelSpeed * dt)
-        rootPart.CFrame = CFrame.new(rootPart.Position + (direction * step))
+        
+        -- Zigzag anti-stuck calculation every 0.8 seconds
+        if tick() - zigzagTimer >= 0.8 then
+            zigzagTimer = tick()
+            zigzagState = zigzagState + 1
+        end
+        
+        local sideOffset = Vector3.new(0, 0, 0)
+        local rightVector = rootPart.CFrame.RightVector
+        
+        if zigzagState % 4 == 1 then
+            sideOffset = rightVector * 1.5 -- sidestep right
+        elseif zigzagState % 4 == 2 then
+            sideOffset = -rightVector * 1.5 -- sidestep left
+        elseif zigzagState % 4 == 3 then
+            sideOffset = -direction * 1.0 -- brief step backward to clear corners
+        end
+        
+        local adjustedTarget = targetPos + sideOffset
+        local adjDirection = (adjustedTarget - rootPart.Position).Unit
+        local step = math.min(distance, travelSpeed * dt)
+        
+        rootPart.CFrame = CFrame.new(rootPart.Position + (adjDirection * step))
         rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z))
     else
-        logMessage(string.format("Reached Waypoint #%d! Pausing for room events...", currentWaypointIndex))
+        logMessage(string.format("Reached Waypoint #%d! Pausing...", currentWaypointIndex))
         roomWaitTimer = tick()
         waitingInRoom = isRunning
     end
