@@ -16,7 +16,7 @@ local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.49 - Turtle FX Filter)
+-- CREATE TEST UI (V5.50 - Updated FX Filter with Clamp)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.49]"
+titleLabel.Text = "Radar & Approach [V5.50]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -106,7 +106,7 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
--- Left Column Inputs (Default updated to CTurtleFXc)
+-- Left Column Inputs
 local monsterBox = createConfigRow("Target Name:", 15, "CTurtleFXc")
 local radiusBox = createConfigRow("Stud Radius:", 45, "500")
 local stopBox = createConfigRow("Stop Distance:", 75, "5")
@@ -362,7 +362,7 @@ end)
 local loggedPartsCache = {}
 
 -- ==========================================
--- REAL-TIME RADAR & APPROACH LOOP (V5.49)
+-- REAL-TIME RADAR & APPROACH LOOP (V5.50)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -438,7 +438,7 @@ RunService.RenderStepped:Connect(function(dt)
                         if not lockedTarget and targetNameInput ~= "" then
                             if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
                                 
-                                -- EXCLUSIVE COMBAT FX FILTER: Automatically ignore all 11 combat/animation effect sub-parts
+                                -- EXCLUSIVE COMBAT FX FILTER: Automatically ignores all combat/animation effect sub-parts including clamp
                                 local isCombatFX = string.find(objName, "_ring", 1, true) or
                                                  string.find(objName, "_launch", 1, true) or
                                                  string.find(objName, "_skid", 1, true) or
@@ -449,7 +449,8 @@ RunService.RenderStepped:Connect(function(dt)
                                                  string.find(objName, "_slam", 1, true) or
                                                  string.find(objName, "_erupt", 1, true) or
                                                  string.find(objName, "_crumble", 1, true) or
-                                                 string.find(objName, "_snap", 1, true)
+                                                 string.find(objName, "_snap", 1, true) or
+                                                 string.find(objName, "_clamp", 1, true)
                                                  
                                 if not isCombatFX then
                                     local tooCloseToRecent = false
