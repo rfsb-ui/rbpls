@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonFlowConfigV42.json"
+local configFileName = "DungeonFlowConfigV43.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON BOT UI (V4.2 - Continuous W-Hold)
+-- CREATE DUNGEON BOT UI (V4.3 - Fixed Walk)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V42"
+screenGui.Name = "DungeonFlowGui_V43"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 240, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Bot [V4.2 - Continuous W]"
+titleLabel.Text = "Dungeon Bot [V4.3 - Fixed Walk]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -119,12 +119,12 @@ local function createConfigRow(name, posY, defaultValue)
 end
 
 local mobPrefixBox = createConfigRow("Mob Prefix:", 15, "FX_")
-local radiusBox = createConfigRow("Stud Radius:", 45, "400")
-local stopBox = createConfigRow("Stop Distance:", 75, "5")
-local speedBox = createConfigRow("Fly Speed:", 105, "44")
+local radiusBox = createConfigRow("Stud Radius:", 45, "50")
+local stopBox = createConfigRow("Stop Distance:", 75, "1")
+local speedBox = createConfigRow("Fly Speed:", 105, "12")
 local heightBox = createConfigRow("Height Offset:", 135, "4")
 local itemBox = createConfigRow("Item Prefix:", 165, "DropAura")
-local walkTimeBox = createConfigRow("W Walk Time (s):", 195, "3.5")
+local walkTimeBox = createConfigRow("W Walk Time (s):", 195, "25")
 
 local rightX = 250
 local rightWidth = 255
@@ -184,7 +184,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Dungeon Bot V4.2 Ready..."
+logLabel.Text = "Dungeon Bot V4.3 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -272,7 +272,7 @@ scanButton.MouseButton1Click:Connect(function()
     if not myRoot then return end
     
     local myPos = myRoot.Position
-    local maxRadius = tonumber(radiusBox.Text) or 400
+    local maxRadius = tonumber(radiusBox.Text) or 50
     
     logMessage("------------------------------------------")
     logMessage(string.format("Running Full Scan (Radius: %d)...", maxRadius))
@@ -336,13 +336,13 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     local myPos = myRoot.Position
-    local maxRadius = tonumber(radiusBox.Text) or 400
-    local stopDistance = tonumber(stopBox.Text) or 5
-    local flySpeed = tonumber(speedBox.Text) or 44
+    local maxRadius = tonumber(radiusBox.Text) or 50
+    local stopDistance = tonumber(stopBox.Text) or 1
+    local flySpeed = tonumber(speedBox.Text) or 12
     local heightOffset = tonumber(heightBox.Text) or 4
     local mobPrefix = mobPrefixBox.Text:lower()
     local itemPrefix = itemBox.Text:lower()
-    local walkDuration = tonumber(walkTimeBox.Text) or 3.5
+    local walkDuration = tonumber(walkTimeBox.Text) or 25
     
     local function getActiveMobsAndItems()
         local mobs = {}
@@ -395,17 +395,20 @@ RunService.RenderStepped:Connect(function(dt)
             myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
             myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(myRoot.Position.X + myRoot.CFrame.LookVector.X, myRoot.Position.Y, myRoot.Position.Z + myRoot.CFrame.LookVector.Z))
         else
-            logMessage("At room center. Starting W key walk forward...")
+            logMessage("At room center. Moving forward...")
             walkTimer = tick()
             currentPhase = "WalkForward"
         end
         return
     end
     
-    -- PHASE 3: Continuously hold W key to walk forward through the gateway
+    -- PHASE 3: Walk Forward via both key simulation and direct position movement
     if currentPhase == "WalkForward" then
-        statusLabel.Text = "Status: Walking Forward (W)... | Phase: Walk | Mobs: 0"
+        statusLabel.Text = "Status: Walking Forward... | Phase: Walk | Mobs: 0"
+        
+        -- Simulate key press and move root directly forward along look vector
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+        myRoot.CFrame = myRoot.CFrame + (myRoot.CFrame.LookVector * (flySpeed * dt))
         
         if tick() - walkTimer >= walkDuration then
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
