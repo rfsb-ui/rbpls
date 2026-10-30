@@ -5,12 +5,13 @@ local localPlayer = Players.LocalPlayer
 
 local isRunning = false
 local autoApproach = false
+local mobDebugEnabled = false
 local lastMobTarget = nil
 local mobApproachStartTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
 -- ==========================================
--- CREATE TEST UI (V5.27 - Two-Section Layout)
+-- CREATE TEST UI (V5.28 - Mob Debug Console Toggle)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -37,7 +38,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.27]"
+titleLabel.Text = "Radar & Approach [V5.28]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -68,7 +69,7 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 320)
+mainFrame.Size = UDim2.new(1, 0, 0, 350) -- Slightly expanded height for the new button
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -109,13 +110,13 @@ local timeoutBox = createConfigRow("Mob Timeout (s):", 135, "1.0")
 local heightBox = createConfigRow("Height Offset:", 165, "4")
 local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
 
--- Right Column Buttons & Status Section (Positioned X: 250)
+-- Right Column Buttons & Status Section
 local rightX = 250
 local rightWidth = 255
 
 -- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, rightWidth, 0, 35)
+toggleButton.Size = UDim2.new(0, rightWidth, 0, 30)
 toggleButton.Position = UDim2.new(0, rightX, 0, 15)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -126,7 +127,7 @@ toggleButton.Parent = mainFrame
 
 -- Auto Approach Toggle Button
 local approachButton = Instance.new("TextButton")
-approachButton.Size = UDim2.new(0, rightWidth, 0, 35)
+approachButton.Size = UDim2.new(0, rightWidth, 0, 30)
 approachButton.Position = UDim2.new(0, rightX, 0, 55)
 approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 approachButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -135,10 +136,21 @@ approachButton.TextSize = 15
 approachButton.Text = "Auto Approach: OFF"
 approachButton.Parent = mainFrame
 
+-- Mob Debug Toggle Button (New!)
+local mobDebugButton = Instance.new("TextButton")
+mobDebugButton.Size = UDim2.new(0, rightWidth, 0, 30)
+mobDebugButton.Position = UDim2.new(0, rightX, 0, 95)
+mobDebugButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+mobDebugButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+mobDebugButton.Font = Enum.Font.SourceSansBold
+mobDebugButton.TextSize = 15
+mobDebugButton.Text = "Mob Debug: OFF"
+mobDebugButton.Parent = mainFrame
+
 -- Save Button
 local saveButton = Instance.new("TextButton")
-saveButton.Size = UDim2.new(0, rightWidth, 0, 35)
-saveButton.Position = UDim2.new(0, rightX, 0, 95)
+saveButton.Size = UDim2.new(0, rightWidth, 0, 30)
+saveButton.Position = UDim2.new(0, rightX, 0, 135)
 saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveButton.Font = Enum.Font.SourceSansBold
@@ -148,8 +160,8 @@ saveButton.Parent = mainFrame
 
 -- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(0, rightWidth, 0, 80)
-statusLabel.Position = UDim2.new(0, rightX, 0, 140)
+statusLabel.Size = UDim2.new(0, rightWidth, 0, 85)
+statusLabel.Position = UDim2.new(0, rightX, 0, 175)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 statusLabel.Text = "Status: Idle\nDetected: None"
@@ -222,6 +234,7 @@ end)
 closeButton.MouseButton1Click:Connect(function()
     isRunning = false
     autoApproach = false
+    mobDebugEnabled = false
     lastMobTarget = nil
     local character = localPlayer.Character
     local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
@@ -261,6 +274,20 @@ approachButton.MouseButton1Click:Connect(function()
     end
 end)
 
+mobDebugButton.MouseButton1Click:Connect(function()
+    mobDebugEnabled = not mobDebugEnabled
+    if mobDebugEnabled then
+        mobDebugButton.Text = "Mob Debug: ON"
+        mobDebugButton.BackgroundColor3 = Color3.fromRGB(200, 140, 0)
+    else
+        mobDebugButton.Text = "Mob Debug: OFF"
+        mobDebugButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    end
+end)
+
+-- Track logged parts to avoid console spamming every frame
+local loggedPartsCache = {}
+
 -- ==========================================
 -- REAL-TIME RADAR & APPROACH LOOP
 -- ==========================================
@@ -296,6 +323,14 @@ RunService.RenderStepped:Connect(function(dt)
             local distance = (obj.Position - myPos).Magnitude
             
             if distance <= maxRadius then
+                -- Mob Debug Logger: Print unique scanned parts when enabled
+                if mobDebugEnabled and distance <= 100 then
+                    if not loggedPartsCache[obj] then
+                        loggedPartsCache[obj] = true
+                        print(string.format("[MOB DEBUG SCAN] Name: %s | Parent: %s | Dist: %.1f", obj.Name, tostring(obj.Parent), distance))
+                    end
+                end
+                
                 if targetPrefix ~= "" and string.find(objName, targetPrefix, 1, true) then
                     if distance < shortestMonsterDist then
                         shortestMonsterDist = distance
@@ -335,6 +370,7 @@ RunService.RenderStepped:Connect(function(dt)
         isLooting = true
     else
         lastMobTarget = nil
+        loggedPartsCache = {} -- Reset cache when idle
     end
     
     if targetPart then
