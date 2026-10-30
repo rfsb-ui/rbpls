@@ -16,7 +16,7 @@ local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.50 - Updated FX Filter with Clamp)
+-- CREATE TEST UI (V5.52 - Updated FX Filter with Glance)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -30,7 +30,7 @@ if not success then
 end
 
 local topBar = Instance.new("Frame")
-topBar.Size = UDim2.new(0, 520, 0, 35)
+topBar.Size = UDim2.new(0, 520, 0, 55)
 topBar.Position = UDim2.new(0.5, -260, 0.3, 0)
 topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
@@ -39,19 +39,31 @@ topBar.Draggable = true
 topBar.Parent = screenGui
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -75, 1, 0)
-titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.Size = UDim2.new(0, 180, 0, 20)
+titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.50]"
+titleLabel.Text = "Radar & Approach [V5.52]"
 titleLabel.Font = Enum.Font.SourceSansBold
-titleLabel.TextSize = 16
+titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = topBar
 
+-- Persistent Status Display in Top Bar (Visible when Minimized!)
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -75, 0, 25)
+statusLabel.Position = UDim2.new(0, 10, 0, 25)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+statusLabel.Text = "Status: Idle | Target: None"
+statusLabel.Font = Enum.Font.SourceSansBold
+statusLabel.TextSize = 13
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = topBar
+
 -- Close Button (X)
 local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 30, 0, 35)
+closeButton.Size = UDim2.new(0, 30, 0, 55)
 closeButton.Position = UDim2.new(1, -30, 0, 0)
 closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -63,7 +75,7 @@ closeButton.Parent = topBar
 
 -- Minimize Button (-)
 local minimizeButton = Instance.new("TextButton")
-minimizeButton.Size = UDim2.new(0, 30, 0, 35)
+minimizeButton.Size = UDim2.new(0, 30, 0, 55)
 minimizeButton.Position = UDim2.new(1, -65, 0, 0)
 minimizeButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -74,7 +86,7 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 380)
+mainFrame.Size = UDim2.new(1, 0, 0, 310)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -116,7 +128,7 @@ local heightBox = createConfigRow("Height Offset:", 165, "4")
 local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
 local minBlacklistDistBox = createConfigRow("Min Target Dist:", 225, "30")
 
--- Right Column Buttons & Status Section
+-- Right Column Buttons Section
 local rightX = 250
 local rightWidth = 255
 
@@ -166,7 +178,7 @@ mobDebugButton.Parent = mainFrame
 
 -- Save Button
 local saveButton = Instance.new("TextButton")
-saveButton.Size = UDim2.new(0, rightWidth, 0, 30)
+saveButton.Size = UDim2.new(0, rightWidth, 0, 35)
 saveButton.Position = UDim2.new(0, rightX, 0, 175)
 saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -174,19 +186,6 @@ saveButton.Font = Enum.Font.SourceSansBold
 saveButton.TextSize = 15
 saveButton.Text = "Save Settings"
 saveButton.Parent = mainFrame
-
--- Live Status Readout
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(0, rightWidth, 0, 85)
-statusLabel.Position = UDim2.new(0, rightX, 0, 215)
-statusLabel.BackgroundTransparency = 1
-statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-statusLabel.Text = "Status: Idle\nDetected: None"
-statusLabel.Font = Enum.Font.SourceSansBold
-statusLabel.TextSize = 14
-statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.TextYAlignment = Enum.TextYAlignment.Top
-statusLabel.Parent = mainFrame
 
 -- ==========================================
 -- FILE SAVING & LOADING LOGIC
@@ -310,7 +309,7 @@ toggleButton.MouseButton1Click:Connect(function()
         clearHighlights()
         approachButton.Text = "Auto Approach: OFF"
         approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        statusLabel.Text = "Status: Idle\nDetected: None"
+        statusLabel.Text = "Status: Idle | Target: None"
     end
 end)
 
@@ -362,7 +361,7 @@ end)
 local loggedPartsCache = {}
 
 -- ==========================================
--- REAL-TIME RADAR & APPROACH LOOP (V5.50)
+-- REAL-TIME RADAR & APPROACH LOOP (V5.52)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -438,7 +437,7 @@ RunService.RenderStepped:Connect(function(dt)
                         if not lockedTarget and targetNameInput ~= "" then
                             if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
                                 
-                                -- EXCLUSIVE COMBAT FX FILTER: Automatically ignores all combat/animation effect sub-parts including clamp
+                                -- EXCLUSIVE COMBAT FX FILTER: Automatically ignores all combat/animation effect sub-parts including glance
                                 local isCombatFX = string.find(objName, "_ring", 1, true) or
                                                  string.find(objName, "_launch", 1, true) or
                                                  string.find(objName, "_skid", 1, true) or
@@ -450,7 +449,9 @@ RunService.RenderStepped:Connect(function(dt)
                                                  string.find(objName, "_erupt", 1, true) or
                                                  string.find(objName, "_crumble", 1, true) or
                                                  string.find(objName, "_snap", 1, true) or
-                                                 string.find(objName, "_clamp", 1, true)
+                                                 string.find(objName, "_clamp", 1, true) or
+                                                 string.find(objName, "_stomp", 1, true) or
+                                                 string.find(objName, "_glance", 1, true)
                                                  
                                 if not isCombatFX then
                                     local tooCloseToRecent = false
@@ -505,7 +506,7 @@ RunService.RenderStepped:Connect(function(dt)
         
         local modeText = isLooting and "Item" or "Mob"
         local statusText = autoApproach and (isLooting and "Looting Drop" or "Targeting Mob") or "Locked"
-        statusLabel.Text = string.format("Status: %s [%s]\nTarget: [%s] (Dist: %.1f)", 
+        statusLabel.Text = string.format("Status: %s [%s] | Target: %s (%.0fm)", 
             statusText, 
             modeText, 
             targetPart.Name, 
@@ -534,6 +535,6 @@ RunService.RenderStepped:Connect(function(dt)
         end
     else
         lockedTarget = nil
-        statusLabel.Text = "Status: Searching...\nDetected: None"
+        statusLabel.Text = "Status: Searching... | Target: None"
     end
 end)
