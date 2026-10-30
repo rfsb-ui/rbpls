@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonFlowConfigV43.json"
+local configFileName = "DungeonFlowConfigV44.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON BOT UI (V4.3 - Fixed Walk)
+-- CREATE DUNGEON BOT UI (V4.4 - Latched Center)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V43"
+screenGui.Name = "DungeonFlowGui_V44"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 240, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Bot [V4.3 - Fixed Walk]"
+titleLabel.Text = "Dungeon Bot [V4.4 - Latched Center]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -184,7 +184,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Dungeon Bot V4.3 Ready..."
+logLabel.Text = "Dungeon Bot V4.4 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -383,7 +383,7 @@ RunService.RenderStepped:Connect(function(dt)
         return
     end
     
-    -- PHASE 2: Return to Saved Room Center
+    -- PHASE 2: Return to Saved Room Center (with strict latching)
     if currentPhase == "ReturnToCenter" then
         statusLabel.Text = "Status: Returning to Center | Phase: Center | Mobs: 0"
         local targetPos = roomCenterPos + Vector3.new(0, heightOffset, 0)
@@ -395,7 +395,7 @@ RunService.RenderStepped:Connect(function(dt)
             myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
             myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(myRoot.Position.X + myRoot.CFrame.LookVector.X, myRoot.Position.Y, myRoot.Position.Z + myRoot.CFrame.LookVector.Z))
         else
-            logMessage("At room center. Moving forward...")
+            logMessage("Reached room center latched. Starting W key walk forward...")
             walkTimer = tick()
             currentPhase = "WalkForward"
         end
@@ -406,7 +406,6 @@ RunService.RenderStepped:Connect(function(dt)
     if currentPhase == "WalkForward" then
         statusLabel.Text = "Status: Walking Forward... | Phase: Walk | Mobs: 0"
         
-        -- Simulate key press and move root directly forward along look vector
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
         myRoot.CFrame = myRoot.CFrame + (myRoot.CFrame.LookVector * (flySpeed * dt))
         
@@ -436,7 +435,7 @@ RunService.RenderStepped:Connect(function(dt)
             local closestMob = activeMobs[1]
             local minD = (closestMob.Position - myPos).Magnitude
             for i = 2, #activeMobs do
-                local d = (activeMobs[i].Position - myPos).Magnitude
+                local d = (closestMob.Position - myPos).Magnitude
                 if d < minD then
                     minD = d
                     closestMob = activeMobs[i]
