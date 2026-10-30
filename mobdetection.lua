@@ -6,7 +6,7 @@ local isRunning = false
 local autoApproach = false
 
 -- ==========================================
--- CREATE TEST UI (V5.14 - Adjustable Fly Speed)
+-- CREATE TEST UI (V5.15 - Fixed Layout Height)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -33,7 +33,7 @@ titleLabel.Size = UDim2.new(1, -70, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.14]"
+titleLabel.Text = "Radar & Approach [V5.15]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -51,7 +51,7 @@ closeButton.BorderSizePixel = 0
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 315) -- Expanded to fit the new speed box
+mainFrame.Size = UDim2.new(1, 0, 0, 335) -- Expanded frame height to fit all fields comfortably
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -120,7 +120,7 @@ stopBox.Font = Enum.Font.SourceSans
 stopBox.TextSize = 14
 stopBox.Parent = mainFrame
 
--- Fly Speed Input Box (New!)
+-- Fly Speed Input Box
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(0, 130, 0, 30)
 speedLabel.Position = UDim2.new(0, 10, 0, 130)
@@ -136,7 +136,7 @@ speedBox.Size = UDim2.new(0, 100, 0, 30)
 speedBox.Position = UDim2.new(0, 150, 0, 130)
 speedBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedBox.Text = "44" -- Default speed value
+speedBox.Text = "44"
 speedBox.Font = Enum.Font.SourceSans
 speedBox.TextSize = 14
 speedBox.Parent = mainFrame
@@ -144,7 +144,7 @@ speedBox.Parent = mainFrame
 -- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -20, 0, 35)
-toggleButton.Position = UDim2.new(0, 10, 0, 170)
+toggleButton.Position = UDim2.new(0, 10, 0, 175)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
@@ -155,7 +155,7 @@ toggleButton.Parent = mainFrame
 -- Auto Approach Toggle Button
 local approachButton = Instance.new("TextButton")
 approachButton.Size = UDim2.new(1, -20, 0, 35)
-approachButton.Position = UDim2.new(0, 10, 0, 215)
+approachButton.Position = UDim2.new(0, 10, 0, 220)
 approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 approachButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 approachButton.Font = Enum.Font.SourceSansBold
@@ -166,7 +166,7 @@ approachButton.Parent = mainFrame
 -- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 45)
-statusLabel.Position = UDim2.new(0, 10, 0, 260)
+statusLabel.Position = UDim2.new(0, 10, 0, 265)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 statusLabel.Text = "Status: Idle\nDetected: None"
@@ -266,7 +266,6 @@ RunService.RenderStepped:Connect(function(dt)
             end
             
             if distance > stopDistance then
-                -- Speed-based delta step calculation
                 local step = math.min(distance - stopDistance, flySpeed * dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(closestPart.Position.X, myRoot.Position.Y, closestPart.Position.Z))
