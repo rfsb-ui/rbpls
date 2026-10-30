@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonWaypointConfigV36.json"
+local configFileName = "DungeonWaypointConfigV37.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE WAYPOINT ROUTER UI (V3.6 - Safe Snap)
+-- CREATE WAYPOINT ROUTER UI (V3.7 - Direct Fix)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonWaypointGui_V36"
+screenGui.Name = "DungeonWaypointGui_V37"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 310, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Waypoint Router [V3.6 - Safe Snap]"
+titleLabel.Text = "Waypoint Router [V3.7 - Direct Glide]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -206,7 +206,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Waypoint Router V3.6 Ready...\nSafe ground snap active."
+logLabel.Text = "Waypoint Router V3.7 Ready...\nDirect horizontal glide active."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -342,25 +342,6 @@ toggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Safer ground snapping that falls back to the exact saved Y coordinate if ray misses
-local function getSnappedPosition(targetPos, heightOffset, character)
-    local rayOrigin = Vector3.new(targetPos.X, targetPos.Y + 15, targetPos.Z)
-    local rayDirection = Vector3.new(0, -60, 0)
-    
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = RaycastFilterType.Exclude
-    raycastParams.FilterDescendantsInstances = {character}
-    raycastParams.IgnoreWater = true
-    
-    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-    if raycastResult then
-        return Vector3.new(targetPos.X, raycastResult.Position.Y + heightOffset, targetPos.Z)
-    else
-        -- Fallback: use the original saved Y coordinate safely
-        return Vector3.new(targetPos.X, targetPos.Y + heightOffset, targetPos.Z)
-    end
-end
-
 local function checkDungeonClearedAndRepeat()
     local success, cleared = pcall(function()
         for _, guiObj in ipairs(playerGui:GetDescendants()) do
@@ -443,8 +424,7 @@ RunService.RenderStepped:Connect(function(dt)
     local nearbyItem = getNearestItem(myPos, itemPrefix, lootRadius, character)
     if nearbyItem then
         statusLabel.Text = "Status: Auto-Looting Item Drop!"
-        local rawTargetPos = nearbyItem.Position
-        local targetPos = getSnappedPosition(rawTargetPos, heightOffset, character)
+        local targetPos = Vector3.new(nearbyItem.Position.X, myPos.Y, nearbyItem.Position.Z)
         local distance = (targetPos - myPos).Magnitude
         
         if distance > 2 then
@@ -462,8 +442,7 @@ RunService.RenderStepped:Connect(function(dt)
     if isFinalBossWaypoint then
         statusLabel.Text = "Status: Final Boss Room (Anchor Locked)"
         local targetData = waypoints[#waypoints]
-        local rawTargetPos = Vector3.new(targetData.X, targetData.Y, targetData.Z)
-        local targetPos = getSnappedPosition(rawTargetPos, heightOffset, character)
+        local targetPos = Vector3.new(targetData.X, targetData.Y + heightOffset, targetData.Z)
         
         if (targetPos - rootPart.Position).Magnitude > 5 then
             rootPart.CFrame = CFrame.new(targetPos)
@@ -484,8 +463,8 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     local targetData = waypoints[currentWaypointIndex]
-    local rawTargetPos = Vector3.new(targetData.X, targetData.Y, targetData.Z)
-    local targetPos = getSnappedPosition(rawTargetPos, heightOffset, character)
+    -- Use waypoint's exact X and Z, with character's current Y plus height offset to prevent locking
+    local targetPos = Vector3.new(targetData.X, targetData.Y + heightOffset, targetData.Z)
     
     if waitingInRoom then
         statusLabel.Text = string.format("Status: Waiting in Room #%d", currentWaypointIndex)
