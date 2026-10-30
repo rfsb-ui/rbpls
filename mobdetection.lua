@@ -16,7 +16,7 @@ local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.52 - Updated FX Filter with Glance)
+-- CREATE TEST UI (V5.54 - Updated FX Filter with Tide)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.52]"
+titleLabel.Text = "Radar & Approach [V5.54]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -361,7 +361,7 @@ end)
 local loggedPartsCache = {}
 
 -- ==========================================
--- REAL-TIME RADAR & APPROACH LOOP (V5.52)
+-- REAL-TIME RADAR & APPROACH LOOP (V5.54)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -398,78 +398,80 @@ RunService.RenderStepped:Connect(function(dt)
     local closestItem = nil
     local shortestItemDist = math.huge
     
-    local scanList = {workspace}
-    for _, child in ipairs(workspace:GetChildren()) do
-        if child:IsA("Folder") or child:IsA("Model") then
-            table.insert(scanList, child)
-        end
+    local function getRecursiveDescendants(parentObj)
+        local results = {}
+        pcall(function()
+            for _, child in ipairs(parentObj:GetChildren()) do
+                table.insert(results, child)
+                for _, subChild in ipairs(getRecursiveDescendants(child)) do
+                    table.insert(results, subChild)
+                end
+            end
+        end)
+        return results
     end
     
-    for _, container in ipairs(scanList) do
-        local success, descendants = pcall(function()
-            return container:GetDescendants()
-        end)
-        
-        if success and descendants then
-            for _, obj in ipairs(descendants) do
-                if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
-                    local objName = obj.Name:lower()
-                    local distance = (obj.Position - myPos).Magnitude
-                    
-                    if distance <= maxRadius then
-                        local model = obj.Parent
-                        local modelName = model and model.Name:lower() or ""
+    local allObjects = getRecursiveDescendants(workspace)
+    table.insert(allObjects, workspace)
+    
+    for _, obj in ipairs(allObjects) do
+        if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
+            local objName = obj.Name:lower()
+            local distance = (obj.Position - myPos).Magnitude
+            
+            if distance <= maxRadius then
+                local model = obj.Parent
+                local modelName = model and model.Name:lower() or ""
+                
+                if mobDebugEnabled and distance <= 120 then
+                    if not loggedPartsCache[obj] then
+                        loggedPartsCache[obj] = true
+                        print(string.format("[RECURSIVE SCAN] Part: %s | Model: %s | Dist: %.1f", obj.Name, model.Name, distance))
+                    end
+                end
+                
+                if autoLootEnabled and itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
+                    if distance < shortestItemDist then
+                        shortestItemDist = distance
+                        closestItem = obj
+                    end
+                end
+                
+                if not lockedTarget and targetNameInput ~= "" then
+                    if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
                         
-                        if mobDebugEnabled and distance <= 120 then
-                            if not loggedPartsCache[obj] then
-                                loggedPartsCache[obj] = true
-                                print(string.format("[SCAN TRACE] Part: %s | Model: %s | Dist: %.1f", obj.Name, model.Name, distance))
-                            end
-                        end
-                        
-                        if autoLootEnabled and itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
-                            if distance < shortestItemDist then
-                                shortestItemDist = distance
-                                closestItem = obj
-                            end
-                        end
-                        
-                        if not lockedTarget and targetNameInput ~= "" then
-                            if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
-                                
-                                -- EXCLUSIVE COMBAT FX FILTER: Automatically ignores all combat/animation effect sub-parts including glance
-                                local isCombatFX = string.find(objName, "_ring", 1, true) or
-                                                 string.find(objName, "_launch", 1, true) or
-                                                 string.find(objName, "_skid", 1, true) or
-                                                 string.find(objName, "_death", 1, true) or
-                                                 string.find(objName, "_splash", 1, true) or
-                                                 string.find(objName, "_hit", 1, true) or
-                                                 string.find(objName, "_puff", 1, true) or
-                                                 string.find(objName, "_slam", 1, true) or
-                                                 string.find(objName, "_erupt", 1, true) or
-                                                 string.find(objName, "_crumble", 1, true) or
-                                                 string.find(objName, "_snap", 1, true) or
-                                                 string.find(objName, "_clamp", 1, true) or
-                                                 string.find(objName, "_stomp", 1, true) or
-                                                 string.find(objName, "_glance", 1, true)
-                                                 
-                                if not isCombatFX then
-                                    local tooCloseToRecent = false
-                                    for _, recent in ipairs(recentTargetHistory) do
-                                        if (obj.Position - recent.pos).Magnitude < minBlacklistDist then
-                                            tooCloseToRecent = true
-                                            break
-                                        end
-                                    end
-                                    
-                                    if not tooCloseToRecent then
-                                        lockedTarget = obj
-                                        mobApproachStartTime = os.clock()
-                                        table.insert(recentTargetHistory, {pos = obj.Position, time = os.clock()})
-                                        print(string.format("[LOCKED] Clean Core Part Acquired -> Part: %s (Model: %s) at Dist: %.1f", obj.Name, model.Name, distance))
-                                        break
-                                    end
+                        -- EXCLUSIVE COMBAT FX FILTER: Automatically ignores all combat/animation effect sub-parts including tide
+                        local isCombatFX = string.find(objName, "_ring", 1, true) or
+                                         string.find(objName, "_launch", 1, true) or
+                                         string.find(objName, "_skid", 1, true) or
+                                         string.find(objName, "_death", 1, true) or
+                                         string.find(objName, "_splash", 1, true) or
+                                         string.find(objName, "_hit", 1, true) or
+                                         string.find(objName, "_puff", 1, true) or
+                                         string.find(objName, "_slam", 1, true) or
+                                         string.find(objName, "_erupt", 1, true) or
+                                         string.find(objName, "_crumble", 1, true) or
+                                         string.find(objName, "_snap", 1, true) or
+                                         string.find(objName, "_clamp", 1, true) or
+                                         string.find(objName, "_stomp", 1, true) or
+                                         string.find(objName, "_glance", 1, true) or
+                                         string.find(objName, "_tide", 1, true)
+                                         
+                        if not isCombatFX then
+                            local tooCloseToRecent = false
+                            for _, recent in ipairs(recentTargetHistory) do
+                                if (obj.Position - recent.pos).Magnitude < minBlacklistDist then
+                                    tooCloseToRecent = true
+                                    break
                                 end
+                            end
+                            
+                            if not tooCloseToRecent then
+                                lockedTarget = obj
+                                mobApproachStartTime = os.clock()
+                                table.insert(recentTargetHistory, {pos = obj.Position, time = os.clock()})
+                                print(string.format("[LOCKED] Clean Core Part Acquired -> Part: %s (Model: %s) at Dist: %.1f", obj.Name, model.Name, distance))
+                                break
                             end
                         end
                     end
