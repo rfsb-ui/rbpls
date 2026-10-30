@@ -12,24 +12,24 @@ local lastMobTarget = nil
 local mobApproachStartTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
--- Spatial Target History (Prevents re-targeting the same mob location)
 local recentTargetHistory = {}
-
--- ESP Visual Tracking Elements
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.40 - Auto Loot Toggle)
+-- CREATE TEST UI (V5.41 - Safe GUI Parent Fallback)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
 screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
 
-local success = pcall(function()
+local parentSuccess = pcall(function()
     screenGui.Parent = game:GetService("CoreGui")
 end)
-if not success then
-    screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+if not parentSuccess then
+    pcall(function()
+        screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+    end)
 end
 
 local topBar = Instance.new("Frame")
@@ -46,7 +46,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.40]"
+titleLabel.Text = "Radar & Approach [V5.41]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -77,7 +77,7 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 380) -- Expanded slightly for the new button
+mainFrame.Size = UDim2.new(1, 0, 0, 380)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -144,7 +144,7 @@ approachButton.TextSize = 15
 approachButton.Text = "Auto Approach: OFF"
 approachButton.Parent = mainFrame
 
--- Auto Loot Toggle Button (New!)
+-- Auto Loot Toggle Button
 local lootButton = Instance.new("TextButton")
 lootButton.Size = UDim2.new(0, rightWidth, 0, 30)
 lootButton.Position = UDim2.new(0, rightX, 0, 95)
@@ -320,4 +320,192 @@ approachButton.MouseButton1Click:Connect(function()
     if autoApproach then
         approachButton.Text = "Auto Approach: ON"
         approachButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-        lastMobTarget
+        lastMobTarget = nil
+    else
+        approachButton.Text = "Auto Approach: OFF"
+        approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        lastMobTarget = nil
+    end
+end)
+
+lootButton.MouseButton1Click:Connect(function()
+    autoLootEnabled = not autoLootEnabled
+    if autoLootEnabled then
+        lootButton.Text = "Auto Loot: ON"
+        lootButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    else
+        lootButton.Text = "Auto Loot: OFF"
+        lootButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    end
+end)
+
+mobDebugButton.MouseButton1Click:Connect(function()
+    mobDebugEnabled = not mobDebugEnabled
+    if mobDebugEnabled then
+        mobDebugButton.Text = "Mob Debug: ON"
+        mobDebugButton.BackgroundColor3 = Color3.fromRGB(200, 140, 0)
+    else
+        mobDebugButton.Text = "Mob Debug: OFF"
+        mobDebugButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    end
+end)
+
+-- Anti-AFK Connection
+localPlayer.Idled:Connect(function()
+    if isRunning then
+        VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end
+end)
+
+local loggedPartsCache = {}
+
+-- ==========================================
+-- REAL-TIME RADAR & APPROACH LOOP
+-- ==========================================
+RunService.RenderStepped:Connect(function(dt)
+    if not isRunning then return end
+    
+    local character = localPlayer.Character
+    local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    
+    if not myRoot then
+        statusLabel.Text = "Status: Character not found"
+        return
+    end
+    
+    local myPos = myRoot.Position
+    local maxRadius = tonumber(radiusBox.Text) or 500
+    local stopDistance = tonumber(stopBox.Text) or 5
+    local flySpeed = tonumber(speedBox.Text) or 44
+    local mobTimeout = tonumber(timeoutBox.Text) or 1.0
+    local heightOffset = tonumber(heightBox.Text) or 4
+    local targetNameInput = monsterBox.Text:lower()
+    local itemPrefix = itemBox.Text:lower()
+    
+    local currentTime = os.clock()
+    for i = #recentTargetHistory, 1, -1 do
+        if currentTime - recentTargetHistory[i].time > 3.5 then
+            table.remove(recentTargetHistory, i)
+        end
+    end
+    
+    local closestMonster = nil
+    local shortestMonsterDist = math.huge
+    
+    local closestItem = nil
+    local shortestItemDist = math.huge
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
+            local objName = obj.Name:lower()
+            local distance = (obj.Position - myPos).Magnitude
+            
+            if distance <= maxRadius then
+                local model = obj.Parent
+                local modelName = model and model.Name:lower() or ""
+                
+                if mobDebugEnabled and distance <= 75 then
+                    if not loggedPartsCache[obj] then
+                        loggedPartsCache[obj] = true
+                        print(string.format("[DEBUGGER] Part: %s | Model: %s | Dist: %.1f", obj.Name, model.Name, distance))
+                    end
+                end
+                
+                if targetNameInput ~= "" then
+                    if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
+                        local tooCloseToRecent = false
+                        for _, recent in ipairs(recentTargetHistory) do
+                            if (obj.Position - recent.pos).Magnitude < 18 then
+                                tooCloseToRecent = true
+                                break
+                            end
+                        end
+                        
+                        if not tooCloseToRecent then
+                            if distance < shortestMonsterDist then
+                                shortestMonsterDist = distance
+                                closestMonster = obj
+                            end
+                        end
+                    end
+                end
+                
+                if autoLootEnabled and itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
+                    if distance < shortestItemDist then
+                        shortestItemDist = distance
+                        closestItem = obj
+                    end
+                end
+            end
+        end
+    end
+    
+    local targetPart = nil
+    local isLooting = false
+    
+    if autoLootEnabled and closestItem and shortestItemDist <= 35 then
+        targetPart = closestItem
+        isLooting = true
+    elseif closestMonster then
+        if closestMonster ~= lastMobTarget then
+            lastMobTarget = closestMonster
+            mobApproachStartTime = os.clock()
+            table.insert(recentTargetHistory, {pos = closestMonster.Position, time = os.clock()})
+        end
+        
+        local timeElapsed = os.clock() - mobApproachStartTime
+        
+        if autoLootEnabled and autoApproach and timeElapsed < mobTimeout and closestItem then
+            targetPart = closestItem
+            isLooting = true
+        else
+            targetPart = closestMonster
+        end
+    elseif autoLootEnabled and closestItem then
+        targetPart = closestItem
+        isLooting = true
+    else
+        lastMobTarget = nil
+        loggedPartsCache = {}
+        clearHighlights()
+    end
+    
+    if targetPart then
+        setHighlight(targetPart, isLooting and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 50, 50))
+        
+        local modeText = isLooting and "Item" or "Mob"
+        local statusText = autoApproach and (isLooting and "Looting Drop" or "Targeting Mob") or "Locked"
+        statusLabel.Text = string.format("Status: %s [%s]\nTarget: [%s] (Dist: %.1f)", 
+            statusText, 
+            modeText, 
+            targetPart.Name, 
+            (targetPart.Position - myPos).Magnitude
+        )
+        
+        if autoApproach then
+            local currentOffset = heightOffset
+            if isLooting then
+                currentOffset = 0
+            end
+            
+            local targetPos = targetPart.Position + Vector3.new(0, currentOffset, 0)
+            local distance = (targetPos - myRoot.Position).Magnitude
+            local direction = (targetPos - myRoot.Position).Unit
+            
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+            
+            if distance > stopDistance then
+                local step = math.min(distance - stopDistance, flySpeed * dt)
+                myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
+                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
+            end
+        end
+    else
+        lastMobTarget = nil
+        statusLabel.Text = "Status: Searching...\nDetected: None"
+    end
+end)
