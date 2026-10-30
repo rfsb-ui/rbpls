@@ -15,7 +15,7 @@ local configFileName = "RadarApproachTestConfig.json"
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.31 - Deadzone Jitter Fix)
+-- CREATE TEST UI (V5.32 - Instant Snap & Follow)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -42,7 +42,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.31]"
+titleLabel.Text = "Radar & Approach [V5.32]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -349,7 +349,7 @@ RunService.RenderStepped:Connect(function(dt)
     local myPos = myRoot.Position
     local maxRadius = tonumber(radiusBox.Text) or 500
     local stopDistance = tonumber(stopBox.Text) or 5
-    local baseFlySpeed = tonumber(speedBox.Text) or 44
+    local flySpeed = tonumber(speedBox.Text) or 44
     local mobTimeout = tonumber(timeoutBox.Text) or 1.0
     local heightOffset = tonumber(heightBox.Text) or 4
     local targetPrefix = monsterBox.Text:lower()
@@ -447,14 +447,11 @@ RunService.RenderStepped:Connect(function(dt)
             end
             
             if distance > stopDistance then
-                local speedMultiplier = math.clamp(distance / 25, 0.25, 1.0)
-                local currentFlySpeed = baseFlySpeed * speedMultiplier
-                
-                local step = math.min(distance - stopDistance, currentFlySpeed * dt)
+                -- Full speed snap and constant follow without deceleration
+                local step = math.min(distance - stopDistance, flySpeed * dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
             else
-                -- Deadzone filter: Freeze physics velocity completely to prevent micro-jumping upon arrival
                 myRoot.AssemblyLinearVelocity = Vector3.zero
                 myRoot.AssemblyAngularVelocity = Vector3.zero
             end
