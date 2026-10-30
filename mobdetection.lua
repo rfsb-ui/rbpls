@@ -16,7 +16,7 @@ local configFileName = "RadarApproachTestConfig.json"
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.59 - Animal SpawnPoints Routing)
+-- CREATE TEST UI (V5.60 - Strict Spawn Timer)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.59]"
+titleLabel.Text = "Radar & Approach [V5.60]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -118,7 +118,7 @@ local monsterBox = createConfigRow("Target Name:", 15, "TurtleSpawn")
 local radiusBox = createConfigRow("Stud Radius:", 45, "500")
 local stopBox = createConfigRow("Stop Distance:", 75, "5")
 local speedBox = createConfigRow("Fly Speed:", 105, "44")
-local timeoutBox = createConfigRow("Spawn Timeout(s):", 135, "2.0")
+local timeoutBox = createConfigRow("Spawn Timeout(s):", 135, "20.0")
 local heightBox = createConfigRow("Height Offset:", 165, "4")
 local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
 local minBlacklistDistBox = createConfigRow("Min Target Dist:", 225, "30")
@@ -321,7 +321,7 @@ local spawnTimer = 0
 local activeTargetSpawn = nil
 
 -- ==========================================
--- REAL-TIME SPAWN POINT ROUTING LOOP (V5.59)
+-- REAL-TIME SPAWN POINT ROUTING LOOP (V5.60)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -338,7 +338,7 @@ RunService.RenderStepped:Connect(function(dt)
     local maxRadius = tonumber(radiusBox.Text) or 500
     local stopDistance = tonumber(stopBox.Text) or 5
     local flySpeed = tonumber(speedBox.Text) or 44
-    local spawnTimeout = tonumber(timeoutBox.Text) or 2.0
+    local spawnTimeout = tonumber(timeoutBox.Text) or 20.0
     local heightOffset = tonumber(heightBox.Text) or 4
     local targetNameInput = monsterBox.Text:lower()
     local itemPrefix = itemBox.Text:lower()
@@ -377,7 +377,6 @@ RunService.RenderStepped:Connect(function(dt)
                     if targetNameInput ~= "" then
                         if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) or string.find(modelName, "animal_spawnpoints", 1, true) then
                             
-                            -- Avoid duplicate spawns within 10 studs of each other
                             local isDuplicate = false
                             for _, existingPos in ipairs(foundSpawns) do
                                 if (obj.Position - existingPos).Magnitude < 15 then
@@ -388,9 +387,6 @@ RunService.RenderStepped:Connect(function(dt)
                             
                             if not isDuplicate then
                                 table.insert(foundSpawns, obj.Position)
-                                if mobDebugEnabled then
-                                    print(string.format("[SPAWN POINT FOUND] Part: %s | Model: %s | Dist: %.1f", obj.Name, model.Name, distance))
-                                end
                             end
                         end
                     end
@@ -406,7 +402,6 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
-    -- Scan for item drops if auto loot is active
     local closestItem = nil
     local shortestItemDist = math.huge
     if autoLootEnabled and itemPrefix ~= "" then
@@ -436,11 +431,9 @@ RunService.RenderStepped:Connect(function(dt)
         targetPos = activeTargetSpawn
         targetNameText = "Spawn #" .. currentSpawnIndex
         
-        -- Cycle to next spawn point when we arrive or timeout
-        local distToSpawn = (targetPos - myPos).Magnitude
+        -- STRICT TIMER: Only advances to the next spawn point when spawnTimeout has elapsed!
         spawnTimer = spawnTimer + dt
-        
-        if distToSpawn <= stopDistance + 5 or spawnTimer >= spawnTimeout then
+        if spawnTimer >= spawnTimeout then
             spawnTimer = 0
             currentSpawnIndex = currentSpawnIndex + 1
             if currentSpawnIndex > #spawnPointsCache then
@@ -450,7 +443,7 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     if targetPos then
-        local statusText = autoApproach and (isLooting and "Looting Drop" or "Cycling Spawns") or "Locked"
+        local statusText = autoApproach and (isLooting and "Looting Drop" or "Waiting at Spawn") or "Locked"
         statusLabel.Text = string.format("Status: %s | Target: %s (%.0fm)", 
             statusText, 
             targetNameText, 
