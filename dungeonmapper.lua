@@ -7,7 +7,6 @@ local isScanning = false
 local scanInterval = 0
 local configFileName = "DungeonMapperConfig.json"
 
--- Helper function to copy text to clipboard across various exploit executors
 local function copyToClipboard(text)
     local success = pcall(function()
         if setclipboard then
@@ -22,7 +21,7 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON MAPPER UI (V1.2 - Auto-Clipboard)
+-- CREATE DUNGEON MAPPER UI (V1.4 - Separated Copy & Scrollable Console)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DungeonMapperGui"
@@ -36,8 +35,8 @@ if not success then
 end
 
 local topBar = Instance.new("Frame")
-topBar.Size = UDim2.new(0, 420, 0, 50)
-topBar.Position = UDim2.new(0.5, -210, 0.3, 0)
+topBar.Size = UDim2.new(0, 440, 0, 50)
+topBar.Position = UDim2.new(0.5, -220, 0.3, 0)
 topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
 topBar.Active = true
@@ -49,7 +48,7 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Mapper [V1.2]"
+titleLabel.Text = "Dungeon Mapper [V1.4]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -60,13 +59,12 @@ statusLabel.Size = UDim2.new(1, -65, 0, 20)
 statusLabel.Position = UDim2.new(0, 10, 0, 25)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-statusLabel.Text = "Status: Ready at Start Point"
+statusLabel.Text = "Status: Ready to Measure"
 statusLabel.Font = Enum.Font.SourceSansBold
 statusLabel.TextSize = 13
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.Parent = topBar
 
--- Close Button (X)
 local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.new(0, 30, 0, 50)
 closeButton.Position = UDim2.new(1, -30, 0, 0)
@@ -79,7 +77,7 @@ closeButton.BorderSizePixel = 0
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 280)
+mainFrame.Size = UDim2.new(1, 0, 0, 310)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -98,7 +96,7 @@ local function createConfigRow(name, posY, defaultValue)
     label.Parent = mainFrame
 
     local box = Instance.new("TextBox")
-    box.Size = UDim2.new(0, 90, 0, 25)
+    box.Size = UDim2.new(0, 85, 0, 25)
     box.Position = UDim2.new(0, 125, 0, posY)
     box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     box.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -110,37 +108,50 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
-local searchBox = createConfigRow("Search Keyword:", 15, "door")
+local searchBox = createConfigRow("Search Keyword:", 15, "room")
 local radiusBox = createConfigRow("Scan Radius:", 45, "300")
 
 local scanButton = Instance.new("TextButton")
-scanButton.Size = UDim2.new(0, 175, 0, 30)
-scanButton.Position = UDim2.new(0, 230, 0, 15)
+scanButton.Size = UDim2.new(0, 200, 0, 25)
+scanButton.Position = UDim2.new(0, 225, 0, 15)
 scanButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 scanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 scanButton.Font = Enum.Font.SourceSansBold
-scanButton.TextSize = 15
-scanButton.Text = "Scan & Copy"
+scanButton.TextSize = 14
+scanButton.Text = "Scan Surroundings"
 scanButton.Parent = mainFrame
 
 local continuousButton = Instance.new("TextButton")
-continuousButton.Size = UDim2.new(0, 175, 0, 30)
-continuousButton.Position = UDim2.new(0, 230, 0, 50)
+continuousButton.Size = UDim2.new(0, 200, 0, 25)
+continuousButton.Position = UDim2.new(0, 225, 0, 45)
 continuousButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 continuousButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 continuousButton.Font = Enum.Font.SourceSansBold
-continuousButton.TextSize = 15
+continuousButton.TextSize = 14
 continuousButton.Text = "Continuous: OFF"
 continuousButton.Parent = mainFrame
 
--- In-UI Console Log Window
+-- Dedicated Copy Button
+local copyButton = Instance.new("TextButton")
+copyButton.Size = UDim2.new(0, 200, 0, 25)
+copyButton.Position = UDim2.new(0, 225, 0, 75)
+copyButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+copyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyButton.Font = Enum.Font.SourceSansBold
+copyButton.TextSize = 14
+copyButton.Text = "Copy Full Log"
+copyButton.Parent = mainFrame
+
+-- Fully Scrollable In-UI Console Log Window
 local logScrollingFrame = Instance.new("ScrollingFrame")
-logScrollingFrame.Size = UDim2.new(1, -30, 0, 160)
-logScrollingFrame.Position = UDim2.new(0, 15, 0, 95)
+logScrollingFrame.Size = UDim2.new(1, -30, 0, 180)
+logScrollingFrame.Position = UDim2.new(0, 15, 0, 110)
 logScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 logScrollingFrame.BorderSizePixel = 0
 logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 logScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+logScrollingFrame.ScrollBarThickness = 8
+logScrollingFrame.ScrollingEnabled = true
 logScrollingFrame.Parent = mainFrame
 
 local logLabel = Instance.new("TextLabel")
@@ -159,11 +170,14 @@ logLabel.Parent = logScrollingFrame
 local logLines = {}
 local function logMessage(msg)
     table.insert(logLines, msg)
-    if #logLines > 30 then
+    if #logLines > 100 then
         table.remove(logLines, 1)
     end
     logLabel.Text = table.concat(logLines, "\n")
     print(msg)
+    
+    -- Auto-scroll down to bottom when new logs arrive
+    logScrollingFrame.CanvasPosition = Vector2.new(0, logLabel.AbsoluteSize.Y)
 end
 
 closeButton.MouseButton1Click:Connect(function()
@@ -184,9 +198,8 @@ local function performScan()
     local maxRadius = tonumber(radiusBox.Text) or 300
     local keyword = searchBox.Text:lower()
     
-    local resultsBuffer = {}
-    table.insert(resultsBuffer, "------------------------------------------")
-    table.insert(resultsBuffer, string.format("Scanning for '%s' (Radius: %d)", keyword, maxRadius))
+    logMessage("------------------------------------------")
+    logMessage(string.format("Measuring for '%s' (Radius: %d)", keyword, maxRadius))
     
     local count = 0
     pcall(function()
@@ -200,32 +213,33 @@ local function performScan()
                     local dist = (obj.Position - myPos).Magnitude
                     if dist <= maxRadius then
                         count = count + 1
-                        table.insert(resultsBuffer, string.format("[%d] %s (Model: %s) - %.1fm", count, obj.Name, model.Name, dist))
+                        local size = obj.Size
+                        logMessage(string.format("[%d] %s (Model: %s) | Size: (%.1f, %.1f, %.1f) | Dist: %.1fm", 
+                            count, obj.Name, model.Name, size.X, size.Y, size.Z, dist))
                     end
                 end
             end
         end
     end)
     
-    table.insert(resultsBuffer, string.format("Scan Complete. Found: %d", count))
-    table.insert(resultsBuffer, "------------------------------------------")
-    
-    local finalOutput = table.concat(resultsBuffer, "\n")
-    
-    -- Output to in-game console UI & log
-    for _, line in ipairs(resultsBuffer) do
-        logMessage(line)
-    end
-    
-    -- Automatically copy to clipboard!
-    if copyToClipboard(finalOutput) then
-        statusLabel.Text = string.format("Status: Copied %d items to clipboard!", count)
-    else
-        statusLabel.Text = string.format("Status: Found %d (Clipboard failed)", count)
-    end
+    statusLabel.Text = string.format("Status: Found %d matching objects", count)
+    logMessage(string.format("Scan Complete. Found: %d", count))
 end
 
 scanButton.MouseButton1Click:Connect(performScan)
+
+-- Copy Button Handler
+copyButton.MouseButton1Click:Connect(function()
+    local fullText = table.concat(logLines, "\n")
+    if copyToClipboard(fullText) then
+        statusLabel.Text = "Status: Log copied to clipboard!"
+        copyButton.Text = "Copied!"
+        task.wait(1)
+        copyButton.Text = "Copy Full Log"
+    else
+        statusLabel.Text = "Status: Clipboard failed"
+    end
+end)
 
 continuousButton.MouseButton1Click:Connect(function()
     isScanning = not isScanning
