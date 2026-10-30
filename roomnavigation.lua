@@ -22,14 +22,13 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE ROOM TARGETER UI (V1.6 - Guaranteed Display)
+-- CREATE ROOM TARGETER UI (V1.7 - Auto-Approach & Minimize)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "RoomTargeterGui_V16"
+screenGui.Name = "RoomTargeterGui_V17"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 999999
 
--- Guaranteed container injection
 local success, err = pcall(function()
     if syn and syn.protect_gui then
         syn.protect_gui(screenGui)
@@ -47,7 +46,7 @@ end
 
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(0, 440, 0, 55)
-topBar.Position = UDim2.new(0.5, -220, 0.2, 0) -- Centered safely near top-middle
+topBar.Position = UDim2.new(0.5, -220, 0.2, 0)
 topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
 topBar.Active = true
@@ -60,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Room Targeter [V1.6]"
+titleLabel.Text = "Room Targeter [V1.7]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -68,7 +67,7 @@ titleLabel.ZIndex = 11
 titleLabel.Parent = topBar
 
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -65, 0, 25)
+statusLabel.Size = UDim2.new(1, -95, 0, 25)
 statusLabel.Position = UDim2.new(0, 10, 0, 25)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
@@ -79,6 +78,7 @@ statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.ZIndex = 11
 statusLabel.Parent = topBar
 
+-- Close Button (X)
 local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.new(0, 30, 0, 55)
 closeButton.Position = UDim2.new(1, -30, 0, 0)
@@ -90,6 +90,19 @@ closeButton.TextSize = 18
 closeButton.BorderSizePixel = 0
 closeButton.ZIndex = 11
 closeButton.Parent = topBar
+
+-- Minimize Button (-)
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Size = UDim2.new(0, 30, 0, 55)
+minimizeButton.Position = UDim2.new(1, -60, 0, 0)
+minimizeButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeButton.Text = "-"
+minimizeButton.Font = Enum.Font.SourceSansBold
+minimizeButton.TextSize = 20
+minimizeButton.BorderSizePixel = 0
+minimizeButton.ZIndex = 11
+minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(1, 0, 0, 310)
@@ -129,9 +142,10 @@ end
 local prefixBox = createConfigRow("Room Prefix:", 15, "01_StartingRoom")
 local radiusBox = createConfigRow("Scan Radius:", 45, "500")
 local heightBox = createConfigRow("Height Offset:", 75, "5")
+local speedBox = createConfigRow("Fly Speed:", 105, "44")
 
 local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 200, 0, 30)
+toggleButton.Size = UDim2.new(0, 200, 0, 25)
 toggleButton.Position = UDim2.new(0, 225, 0, 15)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -142,8 +156,8 @@ toggleButton.ZIndex = 11
 toggleButton.Parent = mainFrame
 
 local nextButton = Instance.new("TextButton")
-nextButton.Size = UDim2.new(0, 200, 0, 30)
-nextButton.Position = UDim2.new(0, 225, 0, 55)
+nextButton.Size = UDim2.new(0, 200, 0, 25)
+nextButton.Position = UDim2.new(0, 225, 0, 45)
 nextButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 nextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 nextButton.Font = Enum.Font.SourceSansBold
@@ -153,8 +167,8 @@ nextButton.ZIndex = 11
 nextButton.Parent = mainFrame
 
 local copyButton = Instance.new("TextButton")
-copyButton.Size = UDim2.new(0, 200, 0, 30)
-copyButton.Position = UDim2.new(0, 225, 0, 95)
+copyButton.Size = UDim2.new(0, 200, 0, 25)
+copyButton.Position = UDim2.new(0, 225, 0, 75)
 copyButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 copyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 copyButton.Font = Enum.Font.SourceSansBold
@@ -164,8 +178,8 @@ copyButton.ZIndex = 11
 copyButton.Parent = mainFrame
 
 local logScrollingFrame = Instance.new("ScrollingFrame")
-logScrollingFrame.Size = UDim2.new(1, -30, 0, 140)
-logScrollingFrame.Position = UDim2.new(0, 15, 0, 145)
+logScrollingFrame.Size = UDim2.new(1, -30, 0, 180)
+logScrollingFrame.Position = UDim2.new(0, 15, 0, 110)
 logScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 logScrollingFrame.BorderSizePixel = 0
 logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -179,7 +193,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Room Scanner ready (V1.6)..."
+logLabel.Text = "Room Scanner ready (V1.7)..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -197,8 +211,21 @@ local function logMessage(msg)
     logScrollingFrame.CanvasPosition = Vector2.new(0, logLabel.AbsoluteSize.Y)
 end
 
+-- Minimize Toggle Logic
+local minimized = false
+minimizeButton.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    mainFrame.Visible = not minimized
+    minimizeButton.Text = minimized and "+" or "-"
+end)
+
 closeButton.MouseButton1Click:Connect(function()
     isRunning = false
+    local character = localPlayer.Character
+    local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    if rootPart then
+        rootPart.Anchored = false
+    end
     screenGui:Destroy()
 end)
 
@@ -274,6 +301,9 @@ toggleButton.MouseButton1Click:Connect(function()
         toggleButton.Text = "Start Room Cycler"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
         statusLabel.Text = "Status: Idle | Target: None | Rooms: 0"
+        local character = localPlayer.Character
+        local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+        if rootPart then rootPart.Anchored = false end
         logMessage("Room cycler stopped.")
     end
 end)
@@ -307,7 +337,7 @@ copyButton.MouseButton1Click:Connect(function()
     end
 end)
 
-logMessage("V1.6 Loaded Successfully. Ready.")
+logMessage("V1.7 Loaded Successfully. Ready.")
 
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -318,10 +348,25 @@ RunService.RenderStepped:Connect(function(dt)
         scanRooms()
     end
     
-    if #roomsCache > 0 then
+    local character = localPlayer.Character
+    local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    
+    if #roomsCache > 0 and rootPart then
         local currentRoom = roomsCache[currentRoomIndex]
         if currentRoom then
-            statusLabel.Text = string.format("Status: Tracking | Target: %s | Rooms: %d", currentRoom.Name, #roomsCache)
+            statusLabel.Text = string.format("Status: Moving | Target: %s | Rooms: %d", currentRoom.Name, #roomsCache)
+            
+            local heightOffset = tonumber(heightBox.Text) or 5
+            local flySpeed = tonumber(speedBox.Text) or 44
+            local targetPos = currentRoom.Position + Vector3.new(0, heightOffset, 0)
+            
+            local distance = (targetPos - rootPart.Position).Magnitude
+            if distance > 5 then
+                local direction = (targetPos - rootPart.Position).Unit
+                local step = math.min(distance, flySpeed * dt)
+                rootPart.CFrame = CFrame.new(rootPart.Position + (direction * step))
+                rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z))
+            end
         end
     else
         statusLabel.Text = "Status: Searching for Rooms... | Rooms: 0"
