@@ -1,14 +1,16 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
 local autoApproach = false
 local lastMobTarget = nil
 local mobApproachStartTime = 0
+local configFileName = "RadarApproachTestConfig.json"
 
 -- ==========================================
--- CREATE TEST UI (V5.17 - Configurable Mob Timeout)
+-- CREATE TEST UI (V5.19 - Minimize Button & Fixed Height)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -22,8 +24,8 @@ if not success then
 end
 
 local topBar = Instance.new("Frame")
-topBar.Size = UDim2.new(0, 280, 0, 35)
-topBar.Position = UDim2.new(0.5, -140, 0.3, 0)
+topBar.Size = UDim2.new(0, 300, 0, 35)
+topBar.Position = UDim2.new(0.5, -150, 0.3, 0)
 topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
 topBar.Active = true
@@ -31,19 +33,20 @@ topBar.Draggable = true
 topBar.Parent = screenGui
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -70, 1, 0)
+titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.17]"
+titleLabel.Text = "Radar & Approach [V5.19]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = topBar
 
+-- Close Button (X)
 local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 35, 0, 35)
-closeButton.Position = UDim2.new(1, -35, 0, 0)
+closeButton.Size = UDim2.new(0, 30, 0, 35)
+closeButton.Position = UDim2.new(1, -30, 0, 0)
 closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.Text = "X"
@@ -52,8 +55,20 @@ closeButton.TextSize = 18
 closeButton.BorderSizePixel = 0
 closeButton.Parent = topBar
 
+-- Minimize Button (-)
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Size = UDim2.new(0, 30, 0, 35)
+minimizeButton.Position = UDim2.new(1, -65, 0, 0)
+minimizeButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeButton.Text = "-"
+minimizeButton.Font = Enum.Font.SourceSansBold
+minimizeButton.TextSize = 20
+minimizeButton.BorderSizePixel = 0
+minimizeButton.Parent = topBar
+
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 400) -- Expanded height to fit the new timeout row
+mainFrame.Size = UDim2.new(1, 0, 0, 430) -- Generous height to fit all rows and the save button
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -62,7 +77,7 @@ mainFrame.Parent = topBar
 -- Helper function to create clean rows
 local function createRow(name, posY, defaultValue)
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 130, 0, 30)
+    label.Size = UDim2.new(0, 140, 0, 30)
     label.Position = UDim2.new(0, 15, 0, posY)
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -73,8 +88,8 @@ local function createRow(name, posY, defaultValue)
     label.Parent = mainFrame
 
     local box = Instance.new("TextBox")
-    box.Size = UDim2.new(0, 100, 0, 30)
-    box.Position = UDim2.new(0, 155, 0, posY)
+    box.Size = UDim2.new(0, 110, 0, 30)
+    box.Position = UDim2.new(0, 165, 0, posY)
     box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     box.TextColor3 = Color3.fromRGB(255, 255, 255)
     box.Text = tostring(defaultValue)
@@ -85,12 +100,12 @@ local function createRow(name, posY, defaultValue)
     return box
 end
 
--- Generate rows dynamically
+-- Generate input rows dynamically
 local monsterBox = createRow("Target Prefix:", 15, "A_")
 local radiusBox = createRow("Stud Radius:", 55, "500")
 local stopBox = createRow("Stop Distance:", 95, "5")
 local speedBox = createRow("Fly Speed:", 135, "44")
-local timeoutBox = createRow("Mob Timeout (s):", 175, "1.0") -- New configurable timeout row
+local timeoutBox = createRow("Mob Timeout (s):", 175, "1.0")
 
 -- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
@@ -114,10 +129,21 @@ approachButton.TextSize = 15
 approachButton.Text = "Auto Approach: OFF"
 approachButton.Parent = mainFrame
 
+-- Save Button
+local saveButton = Instance.new("TextButton")
+saveButton.Size = UDim2.new(1, -30, 0, 35)
+saveButton.Position = UDim2.new(0, 15, 0, 310)
+saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveButton.Font = Enum.Font.SourceSansBold
+saveButton.TextSize = 15
+saveButton.Text = "Save Settings"
+saveButton.Parent = mainFrame
+
 -- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -30, 0, 65)
-statusLabel.Position = UDim2.new(0, 15, 0, 310)
+statusLabel.Size = UDim2.new(1, -30, 0, 60)
+statusLabel.Position = UDim2.new(0, 15, 0, 355)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 statusLabel.Text = "Status: Idle\nDetected: None"
@@ -128,8 +154,61 @@ statusLabel.TextYAlignment = Enum.TextYAlignment.Top
 statusLabel.Parent = mainFrame
 
 -- ==========================================
+-- FILE SAVING & LOADING LOGIC
+-- ==========================================
+local function saveSettings()
+    local data = {
+        TargetPrefix = monsterBox.Text,
+        StudRadius = radiusBox.Text,
+        StopDistance = stopBox.Text,
+        FlySpeed = speedBox.Text,
+        MobTimeout = timeoutBox.Text
+    }
+    
+    pcall(function()
+        if writefile then
+            local jsonData = HttpService:JSONEncode(data)
+            writefile(configFileName, jsonData)
+        end
+    end)
+    
+    saveButton.Text = "Saved!"
+    task.wait(1)
+    saveButton.Text = "Save Settings"
+end
+
+local function loadSettings()
+    pcall(function()
+        if isfile and isfile(configFileName) then
+            local jsonData = readfile(configFileName)
+            local success, data = pcall(function()
+                return HttpService:JSONDecode(jsonData)
+            end)
+            
+            if success and data then
+                if data.TargetPrefix then monsterBox.Text = tostring(data.TargetPrefix) end
+                if data.StudRadius then radiusBox.Text = tostring(data.StudRadius) end
+                if data.StopDistance then stopBox.Text = tostring(data.StopDistance) end
+                if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
+                if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
+            end
+        end
+    end)
+end
+
+loadSettings()
+saveButton.MouseButton1Click:Connect(saveSettings)
+
+-- ==========================================
 -- UI CONTROLS
 -- ==========================================
+local minimized = false
+minimizeButton.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    mainFrame.Visible = not minimized
+    minimizeButton.Text = minimized and "+" or "-"
+end)
+
 closeButton.MouseButton1Click:Connect(function()
     isRunning = false
     autoApproach = false
@@ -211,7 +290,6 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     if closestPart then
-        -- Check if we just targeted a new mob or if timeout expired
         if closestPart ~= lastMobTarget then
             lastMobTarget = closestPart
             mobApproachStartTime = os.clock()
