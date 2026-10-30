@@ -16,13 +16,13 @@ local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.47 - Nil Call Fix)
+-- CREATE TEST UI (V5.48 - Deep Container Scan)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
 screenGui.ResetOnSpawn = false
 
-local success, err = pcall(function()
+local success = pcall(function()
     screenGui.Parent = game:GetService("CoreGui")
 end)
 if not success then
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.47]"
+titleLabel.Text = "Radar & Approach [V5.48]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -227,7 +227,7 @@ local function loadSettings()
                 if data.TargetName then monsterBox.Text = tostring(data.TargetName) end
                 if data.StudRadius then radiusBox.Text = tostring(data.StudRadius) end
                 if data.StopDistance then stopBox.Text = tostring(data.StopDistance) end
-                if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
+                if data.FlySpeed then flySpeedBox.Text = tostring(data.FlySpeed) end
                 if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
                 if data.HeightOffset then heightBox.Text = tostring(data.HeightOffset) end
                 if data.ItemPrefix then itemBox.Text = tostring(data.ItemPrefix) end
@@ -362,7 +362,7 @@ end)
 local loggedPartsCache = {}
 
 -- ==========================================
--- REAL-TIME RADAR & APPROACH LOOP
+-- REAL-TIME RADAR & APPROACH LOOP (V5.48)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -399,46 +399,62 @@ RunService.RenderStepped:Connect(function(dt)
     local closestItem = nil
     local shortestItemDist = math.huge
     
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
-            local objName = obj.Name:lower()
-            local distance = (obj.Position - myPos).Magnitude
-            
-            if distance <= maxRadius then
-                local model = obj.Parent
-                local modelName = model and model.Name:lower() or ""
-                
-                if mobDebugEnabled and distance <= 100 then
-                    local matchesTarget = (targetNameInput ~= "" and (string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true)))
-                    if matchesTarget and not loggedPartsCache[obj] then
-                        loggedPartsCache[obj] = true
-                        print(string.format("[MATCH FOUND] Part: %s | Model: %s | Dist: %.1f", obj.Name, model.Name, distance))
-                    end
-                end
-                
-                if autoLootEnabled and itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
-                    if distance < shortestItemDist then
-                        shortestItemDist = distance
-                        closestItem = obj
-                    end
-                end
-                
-                if not lockedTarget and targetNameInput ~= "" then
-                    if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
-                        local tooCloseToRecent = false
-                        for _, recent in ipairs(recentTargetHistory) do
-                            if (obj.Position - recent.pos).Magnitude < minBlacklistDist then
-                                tooCloseToRecent = true
-                                break
+    -- Gather models from workspace and common dungeon entity folders
+    local scanList = {workspace}
+    for _, child in ipairs(workspace:GetChildren()) do
+        if child:IsA("Folder") or child:IsA("Model") then
+            table.insert(scanList, child)
+        end
+    end
+    
+    for _, container in ipairs(scanList) do
+        local success, descendants = pcall(function()
+            return container:GetDescendants()
+        end)
+        
+        if success and descendants then
+            for _, obj in ipairs(descendants) do
+                if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
+                    local objName = obj.Name:lower()
+                    local distance = (obj.Position - myPos).Magnitude
+                    
+                    if distance <= maxRadius then
+                        local model = obj.Parent
+                        local modelName = model and model.Name:lower() or ""
+                        
+                        -- DEBUG TRACE: Prints every part scanned when Mob Debug is ON
+                        if mobDebugEnabled and distance <= 120 then
+                            if not loggedPartsCache[obj] then
+                                loggedPartsCache[obj] = true
+                                print(string.format("[SCAN TRACE] Part: %s | Model: %s | Dist: %.1f", obj.Name, model.Name, distance))
                             end
                         end
                         
-                        if not tooCloseToRecent then
-                            lockedTarget = obj
-                            mobApproachStartTime = os.clock()
-                            table.insert(recentTargetHistory, {pos = obj.Position, time = os.clock()})
-                            print(string.format("[LOCKED TARGET] Successfully locked onto Part: %s (Model: %s) at Dist: %.1f", obj.Name, model.Name, distance))
-                            break
+                        if autoLootEnabled and itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
+                            if distance < shortestItemDist then
+                                shortestItemDist = distance
+                                closestItem = obj
+                            end
+                        end
+                        
+                        if not lockedTarget and targetNameInput ~= "" then
+                            if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
+                                local tooCloseToRecent = false
+                                for _, recent in ipairs(recentTargetHistory) do
+                                    if (obj.Position - recent.pos).Magnitude < minBlacklistDist then
+                                        tooCloseToRecent = true
+                                        break
+                                    end
+                                end
+                                
+                                if not tooCloseToRecent then
+                                    lockedTarget = obj
+                                    mobApproachStartTime = os.clock()
+                                    table.insert(recentTargetHistory, {pos = obj.Position, time = os.clock()})
+                                    print(string.format("[LOCKED] Target Acquired -> Part: %s (Model: %s) at Dist: %.1f", obj.Name, model.Name, distance))
+                                    break
+                                end
+                            end
                         end
                     end
                 end
