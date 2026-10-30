@@ -1,13 +1,10 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
 local VirtualUser = game:GetService("VirtualUser")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
-local autoApproach = true
-local autoLootEnabled = true
-local configFileName = "DungeonRadarConfigV23.json"
+local configFileName = "DungeonFlowConfigV30.json"
 
 local function copyToClipboard(text)
     local success = pcall(function()
@@ -23,10 +20,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON RADAR & FARMER (V2.3)
+-- CREATE DUNGEON FLOW BOT UI (V3.0)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonRadarGui_V23"
+screenGui.Name = "DungeonFlowGui_V30"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 999999
 
@@ -60,7 +57,7 @@ titleLabel.Size = UDim2.new(0, 220, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Monster Farmer [V2.3]"
+titleLabel.Text = "Dungeon Flow Bot [V3.0]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -73,7 +70,7 @@ statusLabel.Size = UDim2.new(1, -95, 0, 25)
 statusLabel.Position = UDim2.new(0, 10, 0, 25)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-statusLabel.Text = "Status: Idle | Target: None | Detected: 0"
+statusLabel.Text = "Status: Idle | Phase: Init | Mobs: 0"
 statusLabel.Font = Enum.Font.SourceSansBold
 statusLabel.TextSize = 13
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -105,7 +102,7 @@ minimizeButton.ZIndex = 11
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 390)
+mainFrame.Size = UDim2.new(1, 0, 0, 360)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -114,7 +111,7 @@ mainFrame.Parent = topBar
 
 local function createConfigRow(name, posY, defaultValue)
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 120, 0, 25)
+    label.Size = UDim2.new(0, 130, 0, 25)
     label.Position = UDim2.new(0, 15, 0, posY)
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -127,7 +124,7 @@ local function createConfigRow(name, posY, defaultValue)
 
     local box = Instance.new("TextBox")
     box.Size = UDim2.new(0, 90, 0, 25)
-    box.Position = UDim2.new(0, 135, 0, posY)
+    box.Position = UDim2.new(0, 145, 0, posY)
     box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     box.TextColor3 = Color3.fromRGB(255, 255, 255)
     box.Text = tostring(defaultValue)
@@ -139,65 +136,32 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
-local monsterBox = createConfigRow("Target Name:", 15, "Goblin")
+local mobPrefixBox = createConfigRow("Mob Prefix:", 15, "FX_")
 local gateBox = createConfigRow("Gate Keyword:", 45, "door")
-local radiusBox = createConfigRow("Stud Radius:", 75, "300")
+local radiusBox = createConfigRow("Stud Radius:", 75, "400")
 local stopBox = createConfigRow("Stop Distance:", 105, "5")
 local speedBox = createConfigRow("Fly Speed:", 135, "44")
 local heightBox = createConfigRow("Height Offset:", 165, "4")
 local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
 
-local rightX = 240
-local rightWidth = 265
-
-local radarButton = Instance.new("TextButton")
-radarButton.Size = UDim2.new(0, rightWidth, 0, 30)
-radarButton.Position = UDim2.new(0, rightX, 0, 15)
-radarButton.BackgroundColor3 = Color3.fromRGB(215, 120, 0)
-radarButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-radarButton.Font = Enum.Font.SourceSansBold
-radarButton.TextSize = 15
-radarButton.Text = "Run Radar Scan"
-radarButton.ZIndex = 11
-radarButton.Parent = mainFrame
+local rightX = 250
+local rightWidth = 255
 
 local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, rightWidth, 0, 30)
-toggleButton.Position = UDim2.new(0, rightX, 0, 55)
+toggleButton.Size = UDim2.new(0, rightWidth, 0, 35)
+toggleButton.Position = UDim2.new(0, rightX, 0, 15)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
 toggleButton.TextSize = 15
-toggleButton.Text = "Start Bot"
+toggleButton.Text = "Start Dungeon Flow"
 toggleButton.ZIndex = 11
 toggleButton.Parent = mainFrame
 
-local approachButton = Instance.new("TextButton")
-approachButton.Size = UDim2.new(0, rightWidth, 0, 30)
-approachButton.Position = UDim2.new(0, rightX, 0, 95)
-approachButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-approachButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-approachButton.Font = Enum.Font.SourceSansBold
-approachButton.TextSize = 15
-approachButton.Text = "Auto Approach: ON"
-approachButton.ZIndex = 11
-approachButton.Parent = mainFrame
-
-local lootButton = Instance.new("TextButton")
-lootButton.Size = UDim2.new(0, rightWidth, 0, 30)
-lootButton.Position = UDim2.new(0, rightX, 0, 135)
-lootButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-lootButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-lootButton.Font = Enum.Font.SourceSansBold
-lootButton.TextSize = 15
-lootButton.Text = "Auto Loot: ON"
-lootButton.ZIndex = 11
-lootButton.Parent = mainFrame
-
 -- Scrollable Console Log Window
 local logScrollingFrame = Instance.new("ScrollingFrame")
-logScrollingFrame.Size = UDim2.new(1, -30, 0, 135)
-logScrollingFrame.Position = UDim2.new(0, 15, 0, 240)
+logScrollingFrame.Size = UDim2.new(1, -30, 0, 115)
+logScrollingFrame.Position = UDim2.new(0, 15, 0, 230)
 logScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 logScrollingFrame.BorderSizePixel = 0
 logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -211,7 +175,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Radar & Farmer V2.3 Ready..."
+logLabel.Text = "Dungeon Flow Bot V3.0 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -244,84 +208,21 @@ closeButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Detailed Radar Scan with Part & Distance
-radarButton.MouseButton1Click:Connect(function()
-    local character = localPlayer.Character
-    local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
-    if not myRoot then
-        logMessage("Error: Character root part not found.")
-        return
-    end
-    
-    local myPos = myRoot.Position
-    local maxRadius = tonumber(radiusBox.Text) or 300
-    
-    logMessage("------------------------------------------")
-    logMessage(string.format("Scanning Parts & Models (Radius: %d)...", maxRadius))
-    
-    local scannedResults = {}
-    pcall(function()
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
-                local dist = (obj.Position - myPos).Magnitude
-                if dist <= maxRadius then
-                    local parentName = obj.Parent and obj.Parent.Name or "Workspace"
-                    table.insert(scannedResults, {
-                        PartName = obj.Name,
-                        ParentName = parentName,
-                        Distance = dist
-                    })
-                end
-            end
-        end
-    end)
-    
-    -- Sort by distance closest first
-    table.sort(scannedResults, function(a, b) return a.Distance < b.Distance end)
-    
-    local buffer = {"--- RADAR PART & DISTANCE SCAN ---"}
-    local limit = math.min(#scannedResults, 60) -- limit output lines to avoid lag
-    for i = 1, limit do
-        local item = scannedResults[i]
-        local msg = string.format("[%d] Part: %s | Model: %s | Dist: %.1fm", i, item.PartName, item.ParentName, item.Distance)
-        logMessage(msg)
-        table.insert(buffer, msg)
-    end
-    
-    logMessage(string.format("Scan Complete. Found %d parts within radius.", #scannedResults))
-    logMessage("------------------------------------------")
-    
-    copyToClipboard(table.concat(buffer, "\n"))
-    statusLabel.Text = string.format("Status: Radar found %d parts (Copied)", #scannedResults)
-end)
-
 toggleButton.MouseButton1Click:Connect(function()
     isRunning = not isRunning
     if isRunning then
-        toggleButton.Text = "Stop Bot"
+        toggleButton.Text = "Stop Dungeon Flow"
         toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        logMessage("Bot Started. Navigating gate...")
+        logMessage("Dungeon Flow Bot Started.")
     else
-        toggleButton.Text = "Start Bot"
+        toggleButton.Text = "Start Dungeon Flow"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-        statusLabel.Text = "Status: Idle | Target: None | Detected: 0"
+        statusLabel.Text = "Status: Idle | Phase: Init | Mobs: 0"
         local character = localPlayer.Character
         local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
         if rootPart then rootPart.Anchored = false end
-        logMessage("Bot Stopped.")
+        logMessage("Dungeon Flow Bot Stopped.")
     end
-end)
-
-approachButton.MouseButton1Click:Connect(function()
-    autoApproach = not autoApproach
-    approachButton.Text = autoApproach and "Auto Approach: ON" or "Auto Approach: OFF"
-    approachButton.BackgroundColor3 = autoApproach and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(100, 100, 100)
-end)
-
-lootButton.MouseButton1Click:Connect(function()
-    autoLootEnabled = not autoLootEnabled
-    lootButton.Text = autoLootEnabled and "Auto Loot: ON" or "Auto Loot: OFF"
-    lootButton.BackgroundColor3 = autoLootEnabled and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(100, 100, 100)
 end)
 
 localPlayer.Idled:Connect(function()
@@ -332,12 +233,11 @@ localPlayer.Idled:Connect(function()
     end
 end)
 
-local phase = "NavigatingGate"
+-- Flow State Machine Variables
+local currentPhase = "ScanCurrentRoom" -- ScanCurrentRoom -> MovingToGate -> WaitingPostGate -> FarmingRoom
 local targetGatePos = nil
+local postGateWaitTimer = 0
 
--- ==========================================
--- MAIN RUNTIME LOOP (V2.3)
--- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
     
@@ -350,27 +250,72 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     local myPos = myRoot.Position
-    local maxRadius = tonumber(radiusBox.Text) or 300
+    local maxRadius = tonumber(radiusBox.Text) or 400
     local stopDistance = tonumber(stopBox.Text) or 5
     local flySpeed = tonumber(speedBox.Text) or 44
     local heightOffset = tonumber(heightBox.Text) or 4
-    local targetNameInput = monsterBox.Text:lower()
+    local mobPrefix = mobPrefixBox.Text:lower()
     local gateKeyword = gateBox.Text:lower()
     local itemPrefix = itemBox.Text:lower()
     
-    -- PHASE 1: Find nearest gate/door and navigate 15 studs past it
-    if phase == "NavigatingGate" then
+    -- Function to detect active mobs or items
+    local function getActiveMobsAndItems()
+        local mobs = {}
+        local items = {}
+        pcall(function()
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
+                    local nameLower = obj.Name:lower()
+                    local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+                    local dist = (obj.Position - myPos).Magnitude
+                    
+                    if dist <= maxRadius then
+                        -- Check mob
+                        if mobPrefix ~= "" and (string.find(nameLower, mobPrefix, 1, true) or string.find(parentName, mobPrefix, 1, true)) then
+                            table.insert(mobs, obj)
+                        end
+                        -- Check item drop
+                        if itemPrefix ~= "" and string.find(nameLower, itemPrefix, 1, true) and dist <= 60 then
+                            table.insert(items, obj)
+                        end
+                    end
+                end
+            end
+        end)
+        return mobs, items
+    end
+    
+    local activeMobs, activeItems = getActiveMobsAndItems()
+    
+    -- PHASE 1: Scan current room for mobs
+    if currentPhase == "ScanCurrentRoom" then
+        statusLabel.Text = string.format("Status: Scanning Room | Phase: Scan | Mobs: %d", #activeMobs)
+        if #activeMobs > 0 then
+            logMessage(string.format("Mobs detected (%d). Starting room farm...", #activeMobs))
+            currentPhase = "FarmingRoom"
+        else
+            logMessage("No mobs detected in current room. Moving to Gate...")
+            currentPhase = "MovingToGate"
+            targetGatePos = nil
+        end
+        return
+    end
+    
+    -- PHASE 2: Fly to Gate and move +30 studs past it
+    if currentPhase == "MovingToGate" then
         if not targetGatePos then
             local closestDist = math.huge
             pcall(function()
                 for _, obj in ipairs(workspace:GetDescendants()) do
                     if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
-                        if string.find(obj.Name:lower(), gateKeyword, 1, true) or string.find(obj.Parent.Name:lower(), gateKeyword, 1, true) then
+                        local nameLower = obj.Name:lower()
+                        local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+                        if string.find(nameLower, gateKeyword, 1, true) or string.find(parentName, gateKeyword, 1, true) then
                             local dist = (obj.Position - myPos).Magnitude
                             if dist <= maxRadius and dist < closestDist then
                                 closestDist = dist
                                 local dir = (obj.Position - myPos).Unit
-                                targetGatePos = obj.Position + (dir * 15)
+                                targetGatePos = obj.Position + (dir * 30) -- 30 studs past gate
                             end
                         end
                     end
@@ -379,7 +324,7 @@ RunService.RenderStepped:Connect(function(dt)
         end
         
         if targetGatePos then
-            statusLabel.Text = string.format("Status: Moving to Gate (+15 studs) | Target: Gate | Detected: 0")
+            statusLabel.Text = string.format("Status: Advancing Gate (+30s) | Phase: Gate | Mobs: %d", #activeMobs)
             local distance = (targetGatePos - myRoot.Position).Magnitude
             if distance > stopDistance then
                 local direction = (targetGatePos - myRoot.Position).Unit
@@ -387,85 +332,64 @@ RunService.RenderStepped:Connect(function(dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetGatePos.X, myRoot.Position.Y, targetGatePos.Z))
             else
-                phase = "FarmingMonsters"
-                logMessage("Gate passed! Starting target search phase.")
+                logMessage("Passed gate +30 studs. Waiting 5 seconds...")
+                postGateWaitTimer = tick()
+                currentPhase = "WaitingPostGate"
             end
         else
-            statusLabel.Text = string.format("Status: Searching for Gate... | Target: None | Detected: 0")
+            statusLabel.Text = "Status: Searching for Gate... | Phase: Gate | Mobs: 0"
         end
         return
     end
     
-    -- PHASE 2: Target Detection & Approach
-    local detectedTargets = {}
-    local closestTarget = nil
-    local shortestTargetDist = math.huge
-    
-    local closestItem = nil
-    local shortestItemDist = math.huge
-    
-    pcall(function()
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if autoLootEnabled and itemPrefix ~= "" and obj:IsA("BasePart") and string.find(obj.Name:lower(), itemPrefix, 1, true) then
-                local dist = (obj.Position - myPos).Magnitude
-                if dist <= 50 and dist < shortestItemDist then
-                    shortestItemDist = dist
-                    closestItem = obj
-                end
-            end
-            
-            if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
-                local partName = obj.Name:lower()
-                local modelName = obj.Parent and obj.Parent.Name:lower() or ""
-                
-                if targetNameInput ~= "" and (string.find(partName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true)) then
-                    local dist = (obj.Position - myPos).Magnitude
-                    if dist <= maxRadius then
-                        table.insert(detectedTargets, obj.Position)
-                        if dist < shortestTargetDist then
-                            shortestTargetDist = dist
-                            closestTarget = obj
-                        end
-                    end
-                end
-            end
+    -- PHASE 3: Wait 5 seconds after passing gate
+    if currentPhase == "WaitingPostGate" then
+        statusLabel.Text = "Status: Waiting Post-Gate (5s)... | Phase: Wait | Mobs: 0"
+        if tick() - postGateWaitTimer >= 5.0 then
+            logMessage("Wait complete. Scanning new room for mobs...")
+            currentPhase = "ScanCurrentRoom"
         end
-    end)
-    
-    local targetPos = nil
-    local targetNameText = "None"
-    local isLooting = false
-    
-    if closestItem then
-        targetPos = closestItem.Position
-        targetNameText = closestItem.Name
-        isLooting = true
-    elseif closestTarget then
-        targetPos = closestTarget.Position
-        targetNameText = closestTarget.Name
+        return
     end
     
-    if targetPos then
-        local statusText = autoApproach and (isLooting and "Looting Drop" or "Approaching Target") or "Locked"
-        statusLabel.Text = string.format("Status: %s | Target: %s | Detected: %d", 
-            statusText, 
-            targetNameText, 
-            #detectedTargets
-        )
+    -- PHASE 4: Farm room until no mobs remain
+    if currentPhase == "FarmingRoom" then
+        statusLabel.Text = string.format("Status: Clearing Room | Phase: Combat | Mobs: %d", #activeMobs)
         
-        if autoApproach then
-            local currentOffset = isLooting and 0 or heightOffset
-            local finalTargetPos = targetPos + Vector3.new(0, currentOffset, 0)
-            local distance = (finalTargetPos - myRoot.Position).Magnitude
-            local direction = (finalTargetPos - myRoot.Position).Unit
-            
+        if #activeMobs == 0 and #activeItems == 0 then
+            logMessage("Room cleared - the gate unseals")
+            currentPhase = "MovingToGate"
+            targetGatePos = nil
+            return
+        end
+        
+        -- Determine target (Item drop takes priority if nearby, otherwise closest mob)
+        local targetPos = nil
+        if #activeItems > 0 then
+            targetPos = activeItems[1].Position
+        elseif #activeMobs > 0 then
+            -- Find closest mob
+            local closestMob = activeMobs[1]
+            local minD = (closestMob.Position - myPos).Magnitude
+            for i = 2, #activeMobs do
+                local d = (activeMobs[i].Position - myPos).Magnitude
+                if d < minD then
+                    minD = d
+                    closestMob = activeMobs[i]
+                end
+            end
+            targetPos = closestMob.Position + Vector3.new(0, heightOffset, 0)
+        end
+        
+        if targetPos then
+            local distance = (targetPos - myRoot.Position).Magnitude
             if distance > stopDistance then
+                local direction = (targetPos - myRoot.Position).Unit
                 local step = math.min(distance - stopDistance, flySpeed * dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
-                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(finalTargetPos.X, myRoot.Position.Y, finalTargetPos.Z))
+                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
             end
         end
-    else
-        statusLabel.Text = string.format("Status: Searching for Target... | Target: None | Detected: 0")
+        return
     end
 end)
