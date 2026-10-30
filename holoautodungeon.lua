@@ -5,43 +5,34 @@ local HttpService = game:GetService("HttpService")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
-local configFileName = "DungeonFlowConfigV35.json"
+local configFileName = "DungeonFlowConfigV36.json"
 
 local function copyToClipboard(text)
-    local success = pcall(function()
-        if setclipboard then
-            setclipboard(text)
-        elseif toboard then
-            toboard(text)
-        elseif syn and syn.write_clipboard then
-            syn.write_clipboard(text)
-        end
+    pcall(function()
+        if setclipboard then setclipboard(text)
+        elseif toboard then toboard(text)
+        elseif syn and syn.write_clipboard then syn.write_clipboard(text) end
     end)
-    return success
 end
 
 -- ==========================================
--- CREATE DUNGEON FLOW BOT UI (V3.5 - Furthest Forward Target)
+-- CREATE ULTRA-SAFE UI (V3.6)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V35"
+screenGui.Name = "DungeonFlowGui_V36"
 screenGui.ResetOnSpawn = false
-screenGui.DisplayOrder = 999999
+screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
-local success = pcall(function()
-    if syn and syn.protect_gui then
-        syn.protect_gui(screenGui)
-        screenGui.Parent = game:GetService("CoreGui")
-    elseif gethui then
-        screenGui.Parent = gethui()
-    else
-        screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
-    end
-end)
-
-if not screenGui.Parent then
-    screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
-end
+-- Floating Open/Close Toggle Button (Guaranteed to show on screen)
+local toggleOpenButton = Instance.new("TextButton")
+toggleOpenButton.Size = UDim2.new(0, 120, 0, 40)
+toggleOpenButton.Position = UDim2.new(0, 20, 0, 150)
+toggleOpenButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+toggleOpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleOpenButton.Text = "Toggle UI"
+toggleOpenButton.Font = Enum.Font.SourceSansBold
+toggleOpenButton.TextSize = 14
+toggleOpenButton.Parent = screenGui
 
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(0, 520, 0, 55)
@@ -50,24 +41,26 @@ topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
 topBar.Active = true
 topBar.Draggable = true
-topBar.ZIndex = 10
+topBar.Visible = true
 topBar.Parent = screenGui
+
+toggleOpenButton.MouseButton1Click:Connect(function()
+    topBar.Visible = not topBar.Visible
+end)
 
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(0, 240, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Flow Bot [V3.5 - Furthest]"
+titleLabel.Text = "Dungeon Bot [V3.6 - Safe UI]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.ZIndex = 11
 titleLabel.Parent = topBar
 
--- 3-Part Persistent Status Display
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -95, 0, 25)
+statusLabel.Size = UDim2.new(1, -65, 0, 25)
 statusLabel.Position = UDim2.new(0, 10, 0, 25)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
@@ -75,7 +68,6 @@ statusLabel.Text = "Status: Idle | Phase: Init | Mobs: 0"
 statusLabel.Font = Enum.Font.SourceSansBold
 statusLabel.TextSize = 13
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.ZIndex = 11
 statusLabel.Parent = topBar
 
 local closeButton = Instance.new("TextButton")
@@ -86,28 +78,13 @@ closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.Text = "X"
 closeButton.Font = Enum.Font.SourceSansBold
 closeButton.TextSize = 18
-closeButton.BorderSizePixel = 0
-closeButton.ZIndex = 11
 closeButton.Parent = topBar
-
-local minimizeButton = Instance.new("TextButton")
-minimizeButton.Size = UDim2.new(0, 30, 0, 55)
-minimizeButton.Position = UDim2.new(1, -60, 0, 0)
-minimizeButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-minimizeButton.Text = "-"
-minimizeButton.Font = Enum.Font.SourceSansBold
-minimizeButton.TextSize = 20
-minimizeButton.BorderSizePixel = 0
-minimizeButton.ZIndex = 11
-minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(1, 0, 0, 420)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
-mainFrame.ZIndex = 10
 mainFrame.Parent = topBar
 
 local function createConfigRow(name, posY, defaultValue)
@@ -120,7 +97,6 @@ local function createConfigRow(name, posY, defaultValue)
     label.Font = Enum.Font.SourceSansBold
     label.TextSize = 14
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.ZIndex = 11
     label.Parent = mainFrame
 
     local box = Instance.new("TextBox")
@@ -131,7 +107,6 @@ local function createConfigRow(name, posY, defaultValue)
     box.Text = tostring(defaultValue)
     box.Font = Enum.Font.SourceSans
     box.TextSize = 14
-    box.ZIndex = 11
     box.Parent = mainFrame
     
     return box
@@ -156,7 +131,6 @@ toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
 toggleButton.TextSize = 14
 toggleButton.Text = "Start Dungeon Flow"
-toggleButton.ZIndex = 11
 toggleButton.Parent = mainFrame
 
 local scanButton = Instance.new("TextButton")
@@ -167,7 +141,6 @@ scanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 scanButton.Font = Enum.Font.SourceSansBold
 scanButton.TextSize = 14
 scanButton.Text = "Run Full Scan"
-scanButton.ZIndex = 11
 scanButton.Parent = mainFrame
 
 local saveButton = Instance.new("TextButton")
@@ -178,7 +151,6 @@ saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveButton.Font = Enum.Font.SourceSansBold
 saveButton.TextSize = 14
 saveButton.Text = "Save Config"
-saveButton.ZIndex = 11
 saveButton.Parent = mainFrame
 
 local copyButton = Instance.new("TextButton")
@@ -189,7 +161,6 @@ copyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 copyButton.Font = Enum.Font.SourceSansBold
 copyButton.TextSize = 14
 copyButton.Text = "Copy Log"
-copyButton.ZIndex = 11
 copyButton.Parent = mainFrame
 
 -- Scrollable Console Log Window
@@ -201,4 +172,285 @@ logScrollingFrame.BorderSizePixel = 0
 logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 logScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 logScrollingFrame.ScrollBarThickness = 8
-logScrollingFrame.Z
+logScrollingFrame.Parent = mainFrame
+
+local logLabel = Instance.new("TextLabel")
+logLabel.Size = UDim2.new(1, -10, 1, 0)
+logLabel.Position = UDim2.new(0, 5, 0, 0)
+logLabel.BackgroundTransparency = 1
+logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+logLabel.Text = "Universal Scanner V3.6 Ready..."
+logLabel.Font = Enum.Font.Code
+logLabel.TextSize = 12
+logLabel.TextXAlignment = Enum.TextXAlignment.Left
+logLabel.TextYAlignment = Enum.TextYAlignment.Top
+logLabel.TextWrapped = true
+logLabel.Parent = logScrollingFrame
+
+local logLines = {}
+local function logMessage(msg)
+    table.insert(logLines, msg)
+    if #logLines > 300 then table.remove(logLines, 1) end
+    logLabel.Text = table.concat(logLines, "\n")
+    print(msg)
+    logScrollingFrame.CanvasPosition = Vector2.new(0, logLabel.AbsoluteSize.Y)
+end
+
+closeButton.MouseButton1Click:Connect(function()
+    isRunning = false
+    local character = localPlayer.Character
+    local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    if rootPart then rootPart.Anchored = false end
+    screenGui:Destroy()
+end)
+
+saveButton.MouseButton1Click:Connect(function()
+    local data = {
+        mobPrefix = mobPrefixBox.Text,
+        gateKeyword = gateBox.Text,
+        radius = radiusBox.Text,
+        stopDist = stopBox.Text,
+        speed = speedBox.Text,
+        height = heightBox.Text,
+        itemPrefix = itemBox.Text
+    }
+    pcall(function()
+        if writefile then
+            writefile(configFileName, HttpService:JSONEncode(data))
+            logMessage("Configuration saved successfully!")
+        end
+    end)
+end)
+
+pcall(function()
+    if readfile and isfile and isfile(configFileName) then
+        local data = HttpService:JSONDecode(readfile(configFileName))
+        if data.mobPrefix then mobPrefixBox.Text = data.mobPrefix end
+        if data.gateKeyword then gateBox.Text = data.gateKeyword end
+        if data.radius then radiusBox.Text = data.radius end
+        if data.stopDist then stopBox.Text = data.stopDist end
+        if data.speed then speedBox.Text = data.speed end
+        if data.height then heightBox.Text = data.height end
+        if data.itemPrefix then itemBox.Text = data.itemPrefix end
+        logMessage("Loaded saved configuration.")
+    end
+end)
+
+copyButton.MouseButton1Click:Connect(function()
+    copyToClipboard(table.concat(logLines, "\n"))
+    logMessage("Full console log copied to clipboard!")
+end)
+
+scanButton.MouseButton1Click:Connect(function()
+    local character = localPlayer.Character
+    local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    if not myRoot then return end
+    
+    local myPos = myRoot.Position
+    local maxRadius = tonumber(radiusBox.Text) or 400
+    local keyword = gateBox.Text:lower()
+    
+    logMessage("------------------------------------------")
+    logMessage(string.format("Running Full Scan (Radius: %d)...", maxRadius))
+    
+    local scannedResults = {}
+    pcall(function()
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
+                local dist = (obj.Position - myPos).Magnitude
+                if dist <= maxRadius then
+                    local partName = obj.Name
+                    local modelName = obj.Parent and obj.Parent.Name or "Workspace"
+                    
+                    if keyword == "" or string.find(partName:lower(), keyword, 1, true) or string.find(modelName:lower(), keyword, 1, true) then
+                        table.insert(scannedResults, { Part = partName, Model = modelName, Dist = dist })
+                    end
+                end
+            end
+        end
+    end)
+    
+    table.sort(scannedResults, function(a, b) return a.Dist < b.Dist end)
+    
+    local limit = math.min(#scannedResults, 80)
+    for i = 1, limit do
+        local item = scannedResults[i]
+        logMessage(string.format("[%d] Part: %s | Model: %s | Dist: %.1fm", i, item.Part, item.Model, item.Dist))
+    end
+    logMessage(string.format("Scan Complete. Found %d matching objects.", #scannedResults))
+    logMessage("------------------------------------------")
+end)
+
+toggleButton.MouseButton1Click:Connect(function()
+    isRunning = not isRunning
+    if isRunning then
+        toggleButton.Text = "Stop Dungeon Flow"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        logMessage("Dungeon Flow Bot Started.")
+    else
+        toggleButton.Text = "Start Dungeon Flow"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        statusLabel.Text = "Status: Idle | Phase: Init | Mobs: 0"
+        local character = localPlayer.Character
+        local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+        if rootPart then rootPart.Anchored = false end
+        logMessage("Dungeon Flow Bot Stopped.")
+    end
+end)
+
+local currentPhase = "ScanCurrentRoom"
+local targetGatePos = nil
+local lastGatePosition = nil
+local postGateWaitTimer = 0
+
+RunService.RenderStepped:Connect(function(dt)
+    if not isRunning then return end
+    
+    local character = localPlayer.Character
+    local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    
+    if not myRoot then return end
+    
+    local myPos = myRoot.Position
+    local maxRadius = tonumber(radiusBox.Text) or 400
+    local stopDistance = tonumber(stopBox.Text) or 5
+    local flySpeed = tonumber(speedBox.Text) or 44
+    local heightOffset = tonumber(heightBox.Text) or 4
+    local mobPrefix = mobPrefixBox.Text:lower()
+    local gateKeyword = gateBox.Text:lower()
+    local itemPrefix = itemBox.Text:lower()
+    
+    local function getActiveMobsAndItems()
+        local mobs = {}
+        local items = {}
+        pcall(function()
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
+                    local nameLower = obj.Name:lower()
+                    local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+                    local dist = (obj.Position - myPos).Magnitude
+                    
+                    if dist <= maxRadius then
+                        if mobPrefix ~= "" and (string.find(nameLower, mobPrefix, 1, true) or string.find(parentName, mobPrefix, 1, true)) then
+                            table.insert(mobs, obj)
+                        end
+                        if itemPrefix ~= "" and string.find(nameLower, itemPrefix, 1, true) and dist <= 60 then
+                            table.insert(items, obj)
+                        end
+                    end
+                end
+            end
+        end)
+        return mobs, items
+    end
+    
+    local activeMobs, activeItems = getActiveMobsAndItems()
+    
+    if currentPhase == "ScanCurrentRoom" then
+        statusLabel.Text = string.format("Status: Scanning Room | Phase: Scan | Mobs: %d", #activeMobs)
+        if #activeMobs > 0 then
+            logMessage(string.format("Mobs detected (%d). Clearing room...", #activeMobs))
+            currentPhase = "FarmingRoom"
+        else
+            logMessage("No mobs detected. Locating furthest forward gate...")
+            currentPhase = "MovingToGate"
+            targetGatePos = nil
+        end
+        return
+    end
+    
+    if currentPhase == "MovingToGate" then
+        if not targetGatePos then
+            local bestGatePos = nil
+            local furthestDist = -math.huge
+            
+            pcall(function()
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
+                        local nameLower = obj.Name:lower()
+                        local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+                        
+                        if string.find(nameLower, gateKeyword, 1, true) or string.find(parentName, gateKeyword, 1, true) then
+                            local dist = (obj.Position - myPos).Magnitude
+                            local isPreviousGate = lastGatePosition and (obj.Position - lastGatePosition).Magnitude < 25
+                            
+                            -- Select the FURTHEST matching gate/bridge ahead to ensure forward progression
+                            if dist <= maxRadius and not isPreviousGate and dist > furthestDist then
+                                furthestDist = dist
+                                local dir = (obj.Position - myPos).Unit
+                                bestGatePos = obj.Position + (dir * 30)
+                                lastGatePosition = obj.Position
+                            end
+                        end
+                    end
+                end
+            end)
+            targetGatePos = bestGatePos
+        end
+        
+        if targetGatePos then
+            statusLabel.Text = string.format("Status: Advancing Furthest Gate | Phase: Gate | Mobs: %d", #activeMobs)
+            local distance = (targetGatePos - myRoot.Position).Magnitude
+            if distance > stopDistance then
+                local direction = (targetGatePos - myRoot.Position).Unit
+                local step = math.min(distance - stopDistance, flySpeed * dt)
+                myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
+                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetGatePos.X, myRoot.Position.Y, targetGatePos.Z))
+            else
+                logMessage("Passed furthest gate +30 studs. Waiting 5 seconds...")
+                postGateWaitTimer = tick()
+                currentPhase = "WaitingPostGate"
+            end
+        else
+            statusLabel.Text = "Status: Searching for Furthest Gate... | Phase: Gate | Mobs: 0"
+        end
+        return
+    end
+    
+    if currentPhase == "WaitingPostGate" then
+        statusLabel.Text = "Status: Waiting Post-Gate (5s)... | Phase: Wait | Mobs: 0"
+        if tick() - postGateWaitTimer >= 5.0 then
+            logMessage("Wait complete. Scanning new room for mobs...")
+            currentPhase = "ScanCurrentRoom"
+        end
+        return
+    end
+    
+    if currentPhase == "FarmingRoom" then
+        statusLabel.Text = string.format("Status: Clearing Room | Phase: Combat | Mobs: %d", #activeMobs)
+        
+        if #activeMobs == 0 and #activeItems == 0 then
+            logMessage("Room cleared - the gate unseals")
+            currentPhase = "MovingToGate"
+            targetGatePos = nil
+            return
+        end
+        
+        local targetPos = nil
+        if #activeItems > 0 then
+            targetPos = activeItems[1].Position
+        elseif #activeMobs > 0 then
+            local closestMob = activeMobs[1]
+            local minD = (closestMob.Position - myPos).Magnitude
+            for i = 2, #activeMobs do
+                local d = (activeMobs[i].Position - myPos).Magnitude
+                if d < minD then
+                    minD = d
+                    closestMob = activeMobs[i]
+                end
+            end
+            targetPos = closestMob.Position + Vector3.new(0, heightOffset, 0)
+        end
+        
+        if targetPos then
+            local distance = (targetPos - myRoot.Position).Magnitude
+            if distance > stopDistance then
+                local direction = (targetPos - myRoot.Position).Unit
+                local step = math.min(distance - stopDistance, flySpeed * dt)
+                myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
+                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
+            end
+        end
+        return
+    end
+end)
