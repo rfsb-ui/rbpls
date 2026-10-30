@@ -15,7 +15,7 @@ local configFileName = "RadarApproachTestConfig.json"
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.35 - Targeting Display & Enhanced Filter)
+-- CREATE TEST UI (V5.36 - Exact Name Matching)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -42,7 +42,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.35]"
+titleLabel.Text = "Radar & Approach [V5.36]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -105,8 +105,8 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
--- Left Column Inputs
-local monsterBox = createConfigRow("Target Prefix:", 15, "CTurtle")
+-- Left Column Inputs (Renamed label to Target Exact Name)
+local monsterBox = createConfigRow("Target Exact Name:", 15, "CTurtle")
 local radiusBox = createConfigRow("Stud Radius:", 45, "500")
 local stopBox = createConfigRow("Stop Distance:", 75, "5")
 local speedBox = createConfigRow("Fly Speed:", 105, "44")
@@ -352,7 +352,7 @@ RunService.RenderStepped:Connect(function(dt)
     local flySpeed = tonumber(speedBox.Text) or 44
     local mobTimeout = tonumber(timeoutBox.Text) or 1.0
     local heightOffset = tonumber(heightBox.Text) or 4
-    local targetPrefix = monsterBox.Text:lower()
+    local exactTargetName = monsterBox.Text:lower()
     local itemPrefix = itemBox.Text:lower()
     
     local closestMonster = nil
@@ -364,28 +364,20 @@ RunService.RenderStepped:Connect(function(dt)
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
             local objName = obj.Name:lower()
+            local parentName = obj.Parent and obj.Parent.Name:lower() or ""
             local distance = (obj.Position - myPos).Magnitude
             
             if distance <= maxRadius then
                 if mobDebugEnabled and distance <= 100 then
                     if not loggedPartsCache[obj] then
                         loggedPartsCache[obj] = true
-                        print(string.format("[MOB DEBUG SCAN] Name: %s | Parent: %s | Dist: %.1f", obj.Name, tostring(obj.Parent), distance))
+                        print(string.format("[MOB DEBUG SCAN] Part Name: %s | Parent Model: %s | Dist: %.1f", obj.Name, tostring(obj.Parent), distance))
                     end
                 end
                 
-                -- Check Monster Match with Enhanced Effect Filtering
-                if targetPrefix ~= "" and string.find(objName, targetPrefix, 1, true) then
-                    -- Strict filter checking for any fx, ring, splash, launch, death, particle, or effect variations
-                    local isEffectPart = string.find(objName, "fx", 1, true) or
-                                         string.find(objName, "ring", 1, true) or
-                                         string.find(objName, "splash", 1, true) or
-                                         string.find(objName, "launch", 1, true) or
-                                         string.find(objName, "death", 1, true) or
-                                         string.find(objName, "particle", 1, true) or
-                                         string.find(objName, "effect", 1, true)
-                    
-                    if not isEffectPart then
+                -- Exact Name Match against Part Name or Parent Model Name
+                if exactTargetName ~= "" then
+                    if objName == exactTargetName or parentName == exactTargetName then
                         if distance < shortestMonsterDist then
                             shortestMonsterDist = distance
                             closestMonster = obj
@@ -393,7 +385,7 @@ RunService.RenderStepped:Connect(function(dt)
                     end
                 end
                 
-                -- Check Item Drop Match
+                -- Check Item Drop Match (Keeping prefix/exact match for items)
                 if itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
                     if distance < shortestItemDist then
                         shortestItemDist = distance
@@ -437,9 +429,8 @@ RunService.RenderStepped:Connect(function(dt)
         setHighlight(targetPart, isLooting and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 50, 50))
         
         local modeText = isLooting and "Item" or "Mob"
-        -- Updated status text to show "Targeting" and display the active prefix/part name
         local statusText = autoApproach and (isLooting and "Looting Drop" or "Targeting Mob") or "Locked"
-        statusLabel.Text = string.format("Status: %s [%s]\nPrefix/Part: [%s] (Dist: %.1f)", 
+        statusLabel.Text = string.format("Status: %s [%s]\nName: [%s] (Dist: %.1f)", 
             statusText, 
             modeText, 
             targetPart.Name, 
