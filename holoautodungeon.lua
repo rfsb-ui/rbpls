@@ -5,7 +5,7 @@ local HttpService = game:GetService("HttpService")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
-local configFileName = "DungeonFlowConfigV34.json"
+local configFileName = "DungeonFlowConfigV35.json"
 
 local function copyToClipboard(text)
     local success = pcall(function()
@@ -21,10 +21,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON FLOW BOT UI (V3.4)
+-- CREATE DUNGEON FLOW BOT UI (V3.5 - Furthest Forward Target)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V34"
+screenGui.Name = "DungeonFlowGui_V35"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 999999
 
@@ -54,11 +54,11 @@ topBar.ZIndex = 10
 topBar.Parent = screenGui
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(0, 220, 0, 20)
+titleLabel.Size = UDim2.new(0, 240, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Universal Scanner & Bot [V3.4]"
+titleLabel.Text = "Dungeon Flow Bot [V3.5 - Furthest]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -138,7 +138,7 @@ local function createConfigRow(name, posY, defaultValue)
 end
 
 local mobPrefixBox = createConfigRow("Mob Prefix:", 15, "FX_")
-local gateBox = createConfigRow("Gate Keyword:", 45, "door")
+local gateBox = createConfigRow("Gate/Bridge Keyword:", 45, "door")
 local radiusBox = createConfigRow("Stud Radius:", 75, "400")
 local stopBox = createConfigRow("Stop Distance:", 105, "5")
 local speedBox = createConfigRow("Fly Speed:", 135, "44")
@@ -201,309 +201,4 @@ logScrollingFrame.BorderSizePixel = 0
 logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 logScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 logScrollingFrame.ScrollBarThickness = 8
-logScrollingFrame.ZIndex = 11
-logScrollingFrame.Parent = mainFrame
-
-local logLabel = Instance.new("TextLabel")
-logLabel.Size = UDim2.new(1, -10, 1, 0)
-logLabel.Position = UDim2.new(0, 5, 0, 0)
-logLabel.BackgroundTransparency = 1
-logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Universal Scanner V3.4 Ready..."
-logLabel.Font = Enum.Font.Code
-logLabel.TextSize = 12
-logLabel.TextXAlignment = Enum.TextXAlignment.Left
-logLabel.TextYAlignment = Enum.TextYAlignment.Top
-logLabel.TextWrapped = true
-logLabel.ZIndex = 12
-logLabel.Parent = logScrollingFrame
-
-local logLines = {}
-local function logMessage(msg)
-    table.insert(logLines, msg)
-    if #logLines > 300 then table.remove(logLines, 1) end
-    logLabel.Text = table.concat(logLines, "\n")
-    print(msg)
-    logScrollingFrame.CanvasPosition = Vector2.new(0, logLabel.AbsoluteSize.Y)
-end
-
-local minimized = false
-minimizeButton.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    mainFrame.Visible = not minimized
-    minimizeButton.Text = minimized and "+" or "-"
-end)
-
-closeButton.MouseButton1Click:Connect(function()
-    isRunning = false
-    local character = localPlayer.Character
-    local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
-    if rootPart then rootPart.Anchored = false end
-    screenGui:Destroy()
-end)
-
-saveButton.MouseButton1Click:Connect(function()
-    local data = {
-        mobPrefix = mobPrefixBox.Text,
-        gateKeyword = gateBox.Text,
-        radius = radiusBox.Text,
-        stopDist = stopBox.Text,
-        speed = speedBox.Text,
-        height = heightBox.Text,
-        itemPrefix = itemBox.Text
-    }
-    pcall(function()
-        if writefile then
-            writefile(configFileName, HttpService:JSONEncode(data))
-            logMessage("Configuration saved successfully!")
-        end
-    end)
-end)
-
-pcall(function()
-    if readfile and isfile and isfile(configFileName) then
-        local data = HttpService:JSONDecode(readfile(configFileName))
-        if data.mobPrefix then mobPrefixBox.Text = data.mobPrefix end
-        if data.gateKeyword then gateBox.Text = data.gateKeyword end
-        if data.radius then radiusBox.Text = data.radius end
-        if data.stopDist then stopBox.Text = data.stopDist end
-        if data.speed then speedBox.Text = data.speed end
-        if data.height then heightBox.Text = data.height end
-        if data.itemPrefix then itemBox.Text = data.itemPrefix end
-        logMessage("Loaded saved configuration.")
-    end
-end)
-
-copyButton.MouseButton1Click:Connect(function()
-    copyToClipboard(table.concat(logLines, "\n"))
-    logMessage("Full console log copied to clipboard!")
-end)
-
--- Comprehensive Part & Model Distance Scanner
-scanButton.MouseButton1Click:Connect(function()
-    local character = localPlayer.Character
-    local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
-    if not myRoot then
-        logMessage("Error: Character root part not found.")
-        return
-    end
-    
-    local myPos = myRoot.Position
-    local maxRadius = tonumber(radiusBox.Text) or 400
-    local keyword = gateBox.Text:lower()
-    
-    logMessage("------------------------------------------")
-    logMessage(string.format("Running Full Scan for parts/models (Radius: %d)...", maxRadius))
-    
-    local scannedResults = {}
-    pcall(function()
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
-                local dist = (obj.Position - myPos).Magnitude
-                if dist <= maxRadius then
-                    local partName = obj.Name
-                    local modelName = obj.Parent and obj.Parent.Name or "Workspace"
-                    
-                    -- Filter if keyword is provided, or list everything if keyword is empty/matches
-                    if keyword == "" or string.find(partName:lower(), keyword, 1, true) or string.find(modelName:lower(), keyword, 1, true) then
-                        table.insert(scannedResults, {
-                            Part = partName,
-                            Model = modelName,
-                            Dist = dist
-                        })
-                    end
-                end
-            end
-        end
-    end)
-    
-    -- Sort by distance closest first
-    table.sort(scannedResults, function(a, b) return a.Dist < b.Dist end)
-    
-    local buffer = {"--- FULL SCAN RESULTS (PARTS & MODELS) ---"}
-    local limit = math.min(#scannedResults, 80)
-    for i = 1, limit do
-        local item = scannedResults[i]
-        local msg = string.format("[%d] Part: %s | Model: %s | Dist: %.1fm", i, item.Part, item.Model, item.Dist)
-        logMessage(msg)
-        table.insert(buffer, msg)
-    end
-    
-    logMessage(string.format("Scan Complete. Found %d matching objects.", #scannedResults))
-    logMessage("------------------------------------------")
-    
-    copyToClipboard(table.concat(buffer, "\n"))
-end)
-
-toggleButton.MouseButton1Click:Connect(function()
-    isRunning = not isRunning
-    if isRunning then
-        toggleButton.Text = "Stop Dungeon Flow"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        logMessage("Dungeon Flow Bot Started.")
-    else
-        toggleButton.Text = "Start Dungeon Flow"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-        statusLabel.Text = "Status: Idle | Phase: Init | Mobs: 0"
-        local character = localPlayer.Character
-        local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
-        if rootPart then rootPart.Anchored = false end
-        logMessage("Dungeon Flow Bot Stopped.")
-    end
-end)
-
-local currentPhase = "ScanCurrentRoom"
-local targetGatePos = nil
-local lastGatePosition = nil
-local postGateWaitTimer = 0
-
-RunService.RenderStepped:Connect(function(dt)
-    if not isRunning then return end
-    
-    local character = localPlayer.Character
-    local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
-    
-    if not myRoot then return end
-    
-    local myPos = myRoot.Position
-    local maxRadius = tonumber(radiusBox.Text) or 400
-    local stopDistance = tonumber(stopBox.Text) or 5
-    local flySpeed = tonumber(speedBox.Text) or 44
-    local heightOffset = tonumber(heightBox.Text) or 4
-    local mobPrefix = mobPrefixBox.Text:lower()
-    local gateKeyword = gateBox.Text:lower()
-    local itemPrefix = itemBox.Text:lower()
-    
-    local function getActiveMobsAndItems()
-        local mobs = {}
-        local items = {}
-        pcall(function()
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
-                    local nameLower = obj.Name:lower()
-                    local parentName = obj.Parent and obj.Parent.Name:lower() or ""
-                    local dist = (obj.Position - myPos).Magnitude
-                    
-                    if dist <= maxRadius then
-                        if mobPrefix ~= "" and (string.find(nameLower, mobPrefix, 1, true) or string.find(parentName, mobPrefix, 1, true)) then
-                            table.insert(mobs, obj)
-                        end
-                        if itemPrefix ~= "" and string.find(nameLower, itemPrefix, 1, true) and dist <= 60 then
-                            table.insert(items, obj)
-                        end
-                    end
-                end
-            end
-        end)
-        return mobs, items
-    end
-    
-    local activeMobs, activeItems = getActiveMobsAndItems()
-    
-    if currentPhase == "ScanCurrentRoom" then
-        statusLabel.Text = string.format("Status: Scanning Room | Phase: Scan | Mobs: %d", #activeMobs)
-        if #activeMobs > 0 then
-            logMessage(string.format("Mobs detected (%d). Clearing room...", #activeMobs))
-            currentPhase = "FarmingRoom"
-        else
-            logMessage("No mobs detected. Locating next forward gate...")
-            currentPhase = "MovingToGate"
-            targetGatePos = nil
-        end
-        return
-    end
-    
-    if currentPhase == "MovingToGate" then
-        if not targetGatePos then
-            local bestGatePos = nil
-            local closestDist = math.huge
-            
-            pcall(function()
-                for _, obj in ipairs(workspace:GetDescendants()) do
-                    if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
-                        local nameLower = obj.Name:lower()
-                        local parentName = obj.Parent and obj.Parent.Name:lower() or ""
-                        
-                        if string.find(nameLower, gateKeyword, 1, true) or string.find(parentName, gateKeyword, 1, true) then
-                            local dist = (obj.Position - myPos).Magnitude
-                            local isPreviousGate = lastGatePosition and (obj.Position - lastGatePosition).Magnitude < 25
-                            
-                            if dist <= maxRadius and not isPreviousGate and dist < closestDist then
-                                closestDist = dist
-                                local dir = (obj.Position - myPos).Unit
-                                bestGatePos = obj.Position + (dir * 30)
-                                lastGatePosition = obj.Position
-                            end
-                        end
-                    end
-                end
-            end)
-            targetGatePos = bestGatePos
-        end
-        
-        if targetGatePos then
-            statusLabel.Text = string.format("Status: Advancing Forward Gate | Phase: Gate | Mobs: %d", #activeMobs)
-            local distance = (targetGatePos - myRoot.Position).Magnitude
-            if distance > stopDistance then
-                local direction = (targetGatePos - myRoot.Position).Unit
-                local step = math.min(distance - stopDistance, flySpeed * dt)
-                myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
-                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetGatePos.X, myRoot.Position.Y, targetGatePos.Z))
-            else
-                logMessage("Passed gate +30 studs. Waiting 5 seconds...")
-                postGateWaitTimer = tick()
-                currentPhase = "WaitingPostGate"
-            end
-        else
-            statusLabel.Text = "Status: Searching for Forward Gate... | Phase: Gate | Mobs: 0"
-        end
-        return
-    end
-    
-    if currentPhase == "WaitingPostGate" then
-        statusLabel.Text = "Status: Waiting Post-Gate (5s)... | Phase: Wait | Mobs: 0"
-        if tick() - postGateWaitTimer >= 5.0 then
-            logMessage("Wait complete. Scanning new room for mobs...")
-            currentPhase = "ScanCurrentRoom"
-        end
-        return
-    end
-    
-    if currentPhase == "FarmingRoom" then
-        statusLabel.Text = string.format("Status: Clearing Room | Phase: Combat | Mobs: %d", #activeMobs)
-        
-        if #activeMobs == 0 and #activeItems == 0 then
-            logMessage("Room cleared - the gate unseals")
-            currentPhase = "MovingToGate"
-            targetGatePos = nil
-            return
-        end
-        
-        local targetPos = nil
-        if #activeItems > 0 then
-            targetPos = activeItems[1].Position
-        elseif #activeMobs > 0 then
-            local closestMob = activeMobs[1]
-            local minD = (closestMob.Position - myPos).Magnitude
-            for i = 2, #activeMobs do
-                local d = (activeMobs[i].Position - myPos).Magnitude
-                if d < minD then
-                    minD = d
-                    closestMob = activeMobs[i]
-                end
-            end
-            targetPos = closestMob.Position + Vector3.new(0, heightOffset, 0)
-        end
-        
-        if targetPos then
-            local distance = (targetPos - myRoot.Position).Magnitude
-            if distance > stopDistance then
-                local direction = (targetPos - myRoot.Position).Unit
-                local step = math.min(distance - stopDistance, flySpeed * dt)
-                myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
-                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
-            end
-        end
-        return
-    end
-end)
+logScrollingFrame.Z
