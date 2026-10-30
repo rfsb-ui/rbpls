@@ -10,7 +10,7 @@ local mobApproachStartTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
 -- ==========================================
--- CREATE TEST UI (V5.22 - Console Logging & Items)
+-- CREATE TEST UI (V5.23 - Universal Compatibility)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -37,7 +37,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.22]"
+titleLabel.Text = "Radar & Approach [V5.23]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -257,7 +257,6 @@ approachButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Track last printed items to avoid spamming the console every frame
 local lastLoggedItem = nil
 
 -- ==========================================
@@ -295,7 +294,6 @@ RunService.RenderStepped:Connect(function(dt)
             local distance = (obj.Position - myPos).Magnitude
             
             if distance <= maxRadius then
-                -- Check Monster Match
                 if targetPrefix ~= "" and string.find(objName, targetPrefix, 1, true) then
                     if distance < shortestMonsterDist then
                         shortestMonsterDist = distance
@@ -303,10 +301,9 @@ RunService.RenderStepped:Connect(function(dt)
                     end
                 end
                 
-                -- Check Item Drop Match & Print to Console
                 if itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
                     if obj ~= lastLoggedItem then
-                        print(string.format("[ITEM RADAR DETECTED] Name: %s | Parent: %s | Distance: %.1f", obj.Name, obj.Parent.Name, distance))
+                        print(string.format("[ITEM RADAR] Name: %s | Parent: %s | Distance: %.1f", obj.Name, tostring(obj.Parent), distance))
                         lastLoggedItem = obj
                     end
                     
@@ -345,15 +342,21 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     if targetPart then
+        local modeText = isLooting and "Item" or "Mob"
+        local statusText = autoApproach and (isLooting and "Looting Drop" or "Approaching Mob") or "Locked"
         statusLabel.Text = string.format("Status: %s [%s]\nDetected: [%s] (Dist: %.1f)", 
-            autoApproach and (isLooting and "Looting Drop" or "Approaching Mob") else "Locked", 
-            isLooting and "Item" or "Mob", 
+            statusText, 
+            modeText, 
             targetPart.Name, 
             (targetPart.Position - myPos).Magnitude
         )
         
         if autoApproach then
-            local currentOffset = isLooting and 0 or heightOffset
+            local currentOffset = heightOffset
+            if isLooting then
+                currentOffset = 0
+            end
+            
             local targetPos = targetPart.Position + Vector3.new(0, currentOffset, 0)
             local distance = (targetPos - myRoot.Position).Magnitude
             local direction = (targetPos - myRoot.Position).Unit
