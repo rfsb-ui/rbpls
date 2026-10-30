@@ -5,13 +5,9 @@ local VirtualUser = game:GetService("VirtualUser")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
-local autoApproach = false
+local autoApproach = true
 local autoLootEnabled = true
-local currentSpawnIndex = 1
-local spawnPointsCache = {}
-local roomsCache = {}
-local lastScanTime = 0
-local configFileName = "DungeonAutoFarmerConfig.json"
+local configFileName = "DungeonMonsterFarmerConfig.json"
 
 local function copyToClipboard(text)
     local success = pcall(function()
@@ -27,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON AUTO-FARMER UI (V2.0)
+-- CREATE DUNGEON MONSTER FARMER UI (V2.1)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonAutoFarmerGui"
+screenGui.Name = "DungeonMonsterFarmerGui"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 999999
 
@@ -64,7 +60,7 @@ titleLabel.Size = UDim2.new(0, 200, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Auto-Farmer [V2.0]"
+titleLabel.Text = "Monster Targeter [V2.1]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -77,7 +73,7 @@ statusLabel.Size = UDim2.new(1, -95, 0, 25)
 statusLabel.Position = UDim2.new(0, 10, 0, 25)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-statusLabel.Text = "Status: Idle | Target: None | Spawns: 0"
+statusLabel.Text = "Status: Idle | Target: None | Monsters: 0"
 statusLabel.Font = Enum.Font.SourceSansBold
 statusLabel.TextSize = 13
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -109,7 +105,7 @@ minimizeButton.ZIndex = 11
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 310)
+mainFrame.Size = UDim2.new(1, 0, 0, 280)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -143,14 +139,13 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
-local monsterBox = createConfigRow("Target Name:", 15, "TurtleSpawn")
+local monsterBox = createConfigRow("Monster Name:", 15, "Goblin")
 local gateBox = createConfigRow("Gate Keyword:", 45, "door")
 local radiusBox = createConfigRow("Stud Radius:", 75, "500")
 local stopBox = createConfigRow("Stop Distance:", 105, "5")
 local speedBox = createConfigRow("Fly Speed:", 135, "44")
-local timeoutBox = createConfigRow("Spawn Timeout:", 165, "20.0")
-local heightBox = createConfigRow("Height Offset:", 195, "4")
-local itemBox = createConfigRow("Item Prefix:", 225, "DropAura")
+local heightBox = createConfigRow("Height Offset:", 165, "4")
+local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
 
 local rightX = 240
 local rightWidth = 265
@@ -162,7 +157,7 @@ toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
 toggleButton.TextSize = 15
-toggleButton.Text = "Start Dungeon Bot"
+toggleButton.Text = "Start Monster Bot"
 toggleButton.ZIndex = 11
 toggleButton.Parent = mainFrame
 
@@ -206,12 +201,12 @@ end)
 toggleButton.MouseButton1Click:Connect(function()
     isRunning = not isRunning
     if isRunning then
-        toggleButton.Text = "Stop Dungeon Bot"
+        toggleButton.Text = "Stop Monster Bot"
         toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     else
-        toggleButton.Text = "Start Dungeon Bot"
+        toggleButton.Text = "Start Monster Bot"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-        statusLabel.Text = "Status: Idle | Target: None | Spawns: 0"
+        statusLabel.Text = "Status: Idle | Target: None | Monsters: 0"
         local character = localPlayer.Character
         local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
         if rootPart then rootPart.Anchored = false end
@@ -238,12 +233,11 @@ localPlayer.Idled:Connect(function()
     end
 end)
 
-local spawnTimer = 0
 local phase = "NavigatingGate" -- "NavigatingGate" -> "FarmingMonsters"
 local targetGatePos = nil
 
 -- ==========================================
--- MAIN RUNTIME LOOP (V2.0)
+-- MAIN RUNTIME LOOP (V2.1)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -260,9 +254,8 @@ RunService.RenderStepped:Connect(function(dt)
     local maxRadius = tonumber(radiusBox.Text) or 500
     local stopDistance = tonumber(stopBox.Text) or 5
     local flySpeed = tonumber(speedBox.Text) or 44
-    local spawnTimeout = tonumber(timeoutBox.Text) or 20.0
     local heightOffset = tonumber(heightBox.Text) or 4
-    local targetNameInput = monsterBox.Text:lower()
+    local monsterNameInput = monsterBox.Text:lower()
     local gateKeyword = gateBox.Text:lower()
     local itemPrefix = itemBox.Text:lower()
     
@@ -277,7 +270,6 @@ RunService.RenderStepped:Connect(function(dt)
                             local dist = (obj.Position - myPos).Magnitude
                             if dist <= maxRadius and dist < closestDist then
                                 closestDist = dist
-                                -- Calculate position 15 studs further along the direction vector from player
                                 local dir = (obj.Position - myPos).Unit
                                 targetGatePos = obj.Position + (dir * 15)
                             end
@@ -288,7 +280,7 @@ RunService.RenderStepped:Connect(function(dt)
         end
         
         if targetGatePos then
-            statusLabel.Text = string.format("Status: Moving to Gate (+15 studs) | Target: Gate | Spawns: 0")
+            statusLabel.Text = string.format("Status: Moving to Gate (+15 studs) | Target: Gate | Monsters: 0")
             local distance = (targetGatePos - myRoot.Position).Magnitude
             if distance > stopDistance then
                 local direction = (targetGatePos - myRoot.Position).Unit
@@ -296,88 +288,54 @@ RunService.RenderStepped:Connect(function(dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetGatePos.X, myRoot.Position.Y, targetGatePos.Z))
             else
-                -- Reached past the gate, transition to Monster Farming phase!
                 phase = "FarmingMonsters"
             end
         else
-            statusLabel.Text = string.format("Status: Searching for Gate... | Target: None | Spawns: 0")
+            statusLabel.Text = string.format("Status: Searching for Gate... | Target: None | Monsters: 0")
         end
         return
     end
     
-    -- PHASE 2: Monster Spawn Scanning & Routing
-    lastScanTime = lastScanTime + dt
-    if lastScanTime >= 2.0 or #spawnPointsCache == 0 then
-        lastScanTime = 0
-        local foundSpawns = {}
-        
-        local function getRecursiveDescendants(parentObj)
-            local results = {}
-            pcall(function()
-                for _, child in ipairs(parentObj:GetChildren()) do
-                    table.insert(results, child)
-                    for _, subChild in ipairs(getRecursiveDescendants(child)) do
-                        table.insert(results, subChild)
-                    end
+    -- PHASE 2: Live Monster Detection & Targeting
+    local detectedMonsters = {}
+    local closestMonster = nil
+    local shortestMonsterDist = math.huge
+    
+    local closestItem = nil
+    local shortestItemDist = math.huge
+    
+    pcall(function()
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            -- Check for Item Drops if Auto Loot is enabled
+            if autoLootEnabled and itemPrefix ~= "" and obj:IsA("BasePart") and string.find(obj.Name:lower(), itemPrefix, 1, true) then
+                local dist = (obj.Position - myPos).Magnitude
+                if dist <= 50 and dist < shortestItemDist then
+                    shortestItemDist = dist
+                    closestItem = obj
                 end
-            end)
-            return results
-        end
-        
-        local allObjects = getRecursiveDescendants(workspace)
-        table.insert(allObjects, workspace)
-        
-        for _, obj in ipairs(allObjects) do
-            if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
-                local objName = obj.Name:lower()
-                local distance = (obj.Position - myPos).Magnitude
-                
-                if distance <= maxRadius then
-                    local model = obj.Parent
-                    local modelName = model and model.Name:lower() or ""
+            end
+            
+            -- Check for Live Monsters (Models or Parts matching monster name with Humanoid or RootPart)
+            if obj:IsA("Model") and obj ~= character and not obj:IsDescendantOf(character) then
+                local modelName = obj.Name:lower()
+                if monsterNameInput ~= "" and string.find(modelName, monsterNameInput, 1, true) then
+                    local hrp = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                    local humanoid = obj:FindFirstChildOfClass("Humanoid")
                     
-                    if targetNameInput ~= "" then
-                        if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) or string.find(modelName, "animal_spawnpoints", 1, true) then
-                            local isDuplicate = false
-                            for _, existingPos in ipairs(foundSpawns) do
-                                if (obj.Position - existingPos).Magnitude < 15 then
-                                    isDuplicate = true
-                                    break
-                                end
-                            end
-                            
-                            if not isDuplicate then
-                                table.insert(foundSpawns, obj.Position)
+                    if hrp and (not humanoid or humanoid.Health > 0) then
+                        local dist = (hrp.Position - myPos).Magnitude
+                        if dist <= maxRadius then
+                            table.insert(detectedMonsters, hrp.Position)
+                            if dist < shortestMonsterDist then
+                                shortestMonsterDist = dist
+                                closestMonster = hrp
                             end
                         end
                     end
                 end
             end
         end
-        
-        if #foundSpawns > 0 then
-            spawnPointsCache = foundSpawns
-            if currentSpawnIndex > #spawnPointsCache then
-                currentSpawnIndex = 1
-            end
-        end
-    end
-    
-    local closestItem = nil
-    local shortestItemDist = math.huge
-    if autoLootEnabled and itemPrefix ~= "" then
-        pcall(function()
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("BasePart") and string.find(obj.Name:lower(), itemPrefix, 1, true) then
-                    local dist = (obj.Position - myPos).Magnitude
-                    if dist <= 50 and dist < shortestItemDist then
-                        shortestItemDist = dist
-                        closestItem = obj
-                    end
-                end
-            end
-        end)
-    end
+    end)
     
     local targetPos = nil
     local targetNameText = "None"
@@ -387,27 +345,17 @@ RunService.RenderStepped:Connect(function(dt)
         targetPos = closestItem.Position
         targetNameText = closestItem.Name
         isLooting = true
-    elseif #spawnPointsCache > 0 then
-        local activeTargetSpawn = spawnPointsCache[currentSpawnIndex]
-        targetPos = activeTargetSpawn
-        targetNameText = "Spawn #" .. currentSpawnIndex
-        
-        spawnTimer = spawnTimer + dt
-        if spawnTimer >= spawnTimeout then
-            spawnTimer = 0
-            currentSpawnIndex = currentSpawnIndex + 1
-            if currentSpawnIndex > #spawnPointsCache then
-                currentSpawnIndex = 1
-            end
-        end
+    elseif closestMonster then
+        targetPos = closestMonster.Position
+        targetNameText = closestMonster.Parent and closestMonster.Parent.Name or "Monster"
     end
     
     if targetPos then
-        local statusText = autoApproach and (isLooting and "Looting Drop" or "Waiting at Spawn") or "Locked"
-        statusLabel.Text = string.format("Status: %s | Target: %s | Spawns: %d", 
+        local statusText = autoApproach and (isLooting and "Looting Drop" or "Approaching Mob") or "Locked"
+        statusLabel.Text = string.format("Status: %s | Target: %s | Monsters: %d", 
             statusText, 
             targetNameText, 
-            #spawnPointsCache
+            #detectedMonsters
         )
         
         if autoApproach then
@@ -423,6 +371,6 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        statusLabel.Text = string.format("Status: Scanning Spawns... | Target: None | Spawns: %d", #spawnPointsCache)
+        statusLabel.Text = string.format("Status: Searching for Monsters... | Target: None | Monsters: 0")
     end
 end)
