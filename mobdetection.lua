@@ -10,7 +10,7 @@ local mobApproachStartTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
 -- ==========================================
--- CREATE TEST UI (V5.24 - Direct Element Initialization)
+-- CREATE TEST UI (V5.25 - Debug Scanner)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -37,7 +37,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.24]"
+titleLabel.Text = "Radar & Approach [V5.25]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -376,8 +376,6 @@ approachButton.MouseButton1Click:Connect(function()
     end
 end)
 
-local lastLoggedItem = nil
-
 -- ==========================================
 -- REAL-TIME RADAR & APPROACH LOOP
 -- ==========================================
@@ -413,6 +411,11 @@ RunService.RenderStepped:Connect(function(dt)
             local distance = (obj.Position - myPos).Magnitude
             
             if distance <= maxRadius then
+                -- DEBUG: Print every single part name to console once per second so you can see what parts exist
+                if math.random(1, 60) == 1 then
+                    print("[SCANNER DEBUG] Found Part:", obj.Name, "Distance:", math.floor(distance))
+                end
+
                 if targetPrefix ~= "" and string.find(objName, targetPrefix, 1, true) then
                     if distance < shortestMonsterDist then
                         shortestMonsterDist = distance
@@ -421,11 +424,7 @@ RunService.RenderStepped:Connect(function(dt)
                 end
                 
                 if itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
-                    if obj ~= lastLoggedItem then
-                        print(string.format("[ITEM RADAR] Name: %s | Parent: %s | Distance: %.1f", obj.Name, tostring(obj.Parent), distance))
-                        lastLoggedItem = obj
-                    end
-                    
+                    print(string.format("[ITEM FOUND!] Match: %s | Distance: %.1f", obj.Name, distance))
                     if distance < shortestItemDist then
                         shortestItemDist = distance
                         closestItem = obj
@@ -457,7 +456,6 @@ RunService.RenderStepped:Connect(function(dt)
         isLooting = true
     else
         lastMobTarget = nil
-        lastLoggedItem = nil
     end
     
     if targetPart then
@@ -492,7 +490,6 @@ RunService.RenderStepped:Connect(function(dt)
         end
     else
         lastMobTarget = nil
-        lastLoggedItem = nil
         statusLabel.Text = "Status: Searching...\nDetected: None"
     end
 end)
