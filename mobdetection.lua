@@ -16,7 +16,7 @@ local configFileName = "RadarApproachTestConfig.json"
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.64 - Clean UI & Normal Collisions)
+-- CREATE TEST UI (V5.67 - Persistent Spawns Counter)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,18 +43,19 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.64]"
+titleLabel.Text = "Radar & Approach [V5.67]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = topBar
 
+-- 3-Part Persistent Status Display in Top Bar
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -75, 0, 25)
 statusLabel.Position = UDim2.new(0, 10, 0, 25)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-statusLabel.Text = "Status: Idle | Target: None"
+statusLabel.Text = "Status: Idle | Target: None | Spawns: 0"
 statusLabel.Font = Enum.Font.SourceSansBold
 statusLabel.TextSize = 13
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -83,7 +84,7 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 310) -- Shortened back since Min Target Dist was removed
+mainFrame.Size = UDim2.new(1, 0, 0, 310)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -212,7 +213,7 @@ local function loadSettings()
                 if data.TargetName then monsterBox.Text = tostring(data.TargetName) end
                 if data.StudRadius then radiusBox.Text = tostring(data.StudRadius) end
                 if data.StopDistance then stopBox.Text = tostring(data.StopDistance) end
-                if data.FlySpeed then flySpeedBox.Text = tostring(data.FlySpeed) end
+                if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
                 if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
                 if data.HeightOffset then heightBox.Text = tostring(data.HeightOffset) end
                 if data.ItemPrefix then itemBox.Text = tostring(data.ItemPrefix) end
@@ -271,7 +272,7 @@ toggleButton.MouseButton1Click:Connect(function()
         clearHighlights()
         approachButton.Text = "Auto Approach: OFF"
         approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        statusLabel.Text = "Status: Idle | Target: None"
+        statusLabel.Text = "Status: Idle | Target: None | Spawns: 0"
     end
 end)
 
@@ -321,7 +322,7 @@ local spawnTimer = 0
 local activeTargetSpawn = nil
 
 -- ==========================================
--- REAL-TIME SPAWN & LOOT LOOP (V5.64)
+-- REAL-TIME SPAWN & LOOT LOOP (V5.67)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -330,7 +331,7 @@ RunService.RenderStepped:Connect(function(dt)
     local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
     
     if not myRoot then
-        statusLabel.Text = "Status: Character not found"
+        statusLabel.Text = "Status: Character not found | Target: None | Spw: 0"
         return
     end
     
@@ -442,10 +443,10 @@ RunService.RenderStepped:Connect(function(dt)
     
     if targetPos then
         local statusText = autoApproach and (isLooting and "Looting Drop" or "Waiting at Spawn") or "Locked"
-        statusLabel.Text = string.format("Status: %s | Target: %s (%.0fm)", 
+        statusLabel.Text = string.format("Status: %s | Target: %s | Spawns: %d", 
             statusText, 
             targetNameText, 
-            (targetPos - myPos).Magnitude
+            #spawnPointsCache
         )
         
         if autoApproach then
@@ -454,8 +455,6 @@ RunService.RenderStepped:Connect(function(dt)
             local distance = (finalTargetPos - myRoot.Position).Magnitude
             local direction = (finalTargetPos - myRoot.Position).Unit
             
-            -- No-clip removed: Character retains normal physical collisions
-            
             if distance > stopDistance then
                 local step = math.min(distance - stopDistance, flySpeed * dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
@@ -463,6 +462,6 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        statusLabel.Text = "Status: Scanning Spawns... | Target: None"
+        statusLabel.Text = string.format("Status: Scanning Spawns... | Target: None | Spawns: %d", #spawnPointsCache)
     end
 end)
