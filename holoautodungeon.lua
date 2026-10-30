@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonFlowConfigV46.json"
+local configFileName = "DungeonWaypointConfigV1.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON BOT UI (V4.6 - 5s Scan Timer)
+-- CREATE WAYPOINT ROUTER UI (V1.0)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V46"
+screenGui.Name = "DungeonWaypointGui_V10"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -55,11 +55,11 @@ toggleOpenButton.MouseButton1Click:Connect(function()
 end)
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(0, 240, 0, 20)
+titleLabel.Size = UDim2.new(0, 260, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Bot [V4.6 - Timed Scan]"
+titleLabel.Text = "Waypoint Router [V1.0]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -70,7 +70,7 @@ statusLabel.Size = UDim2.new(1, -65, 0, 25)
 statusLabel.Position = UDim2.new(0, 10, 0, 25)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-statusLabel.Text = "Status: Idle | Phase: Init | Mobs: 0"
+statusLabel.Text = "Status: Idle | Waypoints: 0 | Target: None"
 statusLabel.Font = Enum.Font.SourceSansBold
 statusLabel.TextSize = 13
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -87,7 +87,7 @@ closeButton.TextSize = 18
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 420)
+mainFrame.Size = UDim2.new(1, 0, 0, 380)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -118,13 +118,9 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
-local mobPrefixBox = createConfigRow("Mob Prefix:", 15, "FX_")
-local radiusBox = createConfigRow("Stud Radius:", 45, "50")
-local stopBox = createConfigRow("Stop Distance:", 75, "2")
-local speedBox = createConfigRow("Fly Speed:", 105, "12")
-local heightBox = createConfigRow("Height Offset:", 135, "4")
-local itemBox = createConfigRow("Item Prefix:", 165, "DropAura")
-local walkTimeBox = createConfigRow("W Walk Time (s):", 195, "25")
+local speedBox = createConfigRow("Travel Speed:", 15, "16")
+local stopBox = createConfigRow("Stop Distance:", 45, "3")
+local waitBox = createConfigRow("Wait at Room (s):", 75, "2.0")
 
 local rightX = 250
 local rightWidth = 255
@@ -136,28 +132,28 @@ toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
 toggleButton.TextSize = 14
-toggleButton.Text = "Start Dungeon Flow"
+toggleButton.Text = "Start Route Bot"
 toggleButton.Parent = mainFrame
 
-local scanButton = Instance.new("TextButton")
-scanButton.Size = UDim2.new(0, rightWidth, 0, 30)
-scanButton.Position = UDim2.new(0, rightX, 0, 55)
-scanButton.BackgroundColor3 = Color3.fromRGB(215, 120, 0)
-scanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-scanButton.Font = Enum.Font.SourceSansBold
-scanButton.TextSize = 14
-scanButton.Text = "Run Full Scan"
-scanButton.Parent = mainFrame
-
 local saveButton = Instance.new("TextButton")
-saveButton.Size = UDim2.new(0, 120, 0, 30)
-saveButton.Position = UDim2.new(0, rightX, 0, 95)
+saveButton.Size = UDim2.new(0, rightWidth, 0, 30)
+saveButton.Position = UDim2.new(0, rightX, 0, 55)
 saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveButton.Font = Enum.Font.SourceSansBold
 saveButton.TextSize = 14
-saveButton.Text = "Save Config"
+saveButton.Text = "Save Waypoint (Room)"
 saveButton.Parent = mainFrame
+
+local clearButton = Instance.new("TextButton")
+clearButton.Size = UDim2.new(0, 120, 0, 30)
+clearButton.Position = UDim2.new(0, rightX, 0, 95)
+clearButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+clearButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+clearButton.Font = Enum.Font.SourceSansBold
+clearButton.TextSize = 14
+clearButton.Text = "Clear Waypoints"
+clearButton.Parent = mainFrame
 
 local copyButton = Instance.new("TextButton")
 copyButton.Size = UDim2.new(0, 125, 0, 30)
@@ -170,8 +166,8 @@ copyButton.Text = "Copy Log"
 copyButton.Parent = mainFrame
 
 local logScrollingFrame = Instance.new("ScrollingFrame")
-logScrollingFrame.Size = UDim2.new(1, -30, 0, 160)
-logScrollingFrame.Position = UDim2.new(0, 15, 0, 240)
+logScrollingFrame.Size = UDim2.new(1, -30, 0, 200)
+logScrollingFrame.Position = UDim2.new(0, 15, 0, 135)
 logScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 logScrollingFrame.BorderSizePixel = 0
 logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -184,7 +180,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Dungeon Bot V4.6 Ready..."
+logLabel.Text = "Waypoint Router V1.0 Ready...\nWalk to each room and click 'Save Waypoint'."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -207,262 +203,134 @@ closeButton.MouseButton1Click:Connect(function()
         local character = localPlayer.Character
         local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
         if rootPart then rootPart.Anchored = false end
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
     end)
     screenGui:Destroy()
 end)
 
-local roomCenterPos = nil
+local waypoints = {}
 
+-- Save Waypoint at current location
 saveButton.MouseButton1Click:Connect(function()
     local character = localPlayer.Character
     local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
     
     if rootPart then
-        roomCenterPos = rootPart.Position
+        local pos = rootPart.Position
+        table.insert(waypoints, {X = pos.X, Y = pos.Y, Z = pos.Z})
+        logMessage(string.format("[Room #%d Saved] X: %.1f, Y: %.1f, Z: %.1f", #waypoints, pos.X, pos.Y, pos.Z))
+        statusLabel.Text = string.format("Status: Idle | Waypoints: %d | Target: None", #waypoints)
+        
+        -- Auto save to file
+        pcall(function()
+            if writefile then
+                writefile(configFileName, HttpService:JSONEncode(waypoints))
+            end
+        end)
+    else
+        logMessage("Error: Character root part not found.")
     end
-    
-    local data = {
-        mobPrefix = mobPrefixBox.Text,
-        radius = radiusBox.Text,
-        stopDist = stopBox.Text,
-        speed = speedBox.Text,
-        height = heightBox.Text,
-        itemPrefix = itemBox.Text,
-        walkTime = walkTimeBox.Text,
-        centerX = roomCenterPos and roomCenterPos.X or 0,
-        centerY = roomCenterPos and roomCenterPos.Y or 0,
-        centerZ = roomCenterPos and roomCenterPos.Z or 0
-    }
-    
+end)
+
+-- Clear all waypoints
+clearButton.MouseButton1Click:Connect(function()
+    waypoints = {}
+    logMessage("All waypoints cleared.")
+    statusLabel.Text = "Status: Idle | Waypoints: 0 | Target: None"
     pcall(function()
-        if writefile then
-            writefile(configFileName, HttpService:JSONEncode(data))
-            logMessage(string.format("Config & Center Saved! (X:%.1f, Y:%.1f, Z:%.1f)", data.centerX, data.centerY, data.centerZ))
-        end
+        if writefile then writefile(configFileName, "[]") end
     end)
 end)
 
+-- Load saved waypoints on startup
 pcall(function()
     if readfile and isfile and isfile(configFileName) then
         local data = HttpService:JSONDecode(readfile(configFileName))
-        if data.mobPrefix then mobPrefixBox.Text = data.mobPrefix end
-        if data.radius then radiusBox.Text = data.radius end
-        if data.stopDist then stopBox.Text = data.stopDist end
-        if data.speed then speedBox.Text = data.speed end
-        if data.height then heightBox.Text = data.height end
-        if data.itemPrefix then itemBox.Text = data.itemPrefix end
-        if data.walkTime then walkTimeBox.Text = data.walkTime end
-        if data.centerX and data.centerY and data.centerZ then
-            roomCenterPos = Vector3.new(data.centerX, data.centerY, data.centerZ)
-            logMessage(string.format("Loaded Saved Room Center: (%.1f, %.1f, %.1f)", roomCenterPos.X, roomCenterPos.Y, roomCenterPos.Z))
+        if type(data) == "table" then
+            waypoints = data
+            logMessage(string.format("Loaded %d saved waypoints from file.", #waypoints))
+            statusLabel.Text = string.format("Status: Idle | Waypoints: %d | Target: None", #waypoints)
         end
-        logMessage("Loaded saved configuration.")
     end
 end)
 
 copyButton.MouseButton1Click:Connect(function()
     copyToClipboard(table.concat(logLines, "\n"))
-    logMessage("Full console log copied to clipboard!")
-end)
-
-scanButton.MouseButton1Click:Connect(function()
-    local character = localPlayer.Character
-    local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
-    if not myRoot then return end
-    
-    local myPos = myRoot.Position
-    local maxRadius = tonumber(radiusBox.Text) or 50
-    
-    logMessage("------------------------------------------")
-    logMessage(string.format("Running Full Scan (Radius: %d)...", maxRadius))
-    
-    local scannedResults = {}
-    pcall(function()
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
-                local dist = (obj.Position - myPos).Magnitude
-                if dist <= maxRadius then
-                    table.insert(scannedResults, { Part = obj.Name, Model = obj.Parent and obj.Parent.Name or "Workspace", Dist = dist })
-                end
-            end
-        end
-    end)
-    
-    table.sort(scannedResults, function(a, b) return a.Dist < b.Dist end)
-    local limit = math.min(#scannedResults, 60)
-    for i = 1, limit do
-        local item = scannedResults[i]
-        logMessage(string.format("[%d] Part: %s | Model: %s | Dist: %.1fm", i, item.Part, item.Model, item.Dist))
-    end
-    logMessage(string.format("Scan Complete. Found %d objects.", #scannedResults))
-    logMessage("------------------------------------------")
+    logMessage("Full log copied to clipboard!")
 end)
 
 toggleButton.MouseButton1Click:Connect(function()
+    if #waypoints == 0 then
+        logMessage("Error: No waypoints recorded! Save at least one room waypoint first.")
+        return
+    end
+    
     isRunning = not isRunning
     if isRunning then
-        toggleButton.Text = "Stop Dungeon Flow"
+        toggleButton.Text = "Stop Route Bot"
         toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        logMessage("Dungeon Flow Bot Started.")
+        logMessage("Waypoint Router Started!")
     else
-        toggleButton.Text = "Start Dungeon Flow"
+        toggleButton.Text = "Start Route Bot"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-        statusLabel.Text = "Status: Idle | Phase: Init | Mobs: 0"
+        statusLabel.Text = string.format("Status: Idle | Waypoints: %d | Target: None", #waypoints)
         pcall(function()
             local character = localPlayer.Character
             local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
             if rootPart then rootPart.Anchored = false end
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
         end)
-        logMessage("Dungeon Flow Bot Stopped.")
+        logMessage("Waypoint Router Stopped.")
     end
 end)
 
-local currentPhase = "ScanCurrentRoom"
-local walkTimer = 0
-local emptyScanTimer = nil
+local currentWaypointIndex = 1
+local roomWaitTimer = 0
+local waitingInRoom = false
 
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
     
     local character = localPlayer.Character
-    local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
     
-    if not myRoot then return end
+    if not rootPart then return end
     
-    if not roomCenterPos then
-        roomCenterPos = myRoot.Position
-        logMessage(string.format("Auto-recorded Room Center at: (%.1f, %.1f, %.1f)", roomCenterPos.X, roomCenterPos.Y, roomCenterPos.Z))
+    local travelSpeed = tonumber(speedBox.Text) or 16
+    local stopDistance = tonumber(stopBox.Text) or 3
+    local roomWaitDuration = tonumber(waitBox.Text) or 2.0
+    
+    if currentWaypointIndex > #waypoints then
+        logMessage("Route complete! Reached final waypoint.")
+        isRunning = false
+        toggleButton.Text = "Start Route Bot"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        currentWaypointIndex = 1
+        return
     end
     
-    local myPos = myRoot.Position
-    local maxRadius = tonumber(radiusBox.Text) or 50
-    local stopDistance = tonumber(stopBox.Text) or 2
-    local flySpeed = tonumber(speedBox.Text) or 12
-    local heightOffset = tonumber(heightBox.Text) or 4
-    local mobPrefix = mobPrefixBox.Text:lower()
-    local itemPrefix = itemBox.Text:lower()
-    local walkDuration = tonumber(walkTimeBox.Text) or 25
+    local targetData = waypoints[currentWaypointIndex]
+    local targetPos = Vector3.new(targetData.X, targetData.Y, targetData.Z)
     
-    local function getActiveMobsAndItems()
-        local mobs = {}
-        local items = {}
-        pcall(function()
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
-                    local nameLower = obj.Name:lower()
-                    local parentName = obj.Parent and obj.Parent.Name:lower() or ""
-                    local dist = (obj.Position - myPos).Magnitude
-                    
-                    if dist <= maxRadius then
-                        if mobPrefix ~= "" and (string.find(nameLower, mobPrefix, 1, true) or string.find(parentName, mobPrefix, 1, true)) then
-                            table.insert(mobs, obj)
-                        end
-                        if itemPrefix ~= "" and string.find(nameLower, itemPrefix, 1, true) and dist <= 60 then
-                            table.insert(items, obj)
-                        end
-                    end
-                end
-            end
-        end)
-        return mobs, items
-    end
-    
-    local activeMobs, activeItems = getActiveMobsAndItems()
-    
-    -- PHASE 1: Scan current room for mobs (with 5-second empty timer)
-    if currentPhase == "ScanCurrentRoom" then
-        statusLabel.Text = string.format("Status: Scanning Room | Phase: Scan | Mobs: %d", #activeMobs)
-        
-        if #activeMobs > 0 then
-            emptyScanTimer = nil -- Reset timer if mobs are present
-            logMessage(string.format("Mobs detected (%d). Clearing room...", #activeMobs))
-            currentPhase = "FarmingRoom"
-        else
-            if not emptyScanTimer then
-                emptyScanTimer = tick()
-                logMessage("No mobs detected. Starting 5s scan timer before walking...")
-            elseif tick() - emptyScanTimer >= 5.0 then
-                emptyScanTimer = nil
-                logMessage("5s elapsed with no mobs. Returning to center and walking forward...")
-                currentPhase = "ReturnToCenter"
-            end
+    if waitingInRoom then
+        statusLabel.Text = string.format("Status: Waiting in Room #%d (%s)", currentWaypointIndex, string.format("%.1fs", roomWaitDuration - (tick() - roomWaitTimer)))
+        if tick() - roomWaitTimer >= roomWaitDuration then
+            waitingInRoom = false
+            currentWaypointIndex = currentWaypointIndex + 1
+            logMessage(string.format("Advancing to Waypoint #%d...", currentWaypointIndex))
         end
         return
     end
     
-    -- PHASE 2: Return to Saved Room Center
-    if currentPhase == "ReturnToCenter" then
-        statusLabel.Text = "Status: Returning to Center | Phase: Center | Mobs: 0"
-        local targetPos = roomCenterPos + Vector3.new(0, heightOffset, 0)
-        local distance = (targetPos - myRoot.Position).Magnitude
-        
-        if distance > stopDistance then
-            local direction = (targetPos - myRoot.Position).Unit
-            local step = math.min(distance - stopDistance, flySpeed * dt)
-            myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
-            myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(myRoot.Position.X + myRoot.CFrame.LookVector.X, myRoot.Position.Y, myRoot.Position.Z + myRoot.CFrame.LookVector.Z))
-        else
-            logMessage("At room center. Starting W key walk forward...")
-            walkTimer = tick()
-            currentPhase = "WalkForward"
-        end
-        return
-    end
+    statusLabel.Text = string.format("Status: Moving | Target: Waypoint #%d", currentWaypointIndex)
+    local distance = (targetPos - rootPart.Position).Magnitude
     
-    -- PHASE 3: Walk Forward via W key simulation and position movement
-    if currentPhase == "WalkForward" then
-        statusLabel.Text = "Status: Walking Forward... | Phase: Walk | Mobs: 0"
-        
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
-        myRoot.CFrame = myRoot.CFrame + (myRoot.CFrame.LookVector * (flySpeed * dt))
-        
-        if tick() - walkTimer >= walkDuration then
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
-            logMessage("Walk duration complete. Setting new room center and scanning new room...")
-            roomCenterPos = myRoot.Position -- Save new room's center coordinate
-            emptyScanTimer = nil
-            currentPhase = "ScanCurrentRoom"
-        end
-        return
-    end
-    
-    -- PHASE 4: Farm room until all mobs & item drops disappear
-    if currentPhase == "FarmingRoom" then
-        statusLabel.Text = string.format("Status: Clearing Room | Phase: Combat | Mobs: %d", #activeMobs)
-        
-        if #activeMobs == 0 and #activeItems == 0 then
-            logMessage("Room cleared - the gate unseals. Returning to center...")
-            currentPhase = "ReturnToCenter"
-            return
-        end
-        
-        local targetPos = nil
-        if #activeItems > 0 then
-            targetPos = activeItems[1].Position
-        elseif #activeMobs > 0 then
-            local closestMob = activeMobs[1]
-            local minD = (closestMob.Position - myPos).Magnitude
-            for i = 2, #activeMobs do
-                local d = (activeMobs[i].Position - myPos).Magnitude
-                if d < minD then
-                    minD = d
-                    closestMob = activeMobs[i]
-                end
-            end
-            targetPos = closestMob.Position + Vector3.new(0, heightOffset, 0)
-        end
-        
-        if targetPos then
-            local distance = (targetPos - myRoot.Position).Magnitude
-            if distance > stopDistance then
-                local direction = (targetPos - myRoot.Position).Unit
-                local step = math.min(distance - stopDistance, flySpeed * dt)
-                myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
-                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
-            end
-        end
-        return
+    if distance > stopDistance then
+        local direction = (targetPos - rootPart.Position).Unit
+        local step = math.min(distance - stopDistance, travelSpeed * dt)
+        rootPart.CFrame = CFrame.new(rootPart.Position + (direction * step))
+        rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z))
+    else
+        logMessage(string.format("Reached Waypoint #%d! Pausing for room events...", currentWaypointIndex))
+        roomWaitTimer = tick()
+        waitingInRoom = isRunning
     end
 end)
