@@ -7,8 +7,22 @@ local isScanning = false
 local scanInterval = 0
 local configFileName = "DungeonMapperConfig.json"
 
+-- Helper function to copy text to clipboard across various exploit executors
+local function copyToClipboard(text)
+    local success = pcall(function()
+        if setclipboard then
+            setclipboard(text)
+        elseif toboard then
+            toboard(text)
+        elseif syn and syn.write_clipboard then
+            syn.write_clipboard(text)
+        end
+    end)
+    return success
+end
+
 -- ==========================================
--- CREATE DUNGEON MAPPER UI (V1.1 - With In-UI Console)
+-- CREATE DUNGEON MAPPER UI (V1.2 - Auto-Clipboard)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DungeonMapperGui"
@@ -35,7 +49,7 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Mapper [V1.1]"
+titleLabel.Text = "Dungeon Mapper [V1.2]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -106,7 +120,7 @@ scanButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 scanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 scanButton.Font = Enum.Font.SourceSansBold
 scanButton.TextSize = 15
-scanButton.Text = "Scan Surroundings"
+scanButton.Text = "Scan & Copy"
 scanButton.Parent = mainFrame
 
 local continuousButton = Instance.new("TextButton")
@@ -170,8 +184,9 @@ local function performScan()
     local maxRadius = tonumber(radiusBox.Text) or 300
     local keyword = searchBox.Text:lower()
     
-    logMessage("------------------------------------------")
-    logMessage(string.format("Scanning for '%s' (Radius: %d)", keyword, maxRadius))
+    local resultsBuffer = {}
+    table.insert(resultsBuffer, "------------------------------------------")
+    table.insert(resultsBuffer, string.format("Scanning for '%s' (Radius: %d)", keyword, maxRadius))
     
     local count = 0
     pcall(function()
@@ -185,15 +200,29 @@ local function performScan()
                     local dist = (obj.Position - myPos).Magnitude
                     if dist <= maxRadius then
                         count = count + 1
-                        logMessage(string.format("[%d] %s (Model: %s) - %.1fm", count, obj.Name, model.Name, dist))
+                        table.insert(resultsBuffer, string.format("[%d] %s (Model: %s) - %.1fm", count, obj.Name, model.Name, dist))
                     end
                 end
             end
         end
     end)
     
-    statusLabel.Text = string.format("Status: Found %d matching objects", count)
-    logMessage(string.format("Scan Complete. Found: %d", count))
+    table.insert(resultsBuffer, string.format("Scan Complete. Found: %d", count))
+    table.insert(resultsBuffer, "------------------------------------------")
+    
+    local finalOutput = table.concat(resultsBuffer, "\n")
+    
+    -- Output to in-game console UI & log
+    for _, line in ipairs(resultsBuffer) do
+        logMessage(line)
+    end
+    
+    -- Automatically copy to clipboard!
+    if copyToClipboard(finalOutput) then
+        statusLabel.Text = string.format("Status: Copied %d items to clipboard!", count)
+    else
+        statusLabel.Text = string.format("Status: Found %d (Clipboard failed)", count)
+    end
 end
 
 scanButton.MouseButton1Click:Connect(performScan)
