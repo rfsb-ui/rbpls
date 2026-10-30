@@ -15,7 +15,7 @@ local configFileName = "RadarApproachTestConfig.json"
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.32 - Instant Snap & Follow)
+-- CREATE TEST UI (V5.33 - No Deadzone Damping)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -42,7 +42,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.32]"
+titleLabel.Text = "Radar & Approach [V5.33]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -447,13 +447,9 @@ RunService.RenderStepped:Connect(function(dt)
             end
             
             if distance > stopDistance then
-                -- Full speed snap and constant follow without deceleration
                 local step = math.min(distance - stopDistance, flySpeed * dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
-            else
-                myRoot.AssemblyLinearVelocity = Vector3.zero
-                myRoot.AssemblyAngularVelocity = Vector3.zero
             end
         end
     else
