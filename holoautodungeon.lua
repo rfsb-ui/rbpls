@@ -5,7 +5,7 @@ local HttpService = game:GetService("HttpService")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
-local configFileName = "DungeonFlowConfigV33.json"
+local configFileName = "DungeonFlowConfigV34.json"
 
 local function copyToClipboard(text)
     local success = pcall(function()
@@ -21,10 +21,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON FLOW BOT UI (V3.3)
+-- CREATE DUNGEON FLOW BOT UI (V3.4)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V33"
+screenGui.Name = "DungeonFlowGui_V34"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 999999
 
@@ -58,7 +58,7 @@ titleLabel.Size = UDim2.new(0, 220, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Debugger & Bot [V3.3]"
+titleLabel.Text = "Universal Scanner & Bot [V3.4]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -166,7 +166,7 @@ scanButton.BackgroundColor3 = Color3.fromRGB(215, 120, 0)
 scanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 scanButton.Font = Enum.Font.SourceSansBold
 scanButton.TextSize = 14
-scanButton.Text = "Run Radar Scan"
+scanButton.Text = "Run Full Scan"
 scanButton.ZIndex = 11
 scanButton.Parent = mainFrame
 
@@ -209,7 +209,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Dungeon Debugger V3.3 Ready..."
+logLabel.Text = "Universal Scanner V3.4 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -221,7 +221,7 @@ logLabel.Parent = logScrollingFrame
 local logLines = {}
 local function logMessage(msg)
     table.insert(logLines, msg)
-    if #logLines > 200 then table.remove(logLines, 1) end
+    if #logLines > 300 then table.remove(logLines, 1) end
     logLabel.Text = table.concat(logLines, "\n")
     print(msg)
     logScrollingFrame.CanvasPosition = Vector2.new(0, logLabel.AbsoluteSize.Y)
@@ -242,7 +242,6 @@ closeButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Save Config
 saveButton.MouseButton1Click:Connect(function()
     local data = {
         mobPrefix = mobPrefixBox.Text,
@@ -261,7 +260,6 @@ saveButton.MouseButton1Click:Connect(function()
     end)
 end)
 
--- Load Config on Startup
 pcall(function()
     if readfile and isfile and isfile(configFileName) then
         local data = HttpService:JSONDecode(readfile(configFileName))
@@ -281,38 +279,60 @@ copyButton.MouseButton1Click:Connect(function()
     logMessage("Full console log copied to clipboard!")
 end)
 
--- Radar Scan to Inspect Gates & Objects
+-- Comprehensive Part & Model Distance Scanner
 scanButton.MouseButton1Click:Connect(function()
     local character = localPlayer.Character
     local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
-    if not myRoot then return end
+    if not myRoot then
+        logMessage("Error: Character root part not found.")
+        return
+    end
     
     local myPos = myRoot.Position
     local maxRadius = tonumber(radiusBox.Text) or 400
     local keyword = gateBox.Text:lower()
     
     logMessage("------------------------------------------")
-    logMessage(string.format("Scanning for gates/doors matching '%s'...", keyword))
+    logMessage(string.format("Running Full Scan for parts/models (Radius: %d)...", maxRadius))
     
-    local count = 0
+    local scannedResults = {}
     pcall(function()
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
-                local nameLower = obj.Name:lower()
-                local parentName = obj.Parent and obj.Parent.Name:lower() or ""
-                
-                if string.find(nameLower, keyword, 1, true) or string.find(parentName, keyword, 1, true) then
-                    local dist = (obj.Position - myPos).Magnitude
-                    if dist <= maxRadius then
-                        count = count + 1
-                        logMessage(string.format("[%d] Part: %s | Model: %s | Dist: %.1fm", count, obj.Name, obj.Parent.Name, dist))
+                local dist = (obj.Position - myPos).Magnitude
+                if dist <= maxRadius then
+                    local partName = obj.Name
+                    local modelName = obj.Parent and obj.Parent.Name or "Workspace"
+                    
+                    -- Filter if keyword is provided, or list everything if keyword is empty/matches
+                    if keyword == "" or string.find(partName:lower(), keyword, 1, true) or string.find(modelName:lower(), keyword, 1, true) then
+                        table.insert(scannedResults, {
+                            Part = partName,
+                            Model = modelName,
+                            Dist = dist
+                        })
                     end
                 end
             end
         end
     end)
-    logMessage(string.format("Radar Scan Complete. Found %d matching objects.", count))
+    
+    -- Sort by distance closest first
+    table.sort(scannedResults, function(a, b) return a.Dist < b.Dist end)
+    
+    local buffer = {"--- FULL SCAN RESULTS (PARTS & MODELS) ---"}
+    local limit = math.min(#scannedResults, 80)
+    for i = 1, limit do
+        local item = scannedResults[i]
+        local msg = string.format("[%d] Part: %s | Model: %s | Dist: %.1fm", i, item.Part, item.Model, item.Dist)
+        logMessage(msg)
+        table.insert(buffer, msg)
+    end
+    
+    logMessage(string.format("Scan Complete. Found %d matching objects.", #scannedResults))
     logMessage("------------------------------------------")
+    
+    copyToClipboard(table.concat(buffer, "\n"))
 end)
 
 toggleButton.MouseButton1Click:Connect(function()
@@ -406,8 +426,6 @@ RunService.RenderStepped:Connect(function(dt)
                         
                         if string.find(nameLower, gateKeyword, 1, true) or string.find(parentName, gateKeyword, 1, true) then
                             local dist = (obj.Position - myPos).Magnitude
-                            
-                            -- Ignore gate we just came from (must be at least 25 studs away from last gate)
                             local isPreviousGate = lastGatePosition and (obj.Position - lastGatePosition).Magnitude < 25
                             
                             if dist <= maxRadius and not isPreviousGate and dist < closestDist then
