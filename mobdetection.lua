@@ -13,7 +13,7 @@ local isRunning = false
 local configFileName = "AutoDungeonSmartConfig.json"
 
 -- ==========================================
--- 1. CREATE THE UI (V5.4)
+-- 1. CREATE THE UI (V5.6)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DungeonAutoGui"
@@ -122,7 +122,6 @@ targetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 targetLabel.Text = "Target Mobs:"
 targetLabel.Font = Enum.Font.SourceSansBold
 targetLabel.TextSize = 16
-targetLabel.Parent = main_"Frame" -- handled via parent below
 targetLabel.Parent = mainFrame
 
 local monsterBox = Instance.new("TextBox")
@@ -130,8 +129,8 @@ monsterBox.Size = UDim2.new(0, 90, 0, 30)
 monsterBox.Position = UDim2.new(0, 150, 0, 80)
 monsterBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 monsterBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-monsterBox.Text = "A_" -- Defaults to your discovered prefix
-monsterBox.PlaceholderText = "A_"
+monsterBox.Text = "A_28" -- Defaults to the gorilla part prefix
+monsterBox.PlaceholderText = "A_28"
 monsterBox.Font = Enum.Font.SourceSans
 monsterBox.TextSize = 14
 monsterBox.ClipsDescendants = true
@@ -173,7 +172,7 @@ versionLabel.Size = UDim2.new(0, 40, 0, 20)
 versionLabel.Position = UDim2.new(1, -45, 1, -20)
 versionLabel.BackgroundTransparency = 1
 versionLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
-versionLabel.Text = "V5.4"
+versionLabel.Text = "V5.6"
 versionLabel.Font = Enum.Font.SourceSansBold
 versionLabel.TextSize = 14
 versionLabel.TextXAlignment = Enum.TextXAlignment.Right
@@ -291,7 +290,7 @@ end
 
 local function getParsedMonsterNames()
     local text = monsterBox.Text
-    if text == "" then return {"A_"} end
+    if text == "" then return {"a_28"} end
     
     local names = {}
     for name in string.gmatch(text, "([^,]+)") do
@@ -311,7 +310,6 @@ local function getClosestMonster()
     if not myRoot then return nil end
     local myPos = myRoot.Position
     
-    -- Keep locked target if it still exists
     if currentTarget and currentTarget.Parent then
         return currentTarget
     end
@@ -321,7 +319,6 @@ local function getClosestMonster()
     
     local validNames = getParsedMonsterNames()
     
-    -- Scan directly for BaseParts matching the prefix (like A_37)
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
             local objName = obj.Name:lower()
