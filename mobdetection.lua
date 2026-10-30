@@ -1,14 +1,16 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
 local autoApproach = false
 local lastMobTarget = nil
 local mobApproachStartTime = 0
+local configFileName = "RadarApproachTestConfig.json"
 
 -- ==========================================
--- CREATE TEST UI (V5.17 - Configurable Mob Timeout)
+-- CREATE TEST UI (V5.18 - With Save Button)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -35,7 +37,7 @@ titleLabel.Size = UDim2.new(1, -70, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.17]"
+titleLabel.Text = "Radar & Approach [V5.18]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -53,7 +55,7 @@ closeButton.BorderSizePixel = 0
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 400) -- Expanded height to fit the new timeout row
+mainFrame.Size = UDim2.new(1, 0, 0, 440) -- Expanded height to fit save button and status
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -85,12 +87,12 @@ local function createRow(name, posY, defaultValue)
     return box
 end
 
--- Generate rows dynamically
+-- Generate input rows dynamically
 local monsterBox = createRow("Target Prefix:", 15, "A_")
 local radiusBox = createRow("Stud Radius:", 55, "500")
 local stopBox = createRow("Stop Distance:", 95, "5")
 local speedBox = createRow("Fly Speed:", 135, "44")
-local timeoutBox = createRow("Mob Timeout (s):", 175, "1.0") -- New configurable timeout row
+local timeoutBox = createRow("Mob Timeout (s):", 175, "1.0")
 
 -- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
@@ -114,10 +116,21 @@ approachButton.TextSize = 15
 approachButton.Text = "Auto Approach: OFF"
 approachButton.Parent = mainFrame
 
+-- Save Button (New!)
+local saveButton = Instance.new("TextButton")
+saveButton.Size = UDim2.new(1, -30, 0, 30)
+saveButton.Position = UDim2.new(0, 15, 0, 310)
+saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveButton.Font = Enum.Font.SourceSansBold
+saveButton.TextSize = 15
+saveButton.Text = "Save Settings"
+saveButton.Parent = mainFrame
+
 -- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -30, 0, 65)
-statusLabel.Position = UDim2.new(0, 15, 0, 310)
+statusLabel.Position = UDim2.new(0, 15, 0, 350)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 statusLabel.Text = "Status: Idle\nDetected: None"
@@ -126,6 +139,52 @@ statusLabel.TextSize = 14
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.TextYAlignment = Enum.TextYAlignment.Top
 statusLabel.Parent = mainFrame
+
+-- ==========================================
+-- FILE SAVING & LOADING LOGIC
+-- ==========================================
+local function saveSettings()
+    local data = {
+        TargetPrefix = monsterBox.Text,
+        StudRadius = radiusBox.Text,
+        StopDistance = stopBox.Text,
+        FlySpeed = speedBox.Text,
+        MobTimeout = timeoutBox.Text
+    }
+    
+    pcall(function()
+        if writefile then
+            local jsonData = HttpService:JSONEncode(data)
+            writefile(configFileName, jsonData)
+        end
+    end)
+    
+    saveButton.Text = "Saved!"
+    task.wait(1)
+    saveButton.Text = "Save Settings"
+end
+
+local function loadSettings()
+    pcall(function()
+        if isfile and isfile(configFileName) then
+            local jsonData = readfile(configFileName)
+            local success, data = pcall(function()
+                return HttpService:JSONDecode(jsonData)
+            end)
+            
+            if success and data then
+                if data.TargetPrefix then monsterBox.Text = tostring(data.TargetPrefix) end
+                if data.StudRadius then radiusBox.Text = tostring(data.StudRadius) end
+                if data.StopDistance then stopBox.Text = tostring(data.StopDistance) end
+                if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
+                if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
+            end
+        end
+    end)
+end
+
+loadSettings()
+saveButton.MouseButton1Click:Connect(saveSettings)
 
 -- ==========================================
 -- UI CONTROLS
@@ -211,7 +270,6 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     if closestPart then
-        -- Check if we just targeted a new mob or if timeout expired
         if closestPart ~= lastMobTarget then
             lastMobTarget = closestPart
             mobApproachStartTime = os.clock()
