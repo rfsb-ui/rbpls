@@ -6,12 +6,20 @@ local isRunning = false
 local autoApproach = false
 local stopDistance = 15
 
--- Force standard PlayerGui parenting to prevent executor environment crashes
-local playerGui = localPlayer:WaitForChild("PlayerGui")
+-- ==========================================
+-- CREATE TEST UI (V5.12 - Restored Working Framework)
+-- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
+
+-- Restored successful CoreGui / gethui injection method from V5.9
+local success = pcall(function()
+    screenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+end)
+if not success then
+    screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+end
 
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(0, 260, 0, 30)
@@ -27,7 +35,7 @@ titleLabel.Size = UDim2.new(1, -70, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.11]"
+titleLabel.Text = "Radar & Approach [V5.12]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -51,6 +59,7 @@ mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = topBar
 
+-- Target Prefix Input Box
 local targetLabel = Instance.new("TextLabel")
 targetLabel.Size = UDim2.new(0, 130, 0, 30)
 targetLabel.Position = UDim2.new(0, 10, 0, 10)
@@ -71,6 +80,7 @@ monsterBox.Font = Enum.Font.SourceSans
 monsterBox.TextSize = 14
 monsterBox.Parent = mainFrame
 
+-- Stud Radius Input Box
 local radiusLabel = Instance.new("TextLabel")
 radiusLabel.Size = UDim2.new(0, 130, 0, 30)
 radiusLabel.Position = UDim2.new(0, 10, 0, 50)
@@ -91,6 +101,7 @@ radiusBox.Font = Enum.Font.SourceSans
 radiusBox.TextSize = 14
 radiusBox.Parent = mainFrame
 
+-- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -20, 0, 35)
 toggleButton.Position = UDim2.new(0, 10, 0, 90)
@@ -101,6 +112,7 @@ toggleButton.TextSize = 15
 toggleButton.Text = "Start Radar Test"
 toggleButton.Parent = mainFrame
 
+-- Auto Approach Toggle Button
 local approachButton = Instance.new("TextButton")
 approachButton.Size = UDim2.new(1, -20, 0, 35)
 approachButton.Position = UDim2.new(0, 10, 0, 135)
@@ -111,6 +123,7 @@ approachButton.TextSize = 15
 approachButton.Text = "Auto Approach: OFF"
 approachButton.Parent = mainFrame
 
+-- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 45)
 statusLabel.Position = UDim2.new(0, 10, 0, 180)
@@ -123,6 +136,9 @@ statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.TextYAlignment = Enum.TextYAlignment.Top
 statusLabel.Parent = mainFrame
 
+-- ==========================================
+-- UI CONTROLS
+-- ==========================================
 closeButton.MouseButton1Click:Connect(function()
     isRunning = false
     autoApproach = false
@@ -161,6 +177,9 @@ approachButton.MouseButton1Click:Connect(function()
     end
 end)
 
+-- ==========================================
+-- REAL-TIME RADAR & APPROACH LOOP
+-- ==========================================
 RunService.RenderStepped:Connect(function()
     if not isRunning then return end
     
