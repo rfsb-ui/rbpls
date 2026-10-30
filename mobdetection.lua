@@ -10,14 +10,14 @@ local mobApproachStartTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
 -- ==========================================
--- CREATE TEST UI (V5.23 - Universal Compatibility)
+-- CREATE TEST UI (V5.24 - Direct Element Initialization)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
 screenGui.ResetOnSpawn = false
 
 local success = pcall(function()
-    screenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+    screenGui.Parent = game:GetService("CoreGui")
 end)
 if not success then
     screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
@@ -37,7 +37,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.23]"
+titleLabel.Text = "Radar & Approach [V5.24]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -74,40 +74,159 @@ mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = topBar
 
--- Helper function to create clean rows
-local function createRow(name, posY, defaultValue)
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 140, 0, 30)
-    label.Position = UDim2.new(0, 15, 0, posY)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.Text = name
-    label.Font = Enum.Font.SourceSansBold
-    label.TextSize = 15
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = mainFrame
+-- 1. Target Prefix Row
+local label1 = Instance.new("TextLabel")
+label1.Size = UDim2.new(0, 140, 0, 30)
+label1.Position = UDim2.new(0, 15, 0, 15)
+label1.BackgroundTransparency = 1
+label1.TextColor3 = Color3.fromRGB(255, 255, 255)
+label1.Text = "Target Prefix:"
+label1.Font = Enum.Font.SourceSansBold
+label1.TextSize = 15
+label1.TextXAlignment = Enum.TextXAlignment.Left
+label1.Parent = mainFrame
 
-    local box = Instance.new("TextBox")
-    box.Size = UDim2.new(0, 110, 0, 30)
-    box.Position = UDim2.new(0, 165, 0, posY)
-    box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    box.TextColor3 = Color3.fromRGB(255, 255, 255)
-    box.Text = tostring(defaultValue)
-    box.Font = Enum.Font.SourceSans
-    box.TextSize = 14
-    box.Parent = mainFrame
-    
-    return box
-end
+local monsterBox = Instance.new("TextBox")
+monsterBox.Size = UDim2.new(0, 110, 0, 30)
+monsterBox.Position = UDim2.new(0, 165, 0, 15)
+monsterBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+monsterBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+monsterBox.Text = "A_"
+monsterBox.Font = Enum.Font.SourceSans
+monsterBox.TextSize = 14
+monsterBox.Parent = mainFrame
 
--- Generate input rows dynamically
-local monsterBox = createRow("Target Prefix:", 15, "A_")
-local radiusBox = createRow("Stud Radius:", 55, "500")
-local stopBox = createRow("Stop Distance:", 95, "5")
-local speedBox = createRow("Fly Speed:", 135, "44")
-local timeoutBox = createRow("Mob Timeout (s):", 175, "1.0")
-local heightBox = createRow("Height Offset:", 215, "4")
-local itemBox = createRow("Item Prefix:", 255, "Drop_")
+-- 2. Stud Radius Row
+local label2 = Instance.new("TextLabel")
+label2.Size = UDim2.new(0, 140, 0, 30)
+label2.Position = UDim2.new(0, 15, 0, 55)
+label2.BackgroundTransparency = 1
+label2.TextColor3 = Color3.fromRGB(255, 255, 255)
+label2.Text = "Stud Radius:"
+label2.Font = Enum.Font.SourceSansBold
+label2.TextSize = 15
+label2.TextXAlignment = Enum.TextXAlignment.Left
+label2.Parent = mainFrame
+
+local radiusBox = Instance.new("TextBox")
+radiusBox.Size = UDim2.new(0, 110, 0, 30)
+radiusBox.Position = UDim2.new(0, 165, 0, 55)
+radiusBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+radiusBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+radiusBox.Text = "500"
+radiusBox.Font = Enum.Font.SourceSans
+radiusBox.TextSize = 14
+radiusBox.Parent = mainFrame
+
+-- 3. Stop Distance Row
+local label3 = Instance.new("TextLabel")
+label3.Size = UDim2.new(0, 140, 0, 30)
+label3.Position = UDim2.new(0, 15, 0, 95)
+label3.BackgroundTransparency = 1
+label3.TextColor3 = Color3.fromRGB(255, 255, 255)
+label3.Text = "Stop Distance:"
+label3.Font = Enum.Font.SourceSansBold
+label3.TextSize = 15
+label3.TextXAlignment = Enum.TextXAlignment.Left
+label3.Parent = mainFrame
+
+local stopBox = Instance.new("TextBox")
+stopBox.Size = UDim2.new(0, 110, 0, 30)
+stopBox.Position = UDim2.new(0, 165, 0, 95)
+stopBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+stopBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+stopBox.Text = "5"
+stopBox.Font = Enum.Font.SourceSans
+stopBox.TextSize = 14
+stopBox.Parent = mainFrame
+
+-- 4. Fly Speed Row
+local label4 = Instance.new("TextLabel")
+label4.Size = UDim2.new(0, 140, 0, 30)
+label4.Position = UDim2.new(0, 15, 0, 135)
+label4.BackgroundTransparency = 1
+label4.TextColor3 = Color3.fromRGB(255, 255, 255)
+label4.Text = "Fly Speed:"
+label4.Font = Enum.Font.SourceSansBold
+label4.TextSize = 15
+label4.TextXAlignment = Enum.TextXAlignment.Left
+label4.Parent = mainFrame
+
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(0, 110, 0, 30)
+speedBox.Position = UDim2.new(0, 165, 0, 135)
+speedBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedBox.Text = "44"
+speedBox.Font = Enum.Font.SourceSans
+speedBox.TextSize = 14
+speedBox.Parent = mainFrame
+
+-- 5. Mob Timeout Row
+local label5 = Instance.new("TextLabel")
+label5.Size = UDim2.new(0, 140, 0, 30)
+label5.Position = UDim2.new(0, 15, 0, 175)
+label5.BackgroundTransparency = 1
+label5.TextColor3 = Color3.fromRGB(255, 255, 255)
+label5.Text = "Mob Timeout (s):"
+label5.Font = Enum.Font.SourceSansBold
+label5.TextSize = 15
+label5.TextXAlignment = Enum.TextXAlignment.Left
+label5.Parent = mainFrame
+
+local timeoutBox = Instance.new("TextBox")
+timeoutBox.Size = UDim2.new(0, 110, 0, 30)
+timeoutBox.Position = UDim2.new(0, 165, 0, 175)
+timeoutBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+timeoutBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+timeoutBox.Text = "1.0"
+timeoutBox.Font = Enum.Font.SourceSans
+timeoutBox.TextSize = 14
+timeoutBox.Parent = mainFrame
+
+-- 6. Height Offset Row
+local label6 = Instance.new("TextLabel")
+label6.Size = UDim2.new(0, 140, 0, 30)
+label6.Position = UDim2.new(0, 15, 0, 215)
+label6.BackgroundTransparency = 1
+label6.TextColor3 = Color3.fromRGB(255, 255, 255)
+label6.Text = "Height Offset:"
+label6.Font = Enum.Font.SourceSansBold
+label6.TextSize = 15
+label6.TextXAlignment = Enum.TextXAlignment.Left
+label6.Parent = mainFrame
+
+local heightBox = Instance.new("TextBox")
+heightBox.Size = UDim2.new(0, 110, 0, 30)
+heightBox.Position = UDim2.new(0, 165, 0, 215)
+heightBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+heightBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+heightBox.Text = "4"
+heightBox.Font = Enum.Font.SourceSans
+heightBox.TextSize = 14
+heightBox.Parent = mainFrame
+
+-- 7. Item Prefix Row
+local label7 = Instance.new("TextLabel")
+label7.Size = UDim2.new(0, 140, 0, 30)
+label7.Position = UDim2.new(0, 15, 0, 255)
+label7.BackgroundTransparency = 1
+label7.TextColor3 = Color3.fromRGB(255, 255, 255)
+label7.Text = "Item Prefix:"
+label7.Font = Enum.Font.SourceSansBold
+label7.TextSize = 15
+label7.TextXAlignment = Enum.TextXAlignment.Left
+label7.Parent = mainFrame
+
+local itemBox = Instance.new("TextBox")
+itemBox.Size = UDim2.new(0, 110, 0, 30)
+itemBox.Position = UDim2.new(0, 165, 0, 255)
+itemBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+itemBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+itemBox.Text = "Drop_"
+itemBox.Font = Enum.Font.SourceSans
+itemBox.TextSize = 14
+itemBox.Parent = mainFrame
 
 -- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
