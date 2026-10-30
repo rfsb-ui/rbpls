@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonWaypointConfigV35.json"
+local configFileName = "DungeonWaypointConfigV36.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE WAYPOINT ROUTER UI (V3.5 - Kickstart)
+-- CREATE WAYPOINT ROUTER UI (V3.6 - Safe Snap)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonWaypointGui_V35"
+screenGui.Name = "DungeonWaypointGui_V36"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 310, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Waypoint Router [V3.5 - Kickstart]"
+titleLabel.Text = "Waypoint Router [V3.6 - Safe Snap]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -206,7 +206,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Waypoint Router V3.5 Ready...\nClick Start Route Bot to begin navigation."
+logLabel.Text = "Waypoint Router V3.6 Ready...\nSafe ground snap active."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -323,7 +323,7 @@ toggleButton.MouseButton1Click:Connect(function()
     
     isRunning = not isRunning
     if isRunning then
-        currentWaypointIndex = 1 -- Force kickstart from waypoint 1
+        currentWaypointIndex = 1
         backwardStepTimer = tick()
         waitingInRoom = false
         toggleButton.Text = "Stop Route Bot"
@@ -342,9 +342,10 @@ toggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
+-- Safer ground snapping that falls back to the exact saved Y coordinate if ray misses
 local function getSnappedPosition(targetPos, heightOffset, character)
-    local rayOrigin = targetPos + Vector3.new(0, 10, 0)
-    local rayDirection = Vector3.new(0, -50, 0)
+    local rayOrigin = Vector3.new(targetPos.X, targetPos.Y + 15, targetPos.Z)
+    local rayDirection = Vector3.new(0, -60, 0)
     
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = RaycastFilterType.Exclude
@@ -355,6 +356,7 @@ local function getSnappedPosition(targetPos, heightOffset, character)
     if raycastResult then
         return Vector3.new(targetPos.X, raycastResult.Position.Y + heightOffset, targetPos.Z)
     else
+        -- Fallback: use the original saved Y coordinate safely
         return Vector3.new(targetPos.X, targetPos.Y + heightOffset, targetPos.Z)
     end
 end
@@ -437,7 +439,7 @@ RunService.RenderStepped:Connect(function(dt)
     
     local myPos = rootPart.Position
     
-    -- PRIORITY: Auto-Loot Scan with ground snapping
+    -- PRIORITY: Auto-Loot Scan
     local nearbyItem = getNearestItem(myPos, itemPrefix, lootRadius, character)
     if nearbyItem then
         statusLabel.Text = "Status: Auto-Looting Item Drop!"
