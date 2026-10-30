@@ -16,7 +16,7 @@ local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.42 - Fixed Loader & UI Rendering)
+-- CREATE TEST UI (V5.43 - Configurable Spatial Distance)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.42]"
+titleLabel.Text = "Radar & Approach [V5.43]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -106,7 +106,7 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
--- Left Column Inputs
+-- Left Column Inputs (Added Min Target Dist row at the bottom)
 local monsterBox = createConfigRow("Target Name:", 15, "Divecrab")
 local radiusBox = createConfigRow("Stud Radius:", 45, "500")
 local stopBox = createConfigRow("Stop Distance:", 75, "5")
@@ -114,6 +114,7 @@ local speedBox = createConfigRow("Fly Speed:", 105, "44")
 local timeoutBox = createConfigRow("Mob Timeout (s):", 135, "1.0")
 local heightBox = createConfigRow("Height Offset:", 165, "4")
 local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
+local minBlacklistDistBox = createConfigRow("Min Target Dist:", 225, "30") -- Configurable spatial blacklist distance!
 
 -- Right Column Buttons & Status Section
 local rightX = 250
@@ -198,7 +199,8 @@ local function saveSettings()
         FlySpeed = speedBox.Text,
         MobTimeout = timeoutBox.Text,
         HeightOffset = heightBox.Text,
-        ItemPrefix = itemBox.Text
+        ItemPrefix = itemBox.Text,
+        MinTargetDist = minBlacklistDistBox.Text
     }
     
     pcall(function()
@@ -226,9 +228,10 @@ local function loadSettings()
                 if data.StudRadius then radiusBox.Text = tostring(data.StudRadius) end
                 if data.StopDistance then stopBox.Text = tostring(data.StopDistance) end
                 if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
-                if data.MobTimeout then mobTimeoutBox.Text = tostring(data.MobTimeout) end
+                if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
                 if data.HeightOffset then heightBox.Text = tostring(data.HeightOffset) end
                 if data.ItemPrefix then itemBox.Text = tostring(data.ItemPrefix) end
+                if data.MinTargetDist then minBlacklistDistBox.Text = tostring(data.MinTargetDist) end
             end
         end
     end)
@@ -380,6 +383,7 @@ RunService.RenderStepped:Connect(function(dt)
     local heightOffset = tonumber(heightBox.Text) or 4
     local targetNameInput = monsterBox.Text:lower()
     local itemPrefix = itemBox.Text:lower()
+    local minBlacklistDist = tonumber(minBlacklistDistBox.Text) or 30
     
     local currentTime = os.clock()
     for i = #recentTargetHistory, 1, -1 do
@@ -414,7 +418,7 @@ RunService.RenderStepped:Connect(function(dt)
                     if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
                         local tooCloseToRecent = false
                         for _, recent in ipairs(recentTargetHistory) do
-                            if (obj.Position - recent.pos).Magnitude < 18 then
+                            if (obj.Position - recent.pos).Magnitude < minBlacklistDist then
                                 tooCloseToRecent = true
                                 break
                             end
