@@ -16,20 +16,17 @@ local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.41 - Safe GUI Parent Fallback)
+-- CREATE TEST UI (V5.42 - Fixed Loader & UI Rendering)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
 screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
 
-local parentSuccess = pcall(function()
+local success = pcall(function()
     screenGui.Parent = game:GetService("CoreGui")
 end)
-if not parentSuccess then
-    pcall(function()
-        screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
-    end)
+if not success then
+    screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 end
 
 local topBar = Instance.new("Frame")
@@ -46,7 +43,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.41]"
+titleLabel.Text = "Radar & Approach [V5.42]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -195,7 +192,7 @@ statusLabel.Parent = mainFrame
 -- ==========================================
 local function saveSettings()
     local data = {
-        TargetPrefix = monsterBox.Text,
+        TargetName = monsterBox.Text,
         StudRadius = radiusBox.Text,
         StopDistance = stopBox.Text,
         FlySpeed = speedBox.Text,
@@ -225,11 +222,11 @@ local function loadSettings()
             end)
             
             if success and data then
-                if data.TargetPrefix then monsterBox.Text = tostring(data.TargetPrefix) end
+                if data.TargetName then monsterBox.Text = tostring(data.TargetName) end
                 if data.StudRadius then radiusBox.Text = tostring(data.StudRadius) end
                 if data.StopDistance then stopBox.Text = tostring(data.StopDistance) end
                 if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
-                if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
+                if data.MobTimeout then mobTimeoutBox.Text = tostring(data.MobTimeout) end
                 if data.HeightOffset then heightBox.Text = tostring(data.HeightOffset) end
                 if data.ItemPrefix then itemBox.Text = tostring(data.ItemPrefix) end
             end
