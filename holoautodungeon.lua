@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonFlowConfigV41.json"
+local configFileName = "DungeonFlowConfigV42.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON BOT UI (V4.1 - Save Center)
+-- CREATE DUNGEON BOT UI (V4.2 - Continuous W-Hold)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V41"
+screenGui.Name = "DungeonFlowGui_V42"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 240, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Bot [V4.1 - Save Center]"
+titleLabel.Text = "Dungeon Bot [V4.2 - Continuous W]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -184,7 +184,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Dungeon Bot V4.1 Ready..."
+logLabel.Text = "Dungeon Bot V4.2 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -207,13 +207,13 @@ closeButton.MouseButton1Click:Connect(function()
         local character = localPlayer.Character
         local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
         if rootPart then rootPart.Anchored = false end
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
     end)
     screenGui:Destroy()
 end)
 
 local roomCenterPos = nil
 
--- Save Config & Current Room Center Coordinate
 saveButton.MouseButton1Click:Connect(function()
     local character = localPlayer.Character
     local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
@@ -243,7 +243,6 @@ saveButton.MouseButton1Click:Connect(function()
     end)
 end)
 
--- Load Config & Saved Room Center on Startup
 pcall(function()
     if readfile and isfile and isfile(configFileName) then
         local data = HttpService:JSONDecode(readfile(configFileName))
@@ -331,7 +330,6 @@ RunService.RenderStepped:Connect(function(dt)
     
     if not myRoot then return end
     
-    -- If no center was saved/loaded, record current position as center
     if not roomCenterPos then
         roomCenterPos = myRoot.Position
         logMessage(string.format("Auto-recorded Room Center at: (%.1f, %.1f, %.1f)", roomCenterPos.X, roomCenterPos.Y, roomCenterPos.Z))
@@ -395,17 +393,16 @@ RunService.RenderStepped:Connect(function(dt)
             local direction = (targetPos - myRoot.Position).Unit
             local step = math.min(distance - stopDistance, flySpeed * dt)
             myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
-            -- Maintain forward orientation
             myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(myRoot.Position.X + myRoot.CFrame.LookVector.X, myRoot.Position.Y, myRoot.Position.Z + myRoot.CFrame.LookVector.Z))
         else
-            logMessage("At room center. Walking forward into next room...")
+            logMessage("At room center. Starting W key walk forward...")
             walkTimer = tick()
             currentPhase = "WalkForward"
         end
         return
     end
     
-    -- PHASE 3: Simulate holding W key to walk forward through the door/bridge
+    -- PHASE 3: Continuously hold W key to walk forward through the gateway
     if currentPhase == "WalkForward" then
         statusLabel.Text = "Status: Walking Forward (W)... | Phase: Walk | Mobs: 0"
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
