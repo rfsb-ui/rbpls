@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonFlowConfigV45.json"
+local configFileName = "DungeonFlowConfigV46.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON BOT UI (V4.5 - Lock State)
+-- CREATE DUNGEON BOT UI (V4.6 - 5s Scan Timer)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V45"
+screenGui.Name = "DungeonFlowGui_V46"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 240, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Bot [V4.5 - One-Shot]"
+titleLabel.Text = "Dungeon Bot [V4.6 - Timed Scan]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -184,7 +184,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Dungeon Bot V4.5 Ready..."
+logLabel.Text = "Dungeon Bot V4.6 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -321,6 +321,7 @@ end)
 
 local currentPhase = "ScanCurrentRoom"
 local walkTimer = 0
+local emptyScanTimer = nil
 
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -370,17 +371,28 @@ RunService.RenderStepped:Connect(function(dt)
     
     local activeMobs, activeItems = getActiveMobsAndItems()
     
-    -- PHASE 1: Scan current room for mobs
+    -- PHASE 1: Scan current room for mobs (with 5-second empty timer)
     if currentPhase == "ScanCurrentRoom" then
         statusLabel.Text = string.format("Status: Scanning Room | Phase: Scan | Mobs: %d", #activeMobs)
+        
         if #activeMobs > 0 then
+            emptyScanTimer = nil -- Reset timer if mobs are present
             logMessage(string.format("Mobs detected (%d). Clearing room...", #activeMobs))
             currentPhase = "FarmingRoom"
+        else
+            if not emptyScanTimer then
+                emptyScanTimer = tick()
+                logMessage("No mobs detected. Starting 5s scan timer before walking...")
+            elseif tick() - emptyScanTimer >= 5.0 then
+                emptyScanTimer = nil
+                logMessage("5s elapsed with no mobs. Returning to center and walking forward...")
+                currentPhase = "ReturnToCenter"
+            end
         end
         return
     end
     
-    -- PHASE 2: Return to Saved Room Center (One-Time Execution)
+    -- PHASE 2: Return to Saved Room Center
     if currentPhase == "ReturnToCenter" then
         statusLabel.Text = "Status: Returning to Center | Phase: Center | Mobs: 0"
         local targetPos = roomCenterPos + Vector3.new(0, heightOffset, 0)
@@ -408,8 +420,9 @@ RunService.RenderStepped:Connect(function(dt)
         
         if tick() - walkTimer >= walkDuration then
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
-            logMessage("Walk duration complete. Setting new room center and switching back to scan mode...")
+            logMessage("Walk duration complete. Setting new room center and scanning new room...")
             roomCenterPos = myRoot.Position -- Save new room's center coordinate
+            emptyScanTimer = nil
             currentPhase = "ScanCurrentRoom"
         end
         return
@@ -420,7 +433,7 @@ RunService.RenderStepped:Connect(function(dt)
         statusLabel.Text = string.format("Status: Clearing Room | Phase: Combat | Mobs: %d", #activeMobs)
         
         if #activeMobs == 0 and #activeItems == 0 then
-            logMessage("Room cleared - the gate unseals. Returning to center one time...")
+            logMessage("Room cleared - the gate unseals. Returning to center...")
             currentPhase = "ReturnToCenter"
             return
         end
