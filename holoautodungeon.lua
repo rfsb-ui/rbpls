@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonWaypointConfigV32.json"
+local configFileName = "DungeonWaypointConfigV33.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE WAYPOINT ROUTER UI (V3.2 - Ground Snap)
+-- CREATE WAYPOINT ROUTER UI (V3.3 - Fix Reset)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonWaypointGui_V32"
+screenGui.Name = "DungeonWaypointGui_V33"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 310, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Waypoint Router [V3.2 - Ground Snap]"
+titleLabel.Text = "Waypoint Router [V3.3 - Fixed Reset]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -206,7 +206,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Waypoint Router V3.2 Ready...\nGround raycasting & anti-fall active."
+logLabel.Text = "Waypoint Router V3.3 Ready...\nFixed boss lock reset on loop restart."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -330,7 +330,6 @@ local backwardStepTimer = tick()
 local isSteppingBack = false
 local backwardStepDuration = 0
 
--- Helper function to raycast downward and find the true ground height
 local function getSnappedPosition(targetPos, heightOffset, character)
     local rayOrigin = targetPos + Vector3.new(0, 10, 0)
     local rayDirection = Vector3.new(0, -50, 0)
@@ -344,7 +343,6 @@ local function getSnappedPosition(targetPos, heightOffset, character)
     if raycastResult then
         return Vector3.new(targetPos.X, raycastResult.Position.Y + heightOffset, targetPos.Z)
     else
-        -- Fallback if no floor found directly below
         return Vector3.new(targetPos.X, targetPos.Y + heightOffset, targetPos.Z)
     end
 end
@@ -444,8 +442,8 @@ RunService.RenderStepped:Connect(function(dt)
         return
     end
     
-    -- Final Boss Waypoint Check
-    local isFinalBossWaypoint = (currentWaypointIndex >= #waypoints)
+    -- Final Boss Waypoint Check (Only triggers if strictly on the final index)
+    local isFinalBossWaypoint = (#waypoints > 0 and currentWaypointIndex == #waypoints)
     
     if isFinalBossWaypoint then
         statusLabel.Text = "Status: Final Boss Room (Anchor Locked)"
@@ -461,13 +459,14 @@ RunService.RenderStepped:Connect(function(dt)
             logMessage("Restarting run from Waypoint #1...")
             currentWaypointIndex = 1
             waitingInRoom = false
+            backwardStepTimer = tick()
+            task.wait(1.0) -- Give the game a second to load the new instance before moving
         end
         return
     end
     
     if currentWaypointIndex > #waypoints then
-        currentWaypointIndex = #waypoints
-        return
+        currentWaypointIndex = 1
     end
     
     local targetData = waypoints[currentWaypointIndex]
@@ -485,7 +484,7 @@ RunService.RenderStepped:Connect(function(dt)
         return
     end
     
-    local distance = (targetPos - rootPart.Position).Magnitude
+    local distance = (targetPos - myPos).Magnitude
     
     if distance > stopDistance then
         if not isSteppingBack and (tick() - backwardStepTimer >= stepInterval) then
@@ -494,7 +493,7 @@ RunService.RenderStepped:Connect(function(dt)
             logMessage(string.format("Taking anti-stuck %d stud backward step...", stepStuds))
         end
         
-        local direction = (targetPos - rootPart.Position).Unit
+        local direction = (targetPos - myPos).Unit
         local step = math.min(distance, travelSpeed * dt)
         
         if isSteppingBack then
@@ -508,7 +507,7 @@ RunService.RenderStepped:Connect(function(dt)
             end
         else
             statusLabel.Text = string.format("Status: Moving Forward | Target: Waypoint #%d", currentWaypointIndex)
-            rootPart.CFrame = CFrame.new(rootPart.Position + (direction * step))
+            rootPart.CFrame = CFrame.new(myPos + (direction * step))
         end
         
         rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z))
