@@ -6,7 +6,7 @@ local isRunning = false
 local autoApproach = false
 
 -- ==========================================
--- CREATE TEST UI (V5.13 - Configurable Stop Distance)
+-- CREATE TEST UI (V5.14 - Adjustable Fly Speed)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -33,7 +33,7 @@ titleLabel.Size = UDim2.new(1, -70, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.13]"
+titleLabel.Text = "Radar & Approach [V5.14]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -51,7 +51,7 @@ closeButton.BorderSizePixel = 0
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 275) -- Expanded to fit the new stop distance box
+mainFrame.Size = UDim2.new(1, 0, 0, 315) -- Expanded to fit the new speed box
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -99,7 +99,7 @@ radiusBox.Font = Enum.Font.SourceSans
 radiusBox.TextSize = 14
 radiusBox.Parent = mainFrame
 
--- Stop Distance Input Box (New!)
+-- Stop Distance Input Box
 local stopLabel = Instance.new("TextLabel")
 stopLabel.Size = UDim2.new(0, 130, 0, 30)
 stopLabel.Position = UDim2.new(0, 10, 0, 90)
@@ -115,15 +115,36 @@ stopBox.Size = UDim2.new(0, 100, 0, 30)
 stopBox.Position = UDim2.new(0, 150, 0, 90)
 stopBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 stopBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-stopBox.Text = "5" -- Default changed closer to 5 studs
+stopBox.Text = "5"
 stopBox.Font = Enum.Font.SourceSans
 stopBox.TextSize = 14
 stopBox.Parent = mainFrame
 
+-- Fly Speed Input Box (New!)
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(0, 130, 0, 30)
+speedLabel.Position = UDim2.new(0, 10, 0, 130)
+speedLabel.BackgroundTransparency = 1
+speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedLabel.Text = "Fly Speed:"
+speedLabel.Font = Enum.Font.SourceSansBold
+speedLabel.TextSize = 15
+speedLabel.Parent = mainFrame
+
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(0, 100, 0, 30)
+speedBox.Position = UDim2.new(0, 150, 0, 130)
+speedBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedBox.Text = "44" -- Default speed value
+speedBox.Font = Enum.Font.SourceSans
+speedBox.TextSize = 14
+speedBox.Parent = mainFrame
+
 -- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -20, 0, 35)
-toggleButton.Position = UDim2.new(0, 10, 0, 130)
+toggleButton.Position = UDim2.new(0, 10, 0, 170)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
@@ -134,7 +155,7 @@ toggleButton.Parent = mainFrame
 -- Auto Approach Toggle Button
 local approachButton = Instance.new("TextButton")
 approachButton.Size = UDim2.new(1, -20, 0, 35)
-approachButton.Position = UDim2.new(0, 10, 0, 175)
+approachButton.Position = UDim2.new(0, 10, 0, 215)
 approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 approachButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 approachButton.Font = Enum.Font.SourceSansBold
@@ -145,7 +166,7 @@ approachButton.Parent = mainFrame
 -- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 45)
-statusLabel.Position = UDim2.new(0, 10, 0, 220)
+statusLabel.Position = UDim2.new(0, 10, 0, 260)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 statusLabel.Text = "Status: Idle\nDetected: None"
@@ -199,7 +220,7 @@ end)
 -- ==========================================
 -- REAL-TIME RADAR & APPROACH LOOP
 -- ==========================================
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
     
     local character = localPlayer.Character
@@ -213,6 +234,7 @@ RunService.RenderStepped:Connect(function()
     local myPos = myRoot.Position
     local maxRadius = tonumber(radiusBox.Text) or 500
     local stopDistance = tonumber(stopBox.Text) or 5
+    local flySpeed = tonumber(speedBox.Text) or 44
     local targetPrefix = monsterBox.Text:lower()
     
     local closestPart = nil
@@ -244,7 +266,9 @@ RunService.RenderStepped:Connect(function()
             end
             
             if distance > stopDistance then
-                myRoot.CFrame = CFrame.new(myRoot.Position + (direction * math.min(distance - stopDistance, 2)))
+                -- Speed-based delta step calculation
+                local step = math.min(distance - stopDistance, flySpeed * dt)
+                myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(closestPart.Position.X, myRoot.Position.Y, closestPart.Position.Z))
             end
         end
