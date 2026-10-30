@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonWaypointConfigV31.json"
+local configFileName = "DungeonWaypointConfigV32.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE WAYPOINT ROUTER UI (V3.1 - Auto-Loot)
+-- CREATE WAYPOINT ROUTER UI (V3.2 - Ground Snap)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonWaypointGui_V31"
+screenGui.Name = "DungeonWaypointGui_V32"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -55,11 +55,11 @@ toggleOpenButton.MouseButton1Click:Connect(function()
 end)
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(0, 300, 0, 20)
+titleLabel.Size = UDim2.new(0, 310, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Waypoint Router [V3.1 - Loot & Config]"
+titleLabel.Text = "Waypoint Router [V3.2 - Ground Snap]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -87,7 +87,7 @@ closeButton.TextSize = 18
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 430)
+mainFrame.Size = UDim2.new(1, 0, 0, 460)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -125,6 +125,7 @@ local itemBox = createConfigRow("Item Prefix:", 105, "DropAura")
 local lootRadiusBox = createConfigRow("Loot Radius:", 135, "60")
 local stepStudsBox = createConfigRow("Step Studs:", 165, "3")
 local stepIntervalBox = createConfigRow("Step Interval (s):", 195, "6")
+local heightOffsetBox = createConfigRow("Height Offset:", 225, "3")
 
 local rightX = 250
 local rightWidth = 255
@@ -171,7 +172,7 @@ copyButton.Parent = mainFrame
 
 local importBox = Instance.new("TextBox")
 importBox.Size = UDim2.new(0, 175, 0, 30)
-importBox.Position = UDim2.new(0, 15, 0, 225)
+importBox.Position = UDim2.new(0, 15, 0, 255)
 importBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 importBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 importBox.PlaceholderText = "Paste JSON Waypoints..."
@@ -182,7 +183,7 @@ importBox.Parent = mainFrame
 
 local importButton = Instance.new("TextButton")
 importButton.Size = UDim2.new(0, 70, 0, 30)
-importButton.Position = UDim2.new(0, 195, 0, 225)
+importButton.Position = UDim2.new(0, 195, 0, 255)
 importButton.BackgroundColor3 = Color3.fromRGB(150, 50, 200)
 importButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 importButton.Font = Enum.Font.SourceSansBold
@@ -191,8 +192,8 @@ importButton.Text = "Import"
 importButton.Parent = mainFrame
 
 local logScrollingFrame = Instance.new("ScrollingFrame")
-logScrollingFrame.Size = UDim2.new(1, -30, 0, 150)
-logScrollingFrame.Position = UDim2.new(0, 15, 0, 260)
+logScrollingFrame.Size = UDim2.new(1, -30, 0, 130)
+logScrollingFrame.Position = UDim2.new(0, 15, 0, 295)
 logScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 logScrollingFrame.BorderSizePixel = 0
 logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -205,7 +206,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Waypoint Router V3.1 Ready...\nAuto-loot & configurable anti-stuck active."
+logLabel.Text = "Waypoint Router V3.2 Ready...\nGround raycasting & anti-fall active."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -329,6 +330,25 @@ local backwardStepTimer = tick()
 local isSteppingBack = false
 local backwardStepDuration = 0
 
+-- Helper function to raycast downward and find the true ground height
+local function getSnappedPosition(targetPos, heightOffset, character)
+    local rayOrigin = targetPos + Vector3.new(0, 10, 0)
+    local rayDirection = Vector3.new(0, -50, 0)
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = RaycastFilterType.Exclude
+    raycastParams.FilterDescendantsInstances = {character}
+    raycastParams.IgnoreWater = true
+    
+    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    if raycastResult then
+        return Vector3.new(targetPos.X, raycastResult.Position.Y + heightOffset, targetPos.Z)
+    else
+        -- Fallback if no floor found directly below
+        return Vector3.new(targetPos.X, targetPos.Y + heightOffset, targetPos.Z)
+    end
+end
+
 local function checkDungeonClearedAndRepeat()
     local success, cleared = pcall(function()
         for _, guiObj in ipairs(playerGui:GetDescendants()) do
@@ -366,15 +386,14 @@ local function checkDungeonClearedAndRepeat()
     return false
 end
 
--- Function to scan workspace for nearby items matching item prefix
-local function getNearestItem(myPos, itemPrefix, maxLootRadius)
+local function getNearestItem(myPos, itemPrefix, maxLootRadius, character)
     if itemPrefix == "" then return nil end
     local closestItem = nil
     local minDistance = maxLootRadius
     
     pcall(function()
         for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") then
+            if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
                 local nameLower = obj.Name:lower()
                 if string.find(nameLower, itemPrefix, 1, true) then
                     local dist = (obj.Position - myPos).Magnitude
@@ -404,14 +423,16 @@ RunService.RenderStepped:Connect(function(dt)
     local lootRadius = tonumber(lootRadiusBox.Text) or 60
     local stepStuds = tonumber(stepStudsBox.Text) or 3
     local stepInterval = tonumber(stepIntervalBox.Text) or 6.0
+    local heightOffset = tonumber(heightOffsetBox.Text) or 3
     
     local myPos = rootPart.Position
     
-    -- PRIORITY: Auto-Loot Scan before moving to waypoints
-    local nearbyItem = getNearestItem(myPos, itemPrefix, lootRadius)
+    -- PRIORITY: Auto-Loot Scan with ground snapping
+    local nearbyItem = getNearestItem(myPos, itemPrefix, lootRadius, character)
     if nearbyItem then
         statusLabel.Text = "Status: Auto-Looting Item Drop!"
-        local targetPos = nearbyItem.Position
+        local rawTargetPos = nearbyItem.Position
+        local targetPos = getSnappedPosition(rawTargetPos, heightOffset, character)
         local distance = (targetPos - myPos).Magnitude
         
         if distance > 2 then
@@ -429,7 +450,8 @@ RunService.RenderStepped:Connect(function(dt)
     if isFinalBossWaypoint then
         statusLabel.Text = "Status: Final Boss Room (Anchor Locked)"
         local targetData = waypoints[#waypoints]
-        local targetPos = Vector3.new(targetData.X, targetData.Y, targetData.Z)
+        local rawTargetPos = Vector3.new(targetData.X, targetData.Y, targetData.Z)
+        local targetPos = getSnappedPosition(rawTargetPos, heightOffset, character)
         
         if (targetPos - rootPart.Position).Magnitude > 5 then
             rootPart.CFrame = CFrame.new(targetPos)
@@ -449,7 +471,8 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     local targetData = waypoints[currentWaypointIndex]
-    local targetPos = Vector3.new(targetData.X, targetData.Y, targetData.Z)
+    local rawTargetPos = Vector3.new(targetData.X, targetData.Y, targetData.Z)
+    local targetPos = getSnappedPosition(rawTargetPos, heightOffset, character)
     
     if waitingInRoom then
         statusLabel.Text = string.format("Status: Waiting in Room #%d", currentWaypointIndex)
@@ -478,7 +501,6 @@ RunService.RenderStepped:Connect(function(dt)
             statusLabel.Text = string.format("Status: Stepping Back (%d studs) | Target: #%d", stepStuds, currentWaypointIndex)
             rootPart.CFrame = rootPart.CFrame - (direction * (travelSpeed * dt))
             
-            -- Calculate duration dynamically based on stepStuds and speed
             local requiredDuration = stepStuds / math.max(travelSpeed, 1)
             if tick() - backwardStepDuration >= requiredDuration then
                 isSteppingBack = false
