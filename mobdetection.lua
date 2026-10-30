@@ -3,12 +3,14 @@ local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
+local autoApproach = false
+local stopDistance = 15
 
 -- ==========================================
--- CREATE TEST UI (V5.9)
+-- CREATE TEST UI (V5.10)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "RadarTestGui"
+screenGui.Name = "RadarApproachTestGui"
 screenGui.ResetOnSpawn = false
 
 local success = pcall(function()
@@ -32,7 +34,7 @@ titleLabel.Size = UDim2.new(1, -70, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar Test [V5.9]"
+titleLabel.Text = "Radar & Approach [V5.10]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -50,7 +52,7 @@ closeButton.BorderSizePixel = 0
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 190)
+mainFrame.Size = UDim2.new(1, 0, 0, 235)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -93,7 +95,7 @@ radiusBox.Size = UDim2.new(0, 100, 0, 30)
 radiusBox.Position = UDim2.new(0, 150, 0, 50)
 radiusBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 radiusBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-radiusBox.Text = "500" -- Configurable search radius
+radiusBox.Text = "500"
 radiusBox.Font = Enum.Font.SourceSans
 radiusBox.TextSize = 14
 radiusBox.Parent = mainFrame
@@ -109,10 +111,21 @@ toggleButton.TextSize = 15
 toggleButton.Text = "Start Radar Test"
 toggleButton.Parent = mainFrame
 
+-- Auto Approach Toggle Button (New!)
+local approachButton = Instance.new("TextButton")
+approachButton.Size = UDim2.new(1, -20, 0, 35)
+approachButton.Position = UDim2.new(0, 10, 0, 135)
+approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+approachButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+approachButton.Font = Enum.Font.SourceSansBold
+approachButton.TextSize = 15
+approachButton.Text = "Auto Approach: OFF"
+approachButton.Parent = mainFrame
+
 -- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 45)
-statusLabel.Position = UDim2.new(0, 10, 0, 135)
+statusLabel.Position = UDim2.new(0, 10, 0, 180)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 statusLabel.Text = "Status: Idle\nDetected: None"
@@ -127,6 +140,12 @@ statusLabel.Parent = mainFrame
 -- ==========================================
 closeButton.MouseButton1Click:Connect(function()
     isRunning = false
+    autoApproach = false
+    local character = localPlayer.Character
+    local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    if rootPart then
+        rootPart.Anchored = false
+    end
     screenGui:Destroy()
 end)
 
@@ -138,12 +157,32 @@ toggleButton.MouseButton1Click:Connect(function()
     else
         toggleButton.Text = "Start Radar Test"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        autoApproach = false
+        approachButton.Text = "Auto Approach: OFF"
+        approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         statusLabel.Text = "Status: Idle\nDetected: None"
     end
 end)
 
+approachButton.MouseButton1Click:Connect(function()
+    if not isRunning then return end
+    autoApproach = not autoApproach
+    if autoApproach then
+        approachButton.Text = "Auto Approach: ON"
+        approachButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    else
+        approachButton.Text = "Auto Approach: OFF"
+        approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        local character = localPlayer.Character
+        local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+        if rootPart then
+            rootPart.Velocity = Vector3.zero
+        end
+    end
+end)
+
 -- ==========================================
--- REAL-TIME RADAR TESTING LOOP
+-- REAL-TIME RADAR & APPROACH LOOP
 -- ==========================================
 RunService.RenderStepped:Connect(function()
     if not isRunning then return end
@@ -167,7 +206,6 @@ RunService.RenderStepped:Connect(function()
         if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
             local objName = obj.Name:lower()
             
-            -- Check if part name contains our target prefix (e.g., "a_")
             if targetPrefix == "" or string.find(objName, targetPrefix, 1, true) then
                 local distance = (obj.Position - myPos).Magnitude
                 if distance <= maxRadius and distance < shortestDistance then
@@ -179,8 +217,24 @@ RunService.RenderStepped:Connect(function()
     end
     
     if closestPart then
-        statusLabel.Text = string.format("Status: Active\nDetected: [%s] (Dist: %.1f)", closestPart.Name, shortestDistance)
+        statusLabel.Text = string.format("Status: %s\nDetected: [%s] (Dist: %.1f)", autoApproach and "Approaching" else "Locked", closestPart.Name, shortestDistance)
+        
+        -- Auto Approach Movement Logic
+        if autoApproach then
+            local distance = (closestPart.Position - myRoot.Position).Magnitude
+            local direction = (closestPart.Position - myRoot.Position).Unit
+            
+            -- Simple noclip and smooth movement towards target part
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+            
+            if distance > stopDistance then
+                myRoot.CFrame = CFrame.new(myRoot.Position + (direction * math.min(distance - stopDistance, 2)))
+                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(closestPart.Position.X, myRoot.Position.Y, closestPart.Position.Z))
+            end
+        end
     else
-        statusLabel.Text = "Status: Searching...\nDetected: No matching parts in radius"
+        statusLabel.Text = "Status: Searching...\nDetected: None"
     end
 end)
