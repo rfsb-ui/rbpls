@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
+local VirtualUser = game:GetService("VirtualUser")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
@@ -10,8 +11,11 @@ local lastMobTarget = nil
 local mobApproachStartTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
+-- ESP Visual Tracking Elements
+local activeHighlights = {}
+
 -- ==========================================
--- CREATE TEST UI (V5.28 - Mob Debug Console Toggle)
+-- CREATE TEST UI (V5.30 - All Optimizations)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -38,7 +42,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.28]"
+titleLabel.Text = "Radar & Approach [V5.30]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -69,7 +73,7 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 350) -- Slightly expanded height for the new button
+mainFrame.Size = UDim2.new(1, 0, 0, 350)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -136,7 +140,7 @@ approachButton.TextSize = 15
 approachButton.Text = "Auto Approach: OFF"
 approachButton.Parent = mainFrame
 
--- Mob Debug Toggle Button (New!)
+-- Mob Debug Toggle Button
 local mobDebugButton = Instance.new("TextButton")
 mobDebugButton.Size = UDim2.new(0, rightWidth, 0, 30)
 mobDebugButton.Position = UDim2.new(0, rightX, 0, 95)
@@ -222,6 +226,36 @@ loadSettings()
 saveButton.MouseButton1Click:Connect(saveSettings)
 
 -- ==========================================
+-- ESP HIGHLIGHT CLEANUP UTILITY
+-- ==========================================
+local function clearHighlights()
+    for _, item in pairs(activeHighlights) do
+        if item and item.Parent then
+            item:Destroy()
+        end
+    end
+    activeHighlights = {}
+end
+
+local function setHighlight(targetObj, color)
+    clearHighlights()
+    if targetObj and targetObj.Parent then
+        local model = targetObj.Parent
+        if not model:IsA("Model") then
+            model = targetObj
+        end
+        
+        local highlight = Instance.new("Highlight")
+        highlight.Adornee = model
+        highlight.FillColor = color
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.FillTransparency = 0.4
+        highlight.Parent = screenGui
+        table.insert(activeHighlights, highlight)
+    end
+end
+
+-- ==========================================
 -- UI CONTROLS
 -- ==========================================
 local minimized = false
@@ -236,6 +270,7 @@ closeButton.MouseButton1Click:Connect(function()
     autoApproach = false
     mobDebugEnabled = false
     lastMobTarget = nil
+    clearHighlights()
     local character = localPlayer.Character
     local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
     if rootPart then
@@ -254,6 +289,7 @@ toggleButton.MouseButton1Click:Connect(function()
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
         autoApproach = false
         lastMobTarget = nil
+        clearHighlights()
         approachButton.Text = "Auto Approach: OFF"
         approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         statusLabel.Text = "Status: Idle\nDetected: None"
@@ -285,7 +321,15 @@ mobDebugButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Track logged parts to avoid console spamming every frame
+-- Anti-AFK Connection
+localPlayer.Idled:Connect(function()
+    if isRunning then
+        VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end
+end)
+
 local loggedPartsCache = {}
 
 -- ==========================================
@@ -305,7 +349,7 @@ RunService.RenderStepped:Connect(function(dt)
     local myPos = myRoot.Position
     local maxRadius = tonumber(radiusBox.Text) or 500
     local stopDistance = tonumber(stopBox.Text) or 5
-    local flySpeed = tonumber(speedBox.Text) or 44
+    local baseFlySpeed = tonumber(speedBox.Text) or 44
     local mobTimeout = tonumber(timeoutBox.Text) or 1.0
     local heightOffset = tonumber(heightBox.Text) or 4
     local targetPrefix = monsterBox.Text:lower()
@@ -323,7 +367,6 @@ RunService.RenderStepped:Connect(function(dt)
             local distance = (obj.Position - myPos).Magnitude
             
             if distance <= maxRadius then
-                -- Mob Debug Logger: Print unique scanned parts when enabled
                 if mobDebugEnabled and distance <= 100 then
                     if not loggedPartsCache[obj] then
                         loggedPartsCache[obj] = true
@@ -351,7 +394,11 @@ RunService.RenderStepped:Connect(function(dt)
     local targetPart = nil
     local isLooting = false
     
-    if closestMonster then
+    -- Smart Target Prioritization: Snatch nearby items immediately if close
+    if closestItem and shortestItemDist <= 35 then
+        targetPart = closestItem
+        isLooting = true
+    elseif closestMonster then
         if closestMonster ~= lastMobTarget then
             lastMobTarget = closestMonster
             mobApproachStartTime = os.clock()
@@ -370,10 +417,13 @@ RunService.RenderStepped:Connect(function(dt)
         isLooting = true
     else
         lastMobTarget = nil
-        loggedPartsCache = {} -- Reset cache when idle
+        loggedPartsCache = {}
+        clearHighlights()
     end
     
     if targetPart then
+        setHighlight(targetPart, isLooting and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 50, 50))
+        
         local modeText = isLooting and "Item" or "Mob"
         local statusText = autoApproach and (isLooting and "Looting Drop" or "Approaching Mob") or "Locked"
         statusLabel.Text = string.format("Status: %s [%s]\nDetected: [%s] (Dist: %.1f)", 
@@ -398,7 +448,11 @@ RunService.RenderStepped:Connect(function(dt)
             end
             
             if distance > stopDistance then
-                local step = math.min(distance - stopDistance, flySpeed * dt)
+                -- Dynamic Speed Scaling: Slow down smoothly as we approach within 25 studs
+                local speedMultiplier = math.clamp(distance / 25, 0.25, 1.0)
+                local currentFlySpeed = baseFlySpeed * speedMultiplier
+                
+                local step = math.min(distance - stopDistance, currentFlySpeed * dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
             end
