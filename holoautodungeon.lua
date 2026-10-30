@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonWaypointConfigV37.json"
+local configFileName = "DungeonWaypointConfigV38.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE WAYPOINT ROUTER UI (V3.7 - Direct Fix)
+-- CREATE WAYPOINT ROUTER UI (V3.8 - Skip Button)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonWaypointGui_V37"
+screenGui.Name = "DungeonWaypointGui_V38"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 310, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Waypoint Router [V3.7 - Direct Glide]"
+titleLabel.Text = "Waypoint Router [V3.8 - Skip Option]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -150,9 +150,19 @@ saveButton.TextSize = 14
 saveButton.Text = "Save Waypoint (Room)"
 saveButton.Parent = mainFrame
 
+local skipButton = Instance.new("TextButton")
+skipButton.Size = UDim2.new(0, rightWidth, 0, 30)
+skipButton.Position = UDim2.new(0, rightX, 0, 95)
+skipButton.BackgroundColor3 = Color3.fromRGB(180, 120, 0)
+skipButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+skipButton.Font = Enum.Font.SourceSansBold
+skipButton.TextSize = 14
+skipButton.Text = "Skip Waypoint"
+skipButton.Parent = mainFrame
+
 local clearButton = Instance.new("TextButton")
 clearButton.Size = UDim2.new(0, 120, 0, 30)
-clearButton.Position = UDim2.new(0, rightX, 0, 95)
+clearButton.Position = UDim2.new(0, rightX, 0, 135)
 clearButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
 clearButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 clearButton.Font = Enum.Font.SourceSansBold
@@ -162,7 +172,7 @@ clearButton.Parent = mainFrame
 
 local copyButton = Instance.new("TextButton")
 copyButton.Size = UDim2.new(0, 125, 0, 30)
-copyButton.Position = UDim2.new(0, rightX + 130, 0, 95)
+copyButton.Position = UDim2.new(0, rightX + 130, 0, 135)
 copyButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 copyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 copyButton.Font = Enum.Font.SourceSansBold
@@ -206,7 +216,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Waypoint Router V3.7 Ready...\nDirect horizontal glide active."
+logLabel.Text = "Waypoint Router V3.8 Ready...\nSkip waypoint feature active."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -257,6 +267,22 @@ saveButton.MouseButton1Click:Connect(function()
         end)
     else
         logMessage("Error: Character root part not found.")
+    end
+end)
+
+-- Skip Waypoint Manual Button
+skipButton.MouseButton1Click:Connect(function()
+    if #waypoints > 0 then
+        currentWaypointIndex = currentWaypointIndex + 1
+        waitingInRoom = false
+        isSteppingBack = false
+        backwardStepTimer = tick()
+        if currentWaypointIndex > #waypoints then
+            currentWaypointIndex = #waypoints
+        end
+        logMessage(string.format("Manual Skip! Advanced to Waypoint #%d", currentWaypointIndex))
+    else
+        logMessage("Error: No active waypoints to skip.")
     end
 end)
 
@@ -463,7 +489,6 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     local targetData = waypoints[currentWaypointIndex]
-    -- Use waypoint's exact X and Z, with character's current Y plus height offset to prevent locking
     local targetPos = Vector3.new(targetData.X, targetData.Y + heightOffset, targetData.Z)
     
     if waitingInRoom then
