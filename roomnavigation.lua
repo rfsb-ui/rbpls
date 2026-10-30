@@ -22,31 +22,37 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE ROOM TARGETER UI (V1.5.1 - Safe Parent)
+-- CREATE ROOM TARGETER UI (V1.6 - Guaranteed Display)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "RoomTargeterGui"
+screenGui.Name = "RoomTargeterGui_V16"
 screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 999999
 
--- Safely parent to CoreGui with fallback to PlayerGui
-local successCore = pcall(function()
-    screenGui.Parent = game:GetService("CoreGui")
+-- Guaranteed container injection
+local success, err = pcall(function()
+    if syn and syn.protect_gui then
+        syn.protect_gui(screenGui)
+        screenGui.Parent = game:GetService("CoreGui")
+    elseif gethui then
+        screenGui.Parent = gethui()
+    else
+        screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+    end
 end)
 
-if not successCore then
-    pcall(function()
-        screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
-    end)
+if not screenGui.Parent then
+    screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 end
 
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(0, 440, 0, 55)
-topBar.Position = UDim2.new(0.5, -220, 0.3, 0)
+topBar.Position = UDim2.new(0.5, -220, 0.2, 0) -- Centered safely near top-middle
 topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
 topBar.Active = true
 topBar.Draggable = true
+topBar.ZIndex = 10
 topBar.Parent = screenGui
 
 local titleLabel = Instance.new("TextLabel")
@@ -54,10 +60,11 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Room Targeter [V1.5.1]"
+titleLabel.Text = "Room Targeter [V1.6]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.ZIndex = 11
 titleLabel.Parent = topBar
 
 local statusLabel = Instance.new("TextLabel")
@@ -69,6 +76,7 @@ statusLabel.Text = "Status: Idle | Target: None | Rooms: 0"
 statusLabel.Font = Enum.Font.SourceSansBold
 statusLabel.TextSize = 13
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.ZIndex = 11
 statusLabel.Parent = topBar
 
 local closeButton = Instance.new("TextButton")
@@ -80,6 +88,7 @@ closeButton.Text = "X"
 closeButton.Font = Enum.Font.SourceSansBold
 closeButton.TextSize = 18
 closeButton.BorderSizePixel = 0
+closeButton.ZIndex = 11
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
@@ -87,6 +96,7 @@ mainFrame.Size = UDim2.new(1, 0, 0, 310)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
+mainFrame.ZIndex = 10
 mainFrame.Parent = topBar
 
 local function createConfigRow(name, posY, defaultValue)
@@ -99,6 +109,7 @@ local function createConfigRow(name, posY, defaultValue)
     label.Font = Enum.Font.SourceSansBold
     label.TextSize = 14
     label.TextXAlignment = Enum.TextXAlignment.Left
+    label.ZIndex = 11
     label.Parent = mainFrame
 
     local box = Instance.new("TextBox")
@@ -109,12 +120,13 @@ local function createConfigRow(name, posY, defaultValue)
     box.Text = tostring(defaultValue)
     box.Font = Enum.Font.SourceSans
     box.TextSize = 14
+    box.ZIndex = 11
     box.Parent = mainFrame
     
     return box
 end
 
-local prefixBox = createConfigRow("Room Prefix:", 15, "room")
+local prefixBox = createConfigRow("Room Prefix:", 15, "01_StartingRoom")
 local radiusBox = createConfigRow("Scan Radius:", 45, "500")
 local heightBox = createConfigRow("Height Offset:", 75, "5")
 
@@ -126,6 +138,7 @@ toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
 toggleButton.TextSize = 14
 toggleButton.Text = "Start Room Cycler"
+toggleButton.ZIndex = 11
 toggleButton.Parent = mainFrame
 
 local nextButton = Instance.new("TextButton")
@@ -136,6 +149,7 @@ nextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 nextButton.Font = Enum.Font.SourceSansBold
 nextButton.TextSize = 14
 nextButton.Text = "Next Room ➡️"
+nextButton.ZIndex = 11
 nextButton.Parent = mainFrame
 
 local copyButton = Instance.new("TextButton")
@@ -146,9 +160,9 @@ copyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 copyButton.Font = Enum.Font.SourceSansBold
 copyButton.TextSize = 14
 copyButton.Text = "Copy Room List"
+copyButton.ZIndex = 11
 copyButton.Parent = mainFrame
 
--- Scrollable Console Log Window
 local logScrollingFrame = Instance.new("ScrollingFrame")
 logScrollingFrame.Size = UDim2.new(1, -30, 0, 140)
 logScrollingFrame.Position = UDim2.new(0, 15, 0, 145)
@@ -157,6 +171,7 @@ logScrollingFrame.BorderSizePixel = 0
 logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 logScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 logScrollingFrame.ScrollBarThickness = 8
+logScrollingFrame.ZIndex = 11
 logScrollingFrame.Parent = mainFrame
 
 local logLabel = Instance.new("TextLabel")
@@ -164,12 +179,13 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Room Scanner ready..."
+logLabel.Text = "Room Scanner ready (V1.6)..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
 logLabel.TextYAlignment = Enum.TextYAlignment.Top
 logLabel.TextWrapped = true
+logLabel.ZIndex = 12
 logLabel.Parent = logScrollingFrame
 
 local logLines = {}
@@ -290,6 +306,8 @@ copyButton.MouseButton1Click:Connect(function()
         statusLabel.Text = "Status: Copy failed"
     end
 end)
+
+logMessage("V1.6 Loaded Successfully. Ready.")
 
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
