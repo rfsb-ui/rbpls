@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonWaypointConfigV21.json"
+local configFileName = "DungeonWaypointConfigV30.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE WAYPOINT ROUTER UI (V2.1)
+-- CREATE WAYPOINT ROUTER UI (V3.0 - Boss & Loop)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonWaypointGui_V21"
+screenGui.Name = "DungeonWaypointGui_V30"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 280, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Waypoint Router [V2.1 - 6s Backward Step]"
+titleLabel.Text = "Waypoint Router [V3.0 - Boss Loop]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -201,7 +201,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Waypoint Router V2.1 Ready...\nWalk to each room and click 'Save Waypoint', or paste JSON and click 'Import'."
+logLabel.Text = "Waypoint Router V3.0 Ready...\nBoss anchor & auto-loop active."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -264,7 +264,7 @@ importButton.MouseButton1Click:Connect(function()
             if writefile then writefile(configFileName, HttpService:JSONEncode(waypoints)) end
         end)
     else
-        logMessage("Error: Invalid JSON waypoint format. Ensure it's a valid coordinate table.")
+        logMessage("Error: Invalid JSON waypoint format.")
     end
 end)
 
@@ -325,6 +325,45 @@ local backwardStepTimer = tick()
 local isSteppingBack = false
 local backwardStepDuration = 0
 
+-- Function to scan screen for "Dungeon Cleared" and click "Repeat"
+local function checkDungeonClearedAndRepeat()
+    local success, cleared = pcall(function()
+        for _, guiObj in ipairs(playerGui:GetDescendants()) do
+            if guiObj:IsA("TextLabel") or guiObj:IsA("TextButton") then
+                local textLower = guiObj.Text:lower()
+                if string.find(textLower, "dungeon cleared", 1, true) or string.find(textLower, "victory", 1, true) then
+                    return true
+                end
+            end
+        end
+        return false
+    end)
+    
+    if success and cleared then
+        logMessage("Dungeon Cleared! Looking for 'Repeat Dungeon' button...")
+        pcall(function()
+            for _, guiObj in ipairs(playerGui:GetDescendants()) do
+                if guiObj:IsA("TextButton") then
+                    local btnText = guiObj.Text:lower()
+                    if string.find(btnText, "repeat", 1, true) or string.find(btnText, "replay", 1, true) or string.find(btnText, "again", 1, true) then
+                        logMessage("Found Repeat button! Clicking...")
+                        -- Simulate click
+                        if guiObj.Activated then
+                            guiObj.Activated:Fire()
+                        elseif guiObj.MouseButton1Click then
+                            guiObj.MouseButton1Click:Fire()
+                        end
+                        task.wait(1.5)
+                        return true
+                    end
+                end
+            end
+        end)
+        return true
+    end
+    return false
+end
+
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
     
@@ -337,12 +376,30 @@ RunService.RenderStepped:Connect(function(dt)
     local stopDistance = tonumber(stopBox.Text) or 3
     local roomWaitDuration = tonumber(waitBox.Text) or 2.0
     
+    -- Check if we are at the final boss waypoint (Waypoint #19 or max waypoint)
+    local isFinalBossWaypoint = (currentWaypointIndex >= #waypoints)
+    
+    if isFinalBossWaypoint then
+        statusLabel.Text = "Status: Final Boss Room (Anchor Locked)"
+        local targetData = waypoints[#waypoints]
+        local targetPos = Vector3.new(targetData.X, targetData.Y, targetData.Z)
+        
+        -- Lock position to boss waypoint if knocked back
+        if (targetPos - rootPart.Position).Magnitude > 5 then
+            rootPart.CFrame = CFrame.new(targetPos)
+        end
+        
+        -- Check if dungeon is cleared and repeat
+        if checkDungeonClearedAndRepeat() then
+            logMessage("Restarting run from Waypoint #1...")
+            currentWaypointIndex = 1
+            waitingInRoom = false
+        end
+        return
+    end
+    
     if currentWaypointIndex > #waypoints then
-        logMessage("Route complete! Reached final waypoint.")
-        isRunning = false
-        toggleButton.Text = "Start Route Bot"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-        currentWaypointIndex = 1
+        currentWaypointIndex = #waypoints
         return
     end
     
@@ -354,7 +411,7 @@ RunService.RenderStepped:Connect(function(dt)
         if tick() - roomWaitTimer >= roomWaitDuration then
             waitingInRoom = false
             currentWaypointIndex = currentWaypointIndex + 1
-            backwardStepTimer = tick() -- Reset timer for next room leg
+            backwardStepTimer = tick()
             logMessage(string.format("Advancing to Waypoint #%d...", currentWaypointIndex))
         end
         return
@@ -363,11 +420,10 @@ RunService.RenderStepped:Connect(function(dt)
     local distance = (targetPos - rootPart.Position).Magnitude
     
     if distance > stopDistance then
-        -- Check if it's time to take a 2-stud backward step every 6 seconds
         if not isSteppingBack and (tick() - backwardStepTimer >= 6.0) then
             isSteppingBack = true
             backwardStepDuration = tick()
-            logMessage("Taking anti-stuck 2 stud backward step...")
+            logMessage("Taking anti-stuck 3 stud backward step...")
         end
         
         local direction = (targetPos - rootPart.Position).Unit
@@ -375,12 +431,11 @@ RunService.RenderStepped:Connect(function(dt)
         
         if isSteppingBack then
             statusLabel.Text = string.format("Status: Stepping Back | Target: Waypoint #%d", currentWaypointIndex)
-            -- Move backward (-direction) for roughly 0.25 seconds or until 2 studs covered
             rootPart.CFrame = rootPart.CFrame - (direction * (travelSpeed * dt))
             
-            if tick() - backwardStepDuration >= 0.25 then
+            if tick() - backwardStepDuration >= 0.35 then
                 isSteppingBack = false
-                backwardStepTimer = tick() -- Reset 6s timer
+                backwardStepTimer = tick()
             end
         else
             statusLabel.Text = string.format("Status: Moving Forward | Target: Waypoint #%d", currentWaypointIndex)
