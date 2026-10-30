@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonWaypointConfigV34.json"
+local configFileName = "DungeonWaypointConfigV35.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE WAYPOINT ROUTER UI (V3.4 - Log Import & Fix)
+-- CREATE WAYPOINT ROUTER UI (V3.5 - Kickstart)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonWaypointGui_V34"
+screenGui.Name = "DungeonWaypointGui_V35"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 310, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Waypoint Router [V3.4 - Log Import]"
+titleLabel.Text = "Waypoint Router [V3.5 - Kickstart]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -206,7 +206,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Waypoint Router V3.4 Ready...\nImport logs waypoints instantly."
+logLabel.Text = "Waypoint Router V3.5 Ready...\nClick Start Route Bot to begin navigation."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -234,6 +234,11 @@ closeButton.MouseButton1Click:Connect(function()
 end)
 
 local waypoints = {}
+local currentWaypointIndex = 1
+local roomWaitTimer = 0
+local waitingInRoom = false
+local backwardStepTimer = tick()
+local isSteppingBack = false
 
 saveButton.MouseButton1Click:Connect(function()
     local character = localPlayer.Character
@@ -263,9 +268,9 @@ importButton.MouseButton1Click:Connect(function()
     
     if success and type(result) == "table" and #result > 0 then
         waypoints = result
+        currentWaypointIndex = 1
         logMessage(string.format("Successfully imported %d waypoints!", #waypoints))
         
-        -- Log out each imported waypoint into the UI window
         for i, wp in ipairs(waypoints) do
             logMessage(string.format("[Room #%d Imported] X: %.1f, Y: %.1f, Z: %.1f", i, wp.X, wp.Y, wp.Z))
         end
@@ -281,6 +286,7 @@ end)
 
 clearButton.MouseButton1Click:Connect(function()
     waypoints = {}
+    currentWaypointIndex = 1
     logLines = {}
     logLabel.Text = "All waypoints and logs cleared."
     statusLabel.Text = "Status: Idle | Waypoints: 0 | Target: None"
@@ -294,6 +300,7 @@ pcall(function()
         local data = HttpService:JSONDecode(readfile(configFileName))
         if type(data) == "table" then
             waypoints = data
+            currentWaypointIndex = 1
             logMessage(string.format("Loaded %d saved waypoints from file.", #waypoints))
             for i, wp in ipairs(waypoints) do
                 logMessage(string.format("[Room #%d] X: %.1f, Y: %.1f, Z: %.1f", i, wp.X, wp.Y, wp.Z))
@@ -316,9 +323,12 @@ toggleButton.MouseButton1Click:Connect(function()
     
     isRunning = not isRunning
     if isRunning then
+        currentWaypointIndex = 1 -- Force kickstart from waypoint 1
+        backwardStepTimer = tick()
+        waitingInRoom = false
         toggleButton.Text = "Stop Route Bot"
         toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        logMessage("Waypoint Router Started!")
+        logMessage("Waypoint Router Started! Moving to Waypoint #1...")
     else
         toggleButton.Text = "Start Route Bot"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
@@ -331,13 +341,6 @@ toggleButton.MouseButton1Click:Connect(function()
         logMessage("Waypoint Router Stopped.")
     end
 end)
-
-local currentWaypointIndex = 1
-local roomWaitTimer = 0
-local waitingInRoom = false
-local backwardStepTimer = tick()
-local isSteppingBack = false
-local backwardStepDuration = 0
 
 local function getSnappedPosition(targetPos, heightOffset, character)
     local rayOrigin = targetPos + Vector3.new(0, 10, 0)
@@ -451,7 +454,7 @@ RunService.RenderStepped:Connect(function(dt)
         return
     end
     
-    -- Final Boss Waypoint Check (Strictly on final index)
+    -- Final Boss Waypoint Check
     local isFinalBossWaypoint = (#waypoints > 0 and currentWaypointIndex == #waypoints)
     
     if isFinalBossWaypoint then
