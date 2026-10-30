@@ -16,7 +16,7 @@ local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.48 - Deep Container Scan)
+-- CREATE TEST UI (V5.49 - Turtle FX Filter)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.48]"
+titleLabel.Text = "Radar & Approach [V5.49]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -106,8 +106,8 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
--- Left Column Inputs
-local monsterBox = createConfigRow("Target Name:", 15, "Divecrab")
+-- Left Column Inputs (Default updated to CTurtleFXc)
+local monsterBox = createConfigRow("Target Name:", 15, "CTurtleFXc")
 local radiusBox = createConfigRow("Stud Radius:", 45, "500")
 local stopBox = createConfigRow("Stop Distance:", 75, "5")
 local speedBox = createConfigRow("Fly Speed:", 105, "44")
@@ -362,7 +362,7 @@ end)
 local loggedPartsCache = {}
 
 -- ==========================================
--- REAL-TIME RADAR & APPROACH LOOP (V5.48)
+-- REAL-TIME RADAR & APPROACH LOOP (V5.49)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -399,7 +399,6 @@ RunService.RenderStepped:Connect(function(dt)
     local closestItem = nil
     local shortestItemDist = math.huge
     
-    -- Gather models from workspace and common dungeon entity folders
     local scanList = {workspace}
     for _, child in ipairs(workspace:GetChildren()) do
         if child:IsA("Folder") or child:IsA("Model") then
@@ -422,7 +421,6 @@ RunService.RenderStepped:Connect(function(dt)
                         local model = obj.Parent
                         local modelName = model and model.Name:lower() or ""
                         
-                        -- DEBUG TRACE: Prints every part scanned when Mob Debug is ON
                         if mobDebugEnabled and distance <= 120 then
                             if not loggedPartsCache[obj] then
                                 loggedPartsCache[obj] = true
@@ -439,20 +437,36 @@ RunService.RenderStepped:Connect(function(dt)
                         
                         if not lockedTarget and targetNameInput ~= "" then
                             if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
-                                local tooCloseToRecent = false
-                                for _, recent in ipairs(recentTargetHistory) do
-                                    if (obj.Position - recent.pos).Magnitude < minBlacklistDist then
-                                        tooCloseToRecent = true
+                                
+                                -- EXCLUSIVE COMBAT FX FILTER: Automatically ignore all 11 combat/animation effect sub-parts
+                                local isCombatFX = string.find(objName, "_ring", 1, true) or
+                                                 string.find(objName, "_launch", 1, true) or
+                                                 string.find(objName, "_skid", 1, true) or
+                                                 string.find(objName, "_death", 1, true) or
+                                                 string.find(objName, "_splash", 1, true) or
+                                                 string.find(objName, "_hit", 1, true) or
+                                                 string.find(objName, "_puff", 1, true) or
+                                                 string.find(objName, "_slam", 1, true) or
+                                                 string.find(objName, "_erupt", 1, true) or
+                                                 string.find(objName, "_crumble", 1, true) or
+                                                 string.find(objName, "_snap", 1, true)
+                                                 
+                                if not isCombatFX then
+                                    local tooCloseToRecent = false
+                                    for _, recent in ipairs(recentTargetHistory) do
+                                        if (obj.Position - recent.pos).Magnitude < minBlacklistDist then
+                                            tooCloseToRecent = true
+                                            break
+                                        end
+                                    end
+                                    
+                                    if not tooCloseToRecent then
+                                        lockedTarget = obj
+                                        mobApproachStartTime = os.clock()
+                                        table.insert(recentTargetHistory, {pos = obj.Position, time = os.clock()})
+                                        print(string.format("[LOCKED] Clean Core Part Acquired -> Part: %s (Model: %s) at Dist: %.1f", obj.Name, model.Name, distance))
                                         break
                                     end
-                                end
-                                
-                                if not tooCloseToRecent then
-                                    lockedTarget = obj
-                                    mobApproachStartTime = os.clock()
-                                    table.insert(recentTargetHistory, {pos = obj.Position, time = os.clock()})
-                                    print(string.format("[LOCKED] Target Acquired -> Part: %s (Model: %s) at Dist: %.1f", obj.Name, model.Name, distance))
-                                    break
                                 end
                             end
                         end
