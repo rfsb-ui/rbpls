@@ -7,7 +7,7 @@ local localPlayer = Players.LocalPlayer
 local isRunning = false
 local autoApproach = true
 local autoLootEnabled = true
-local configFileName = "DungeonMonsterFarmerConfig.json"
+local configFileName = "DungeonRadarConfig.json"
 
 local function copyToClipboard(text)
     local success = pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON MONSTER FARMER UI (V2.1)
+-- CREATE DUNGEON RADAR & MONSTER FARMER (V2.2)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonMonsterFarmerGui"
+screenGui.Name = "DungeonRadarGui_V22"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 999999
 
@@ -60,7 +60,7 @@ titleLabel.Size = UDim2.new(0, 200, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Monster Targeter [V2.1]"
+titleLabel.Text = "Monster Radar & Farmer [V2.2]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -105,7 +105,7 @@ minimizeButton.ZIndex = 11
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 280)
+mainFrame.Size = UDim2.new(1, 0, 0, 390)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -141,7 +141,7 @@ end
 
 local monsterBox = createConfigRow("Monster Name:", 15, "Goblin")
 local gateBox = createConfigRow("Gate Keyword:", 45, "door")
-local radiusBox = createConfigRow("Stud Radius:", 75, "500")
+local radiusBox = createConfigRow("Stud Radius:", 75, "300")
 local stopBox = createConfigRow("Stop Distance:", 105, "5")
 local speedBox = createConfigRow("Fly Speed:", 135, "44")
 local heightBox = createConfigRow("Height Offset:", 165, "4")
@@ -150,20 +150,31 @@ local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
 local rightX = 240
 local rightWidth = 265
 
+local radarButton = Instance.new("TextButton")
+radarButton.Size = UDim2.new(0, rightWidth, 0, 30)
+radarButton.Position = UDim2.new(0, rightX, 0, 15)
+radarButton.BackgroundColor3 = Color3.fromRGB(215, 120, 0)
+radarButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+radarButton.Font = Enum.Font.SourceSansBold
+radarButton.TextSize = 15
+radarButton.Text = "Run Radar Scan"
+radarButton.ZIndex = 11
+radarButton.Parent = mainFrame
+
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, rightWidth, 0, 30)
-toggleButton.Position = UDim2.new(0, rightX, 0, 15)
+toggleButton.Position = UDim2.new(0, rightX, 0, 55)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
 toggleButton.TextSize = 15
 toggleButton.Text = "Start Monster Bot"
-toggleButton.ZIndex = 11
+toggleButton.ZIndex, toggleButton.ZIndex = 11, 11
 toggleButton.Parent = mainFrame
 
 local approachButton = Instance.new("TextButton")
 approachButton.Size = UDim2.new(0, rightWidth, 0, 30)
-approachButton.Position = UDim2.new(0, rightX, 0, 55)
+approachButton.Position = UDim2.new(0, rightX, 0, 95)
 approachButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 approachButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 approachButton.Font = Enum.Font.SourceSansBold
@@ -174,7 +185,7 @@ approachButton.Parent = mainFrame
 
 local lootButton = Instance.new("TextButton")
 lootButton.Size = UDim2.new(0, rightWidth, 0, 30)
-lootButton.Position = UDim2.new(0, rightX, 0, 95)
+lootButton.Position = UDim2.new(0, rightX, 0, 135)
 lootButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 lootButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 lootButton.Font = Enum.Font.SourceSansBold
@@ -182,6 +193,41 @@ lootButton.TextSize = 15
 lootButton.Text = "Auto Loot: ON"
 lootButton.ZIndex = 11
 lootButton.Parent = mainFrame
+
+-- Scrollable Console Log Window
+local logScrollingFrame = Instance.new("ScrollingFrame")
+logScrollingFrame.Size = UDim2.new(1, -30, 0, 135)
+logScrollingFrame.Position = UDim2.new(0, 15, 0, 240)
+logScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+logScrollingFrame.BorderSizePixel = 0
+logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+logScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+logScrollingFrame.ScrollBarThickness = 8
+logScrollingFrame.ZIndex = 11
+logScrollingFrame.Parent = mainFrame
+
+local logLabel = Instance.new("TextLabel")
+logLabel.Size = UDim2.new(1, -10, 1, 0)
+logLabel.Position = UDim2.new(0, 5, 0, 0)
+logLabel.BackgroundTransparency = 1
+logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+logLabel.Text = "Radar Scanner Ready..."
+logLabel.Font = Enum.Font.Code
+logLabel.TextSize = 12
+logLabel.TextXAlignment = Enum.TextXAlignment.Left
+logLabel.TextYAlignment = Enum.TextYAlignment.Top
+logLabel.TextWrapped = true
+logLabel.ZIndex = 12
+logLabel.Parent = logScrollingFrame
+
+local logLines = {}
+local function logMessage(msg)
+    table.insert(logLines, msg)
+    if #logLines > 150 then table.remove(logLines, 1) end
+    logLabel.Text = table.concat(logLines, "\n")
+    print(msg)
+    logScrollingFrame.CanvasPosition = Vector2.new(0, logLabel.AbsoluteSize.Y)
+end
 
 local minimized = false
 minimizeButton.MouseButton1Click:Connect(function()
@@ -198,11 +244,58 @@ closeButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
+-- Radar Scan Execution
+radarButton.MouseButton1Click:Connect(function()
+    local character = localPlayer.Character
+    local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    if not myRoot then
+        logMessage("Error: Character root part not found for radar scan.")
+        return
+    end
+    
+    local myPos = myRoot.Position
+    local maxRadius = tonumber(radiusBox.Text) or 300
+    
+    logMessage("------------------------------------------")
+    logMessage(string.format("Running Radar Scan (Radius: %d)...", maxRadius))
+    
+    local foundModels = {}
+    pcall(function()
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Model") and obj ~= character and not obj:IsDescendantOf(character) then
+                local hrp = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                if hrp then
+                    local dist = (hrp.Position - myPos).Magnitude
+                    if dist <= maxRadius then
+                        local modelName = obj.Name
+                        foundModels[modelName] = (foundModels[modelName] or 0) + 1
+                    end
+                end
+            end
+        end
+    end)
+    
+    local count = 0
+    local buffer = {"--- RADAR SCAN RESULTS ---"}
+    for name, cnt in pairs(foundModels) do
+        count = count + 1
+        local msg = string.format("[%d] Model: %s (Count: %d)", count, name, cnt)
+        logMessage(msg)
+        table.insert(buffer, msg)
+    end
+    logMessage(string.format("Radar Scan Complete. Unique models found: %d", count))
+    logMessage("------------------------------------------")
+    
+    copyToClipboard(table.concat(buffer, "\n"))
+    statusLabel.Text = string.format("Status: Radar found %d models (Copied)", count)
+end)
+
 toggleButton.MouseButton1Click:Connect(function()
     isRunning = not isRunning
     if isRunning then
         toggleButton.Text = "Stop Monster Bot"
         toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        logMessage("Monster Bot Started. Navigating gate...")
     else
         toggleButton.Text = "Start Monster Bot"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
@@ -210,6 +303,7 @@ toggleButton.MouseButton1Click:Connect(function()
         local character = localPlayer.Character
         local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
         if rootPart then rootPart.Anchored = false end
+        logMessage("Monster Bot Stopped.")
     end
 end)
 
@@ -233,11 +327,11 @@ localPlayer.Idled:Connect(function()
     end
 end)
 
-local phase = "NavigatingGate" -- "NavigatingGate" -> "FarmingMonsters"
+local phase = "NavigatingGate"
 local targetGatePos = nil
 
 -- ==========================================
--- MAIN RUNTIME LOOP (V2.1)
+-- MAIN RUNTIME LOOP (V2.2)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -251,7 +345,7 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     local myPos = myRoot.Position
-    local maxRadius = tonumber(radiusBox.Text) or 500
+    local maxRadius = tonumber(radiusBox.Text) or 300
     local stopDistance = tonumber(stopBox.Text) or 5
     local flySpeed = tonumber(speedBox.Text) or 44
     local heightOffset = tonumber(heightBox.Text) or 4
@@ -289,6 +383,7 @@ RunService.RenderStepped:Connect(function(dt)
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetGatePos.X, myRoot.Position.Y, targetGatePos.Z))
             else
                 phase = "FarmingMonsters"
+                logMessage("Gate passed! Starting monster farming phase.")
             end
         else
             statusLabel.Text = string.format("Status: Searching for Gate... | Target: None | Monsters: 0")
@@ -306,7 +401,6 @@ RunService.RenderStepped:Connect(function(dt)
     
     pcall(function()
         for _, obj in ipairs(workspace:GetDescendants()) do
-            -- Check for Item Drops if Auto Loot is enabled
             if autoLootEnabled and itemPrefix ~= "" and obj:IsA("BasePart") and string.find(obj.Name:lower(), itemPrefix, 1, true) then
                 local dist = (obj.Position - myPos).Magnitude
                 if dist <= 50 and dist < shortestItemDist then
@@ -315,7 +409,6 @@ RunService.RenderStepped:Connect(function(dt)
                 end
             end
             
-            -- Check for Live Monsters (Models or Parts matching monster name with Humanoid or RootPart)
             if obj:IsA("Model") and obj ~= character and not obj:IsDescendantOf(character) then
                 local modelName = obj.Name:lower()
                 if monsterNameInput ~= "" and string.find(modelName, monsterNameInput, 1, true) then
