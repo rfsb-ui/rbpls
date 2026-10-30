@@ -22,17 +22,22 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE ROOM TARGETER UI (V1.5)
+-- CREATE ROOM TARGETER UI (V1.5.1 - Safe Parent)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RoomTargeterGui"
 screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
 
-local success = pcall(function()
+-- Safely parent to CoreGui with fallback to PlayerGui
+local successCore = pcall(function()
     screenGui.Parent = game:GetService("CoreGui")
 end)
-if not success then
-    screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+if not successCore then
+    pcall(function()
+        screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+    end)
 end
 
 local topBar = Instance.new("Frame")
@@ -49,7 +54,7 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Room Targeter [V1.5]"
+titleLabel.Text = "Room Targeter [V1.5.1]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -202,7 +207,6 @@ local function scanRooms()
                 elseif obj:IsA("Model") and obj.PrimaryPart then
                     targetPos = obj.PrimaryPart.Position
                 else
-                    -- Fallback: find first basepart inside model/folder
                     for _, child in ipairs(obj:GetDescendants()) do
                         if child:IsA("BasePart") then
                             targetPos = child.Position
@@ -214,7 +218,6 @@ local function scanRooms()
                 if targetPos then
                     local dist = (targetPos - myPos).Magnitude
                     if dist <= maxRadius then
-                        -- Check for duplicates to avoid adding every single part of the same room
                         local isDuplicate = false
                         for _, room in ipairs(foundRooms) do
                             if (room.Position - targetPos).Magnitude < 10 or room.Name == obj.Name then
@@ -236,7 +239,6 @@ local function scanRooms()
         end
     end)
     
-    -- Sort by distance
     table.sort(foundRooms, function(a, b) return a.Distance < b.Distance end)
     roomsCache = foundRooms
     
@@ -255,4 +257,55 @@ toggleButton.MouseButton1Click:Connect(function()
     else
         toggleButton.Text = "Start Room Cycler"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-        statusLabel.Text = "Status: Idle | Target: None | Rooms:
+        statusLabel.Text = "Status: Idle | Target: None | Rooms: 0"
+        logMessage("Room cycler stopped.")
+    end
+end)
+
+nextButton.MouseButton1Click:Connect(function()
+    if #roomsCache > 0 then
+        currentRoomIndex = currentRoomIndex + 1
+        if currentRoomIndex > #roomsCache then
+            currentRoomIndex = 1
+        end
+        logMessage(string.format("Manually switched to Room #%d: %s", currentRoomIndex, roomsCache[currentRoomIndex].Name))
+    else
+        logMessage("No rooms cached yet. Start the cycler or scan first.")
+    end
+end)
+
+copyButton.MouseButton1Click:Connect(function()
+    local buffer = {}
+    table.insert(buffer, "--- DETECTED ROOMS LIST ---")
+    for i, room in ipairs(roomsCache) do
+        table.insert(buffer, string.format("[%d] %s | Dist: %.1fm", i, room.Name, room.Distance))
+    end
+    local fullText = table.concat(buffer, "\n")
+    if copyToClipboard(fullText) then
+        statusLabel.Text = "Status: Rooms list copied!"
+        copyButton.Text = "Copied!"
+        task.wait(1)
+        copyButton.Text = "Copy Room List"
+    else
+        statusLabel.Text = "Status: Copy failed"
+    end
+end)
+
+RunService.RenderStepped:Connect(function(dt)
+    if not isRunning then return end
+    
+    lastScanTime = lastScanTime + dt
+    if lastScanTime >= 3.0 or #roomsCache == 0 then
+        lastScanTime = 0
+        scanRooms()
+    end
+    
+    if #roomsCache > 0 then
+        local currentRoom = roomsCache[currentRoomIndex]
+        if currentRoom then
+            statusLabel.Text = string.format("Status: Tracking | Target: %s | Rooms: %d", currentRoom.Name, #roomsCache)
+        end
+    else
+        statusLabel.Text = "Status: Searching for Rooms... | Rooms: 0"
+    end
+end)
