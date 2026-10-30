@@ -4,7 +4,7 @@ local VirtualUser = game:GetService("VirtualUser")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
-local configFileName = "DungeonFlowConfigV30.json"
+local configFileName = "DungeonFlowConfigV31.json"
 
 local function copyToClipboard(text)
     local success = pcall(function()
@@ -20,10 +20,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON FLOW BOT UI (V3.0)
+-- CREATE DUNGEON FLOW BOT UI (V3.1 - Forward Gate)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V30"
+screenGui.Name = "DungeonFlowGui_V31"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 999999
 
@@ -57,7 +57,7 @@ titleLabel.Size = UDim2.new(0, 220, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Flow Bot [V3.0]"
+titleLabel.Text = "Dungeon Flow Bot [V3.1]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -175,7 +175,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Dungeon Flow Bot V3.0 Ready..."
+logLabel.Text = "Dungeon Flow Bot V3.1 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -233,8 +233,7 @@ localPlayer.Idled:Connect(function()
     end
 end)
 
--- Flow State Machine Variables
-local currentPhase = "ScanCurrentRoom" -- ScanCurrentRoom -> MovingToGate -> WaitingPostGate -> FarmingRoom
+local currentPhase = "ScanCurrentRoom"
 local targetGatePos = nil
 local postGateWaitTimer = 0
 
@@ -250,6 +249,7 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     local myPos = myRoot.Position
+    local myLookVector = myRoot.CFrame.LookVector
     local maxRadius = tonumber(radiusBox.Text) or 400
     local stopDistance = tonumber(stopBox.Text) or 5
     local flySpeed = tonumber(speedBox.Text) or 44
@@ -258,7 +258,6 @@ RunService.RenderStepped:Connect(function(dt)
     local gateKeyword = gateBox.Text:lower()
     local itemPrefix = itemBox.Text:lower()
     
-    -- Function to detect active mobs or items
     local function getActiveMobsAndItems()
         local mobs = {}
         local items = {}
@@ -270,11 +269,9 @@ RunService.RenderStepped:Connect(function(dt)
                     local dist = (obj.Position - myPos).Magnitude
                     
                     if dist <= maxRadius then
-                        -- Check mob
                         if mobPrefix ~= "" and (string.find(nameLower, mobPrefix, 1, true) or string.find(parentName, mobPrefix, 1, true)) then
                             table.insert(mobs, obj)
                         end
-                        -- Check item drop
                         if itemPrefix ~= "" and string.find(nameLower, itemPrefix, 1, true) and dist <= 60 then
                             table.insert(items, obj)
                         end
@@ -294,37 +291,70 @@ RunService.RenderStepped:Connect(function(dt)
             logMessage(string.format("Mobs detected (%d). Starting room farm...", #activeMobs))
             currentPhase = "FarmingRoom"
         else
-            logMessage("No mobs detected in current room. Moving to Gate...")
+            logMessage("No mobs detected. Locating forward gate...")
             currentPhase = "MovingToGate"
             targetGatePos = nil
         end
         return
     end
     
-    -- PHASE 2: Fly to Gate and move +30 studs past it
+    -- PHASE 2: Find Forward Gate (Strictly ahead of character view) and move +30 studs past it
     if currentPhase == "MovingToGate" then
         if not targetGatePos then
-            local closestDist = math.huge
+            local bestGatePos = nil
+            local highestDot = -math.huge
+            
             pcall(function()
                 for _, obj in ipairs(workspace:GetDescendants()) do
                     if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
                         local nameLower = obj.Name:lower()
                         local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+                        
                         if string.find(nameLower, gateKeyword, 1, true) or string.find(parentName, gateKeyword, 1, true) then
-                            local dist = (obj.Position - myPos).Magnitude
-                            if dist <= maxRadius and dist < closestDist then
-                                closestDist = dist
-                                local dir = (obj.Position - myPos).Unit
-                                targetGatePos = obj.Position + (dir * 30) -- 30 studs past gate
+                            local toGateDir = (obj.Position - myPos)
+                            local dist = toGateDir.Magnitude
+                            
+                            if dist <= maxRadius then
+                                local unitDir = toGateDir.Unit
+                                local dot = myLookVector:Dot(unitDir)
+                                
+                                -- Dot > 0 means the gate is in front of the player
+                                if dot > 0 and dot > highestDot then
+                                    highestDot = dot
+                                    bestGatePos = obj.Position + (unitDir * 30)
+                                end
                             end
                         end
                     end
                 end
             end)
+            
+            -- Fallback if no gate found in front: pick absolute closest gate
+            if not bestGatePos then
+                local closestDist = math.huge
+                pcall(function()
+                    for _, obj in ipairs(workspace:GetDescendants()) do
+                        if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
+                            local nameLower = obj.Name:lower()
+                            local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+                            if string.find(nameLower, gateKeyword, 1, true) or string.find(parentName, gateKeyword, 1, true) then
+                                local dist = (obj.Position - myPos).Magnitude
+                                if dist <= maxRadius and dist < closestDist then
+                                    closestDist = dist
+                                    local dir = (obj.Position - myPos).Unit
+                                    bestGatePos = obj.Position + (dir * 30)
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+            
+            targetGatePos = bestGatePos
         end
         
         if targetGatePos then
-            statusLabel.Text = string.format("Status: Advancing Gate (+30s) | Phase: Gate | Mobs: %d", #activeMobs)
+            statusLabel.Text = string.format("Status: Advancing Forward Gate | Phase: Gate | Mobs: %d", #activeMobs)
             local distance = (targetGatePos - myRoot.Position).Magnitude
             if distance > stopDistance then
                 local direction = (targetGatePos - myRoot.Position).Unit
@@ -332,12 +362,12 @@ RunService.RenderStepped:Connect(function(dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetGatePos.X, myRoot.Position.Y, targetGatePos.Z))
             else
-                logMessage("Passed gate +30 studs. Waiting 5 seconds...")
+                logMessage("Passed forward gate +30 studs. Waiting 5 seconds...")
                 postGateWaitTimer = tick()
                 currentPhase = "WaitingPostGate"
             end
         else
-            statusLabel.Text = "Status: Searching for Gate... | Phase: Gate | Mobs: 0"
+            statusLabel.Text = "Status: Searching for Forward Gate... | Phase: Gate | Mobs: 0"
         end
         return
     end
@@ -363,12 +393,10 @@ RunService.RenderStepped:Connect(function(dt)
             return
         end
         
-        -- Determine target (Item drop takes priority if nearby, otherwise closest mob)
         local targetPos = nil
         if #activeItems > 0 then
             targetPos = activeItems[1].Position
         elseif #activeMobs > 0 then
-            -- Find closest mob
             local closestMob = activeMobs[1]
             local minD = (closestMob.Position - myPos).Magnitude
             for i = 2, #activeMobs do
