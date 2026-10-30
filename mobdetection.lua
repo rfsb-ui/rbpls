@@ -10,7 +10,7 @@ local mobApproachStartTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
 -- ==========================================
--- CREATE TEST UI (V5.19 - Minimize Button & Fixed Height)
+-- CREATE TEST UI (V5.20 - Height Offset Above Mobs)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -37,7 +37,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.19]"
+titleLabel.Text = "Radar & Approach [V5.20]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -68,7 +68,7 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 430) -- Generous height to fit all rows and the save button
+mainFrame.Size = UDim2.new(1, 0, 0, 470) -- Expanded height to fit the new height offset row
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -106,11 +106,12 @@ local radiusBox = createRow("Stud Radius:", 55, "500")
 local stopBox = createRow("Stop Distance:", 95, "5")
 local speedBox = createRow("Fly Speed:", 135, "44")
 local timeoutBox = createRow("Mob Timeout (s):", 175, "1.0")
+local heightBox = createRow("Height Offset:", 215, "4") -- New height offset row (defaults to 4 studs above)
 
 -- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -30, 0, 35)
-toggleButton.Position = UDim2.new(0, 15, 0, 220)
+toggleButton.Position = UDim2.new(0, 15, 0, 260)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
@@ -121,7 +122,7 @@ toggleButton.Parent = mainFrame
 -- Auto Approach Toggle Button
 local approachButton = Instance.new("TextButton")
 approachButton.Size = UDim2.new(1, -30, 0, 35)
-approachButton.Position = UDim2.new(0, 15, 0, 265)
+approachButton.Position = UDim2.new(0, 15, 0, 305)
 approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 approachButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 approachButton.Font = Enum.Font.SourceSansBold
@@ -132,7 +133,7 @@ approachButton.Parent = mainFrame
 -- Save Button
 local saveButton = Instance.new("TextButton")
 saveButton.Size = UDim2.new(1, -30, 0, 35)
-saveButton.Position = UDim2.new(0, 15, 0, 310)
+saveButton.Position = UDim2.new(0, 15, 0, 350)
 saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveButton.Font = Enum.Font.SourceSansBold
@@ -143,7 +144,7 @@ saveButton.Parent = mainFrame
 -- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -30, 0, 60)
-statusLabel.Position = UDim2.new(0, 15, 0, 355)
+statusLabel.Position = UDim2.new(0, 15, 0, 395)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 statusLabel.Text = "Status: Idle\nDetected: None"
@@ -162,7 +163,8 @@ local function saveSettings()
         StudRadius = radiusBox.Text,
         StopDistance = stopBox.Text,
         FlySpeed = speedBox.Text,
-        MobTimeout = timeoutBox.Text
+        MobTimeout = timeoutBox.Text,
+        HeightOffset = heightBox.Text
     }
     
     pcall(function()
@@ -191,6 +193,7 @@ local function loadSettings()
                 if data.StopDistance then stopBox.Text = tostring(data.StopDistance) end
                 if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
                 if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
+                if data.HeightOffset then heightBox.Text = tostring(data.HeightOffset) end
             end
         end
     end)
@@ -270,6 +273,7 @@ RunService.RenderStepped:Connect(function(dt)
     local stopDistance = tonumber(stopBox.Text) or 5
     local flySpeed = tonumber(speedBox.Text) or 44
     local mobTimeout = tonumber(timeoutBox.Text) or 1.0
+    local heightOffset = tonumber(heightBox.Text) or 4
     local targetPrefix = monsterBox.Text:lower()
     
     local closestPart = nil
@@ -305,8 +309,10 @@ RunService.RenderStepped:Connect(function(dt)
         statusLabel.Text = string.format("Status: %s\nDetected: [%s] (Dist: %.1f)", autoApproach and "Approaching" or "Locked", closestPart.Name, shortestDistance)
         
         if autoApproach then
-            local distance = (closestPart.Position - myRoot.Position).Magnitude
-            local direction = (closestPart.Position - myRoot.Position).Unit
+            -- Apply height offset to target position so we hover above uphill/sloped mobs
+            local targetPos = closestPart.Position + Vector3.new(0, heightOffset, 0)
+            local distance = (targetPos - myRoot.Position).Magnitude
+            local direction = (targetPos - myRoot.Position).Unit
             
             for _, part in ipairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then part.CanCollide = false end
@@ -315,7 +321,7 @@ RunService.RenderStepped:Connect(function(dt)
             if distance > stopDistance then
                 local step = math.min(distance - stopDistance, flySpeed * dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
-                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(closestPart.Position.X, myRoot.Position.Y, closestPart.Position.Z))
+                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
             end
         end
     else
