@@ -15,7 +15,7 @@ local configFileName = "RadarApproachTestConfig.json"
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.37 - Humanoid DisplayName Matching)
+-- CREATE TEST UI (V5.38 - Supercharged Debugger)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -42,7 +42,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.37]"
+titleLabel.Text = "Radar & Approach [V5.38]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -105,7 +105,7 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
--- Left Column Inputs (Default updated to Divecrab)
+-- Left Column Inputs
 local monsterBox = createConfigRow("Target Name:", 15, "Divecrab")
 local radiusBox = createConfigRow("Stud Radius:", 45, "500")
 local stopBox = createConfigRow("Stop Distance:", 75, "5")
@@ -367,23 +367,22 @@ RunService.RenderStepped:Connect(function(dt)
             local distance = (obj.Position - myPos).Magnitude
             
             if distance <= maxRadius then
-                -- Check model hierarchy and Humanoid DisplayNames for index names like "Divecrab"
                 local model = obj.Parent
                 local modelName = model and model.Name:lower() or ""
                 local humanoid = model and model:FindFirstChildOfClass("Humanoid")
                 local displayName = humanoid and humanoid.DisplayName:lower() or ""
                 
-                if mobDebugEnabled and distance <= 100 then
+                -- SUPERCHARGED DEBUGGER: Prints every nearby part, model name, and humanoid display name to F9 console
+                if mobDebugEnabled and distance <= 75 then
                     if not loggedPartsCache[obj] then
                         loggedPartsCache[obj] = true
-                        print(string.format("[DEBUG] Part: %s | Model: %s | DisplayName: %s | Dist: %.1f", obj.Name, model.Name, humanoid and humanoid.DisplayName or "None", distance))
+                        print(string.format("[DEBUGGER] Part: %s | Model: %s | HumanoidName: %s | Dist: %.1f", obj.Name, model.Name, humanoid and humanoid.DisplayName or "None", distance))
                     end
                 end
                 
-                -- Check if target matches Part Name, Model Name, or Humanoid DisplayName
+                -- Flexible matching against Part Name, Model Name, or Humanoid DisplayName
                 if targetNameInput ~= "" then
-                    if objName == targetNameInput or modelName == targetNameInput or displayName == targetNameInput then
-                        -- Ensure we target a stable part (like HumanoidRootPart or Torso) if available, or the part itself
+                    if objName == targetNameInput or modelName == targetNameInput or displayName == targetNameInput or string.find(modelName, targetNameInput, 1, true) or string.find(displayName, targetNameInput, 1, true) then
                         local rootPart = (model and model:FindFirstChild("HumanoidRootPart")) or obj
                         local rootDist = (rootPart.Position - myPos).Magnitude
                         
