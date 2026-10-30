@@ -8,15 +8,15 @@ local isRunning = false
 local autoApproach = false
 local autoLootEnabled = true
 local mobDebugEnabled = false
-local lockedTarget = nil
-local mobApproachStartTime = 0
+local currentSpawnIndex = 1
+local spawnPointsCache = {}
+local lastScanTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
-local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.56 - Updated FX Filter with Guard & Bloom)
+-- CREATE TEST UI (V5.59 - Animal SpawnPoints Routing)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,13 +43,12 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.56]"
+titleLabel.Text = "Radar & Approach [V5.59]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = topBar
 
--- Persistent Status Display in Top Bar (Visible when Minimized!)
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -75, 0, 25)
 statusLabel.Position = UDim2.new(0, 10, 0, 25)
@@ -61,7 +60,6 @@ statusLabel.TextSize = 13
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.Parent = topBar
 
--- Close Button (X)
 local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.new(0, 30, 0, 55)
 closeButton.Position = UDim2.new(1, -30, 0, 0)
@@ -73,7 +71,6 @@ closeButton.TextSize = 18
 closeButton.BorderSizePixel = 0
 closeButton.Parent = topBar
 
--- Minimize Button (-)
 local minimizeButton = Instance.new("TextButton")
 minimizeButton.Size = UDim2.new(0, 30, 0, 55)
 minimizeButton.Position = UDim2.new(1, -65, 0, 0)
@@ -117,11 +114,11 @@ local function createConfigRow(name, posY, defaultValue)
     return box
 end
 
-local monsterBox = createConfigRow("Target Name:", 15, "CTurtleFXc")
+local monsterBox = createConfigRow("Target Name:", 15, "TurtleSpawn")
 local radiusBox = createConfigRow("Stud Radius:", 45, "500")
 local stopBox = createConfigRow("Stop Distance:", 75, "5")
 local speedBox = createConfigRow("Fly Speed:", 105, "44")
-local timeoutBox = createConfigRow("Mob Timeout (s):", 135, "1.0")
+local timeoutBox = createConfigRow("Spawn Timeout(s):", 135, "2.0")
 local heightBox = createConfigRow("Height Offset:", 165, "4")
 local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
 local minBlacklistDistBox = createConfigRow("Min Target Dist:", 225, "30")
@@ -215,7 +212,7 @@ local function loadSettings()
                 if data.TargetName then monsterBox.Text = tostring(data.TargetName) end
                 if data.StudRadius then radiusBox.Text = tostring(data.StudRadius) end
                 if data.StopDistance then stopBox.Text = tostring(data.StopDistance) end
-                if data.FlySpeed then flySpeedBox.Text = tostring(data.FlySpeed) end
+                if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
                 if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
                 if data.HeightOffset then heightBox.Text = tostring(data.HeightOffset) end
                 if data.ItemPrefix then itemBox.Text = tostring(data.ItemPrefix) end
@@ -249,8 +246,8 @@ closeButton.MouseButton1Click:Connect(function()
     autoApproach = false
     autoLootEnabled = true
     mobDebugEnabled = false
-    lockedTarget = nil
-    recentTargetHistory = {}
+    spawnPointsCache = {}
+    currentSpawnIndex = 1
     clearHighlights()
     local character = localPlayer.Character
     local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
@@ -269,8 +266,8 @@ toggleButton.MouseButton1Click:Connect(function()
         toggleButton.Text = "Start Radar Test"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
         autoApproach = false
-        lockedTarget = nil
-        recentTargetHistory = {}
+        spawnPointsCache = {}
+        currentSpawnIndex = 1
         clearHighlights()
         approachButton.Text = "Auto Approach: OFF"
         approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
@@ -284,11 +281,9 @@ approachButton.MouseButton1Click:Connect(function()
     if autoApproach then
         approachButton.Text = "Auto Approach: ON"
         approachButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-        lockedTarget = nil
     else
         approachButton.Text = "Auto Approach: OFF"
         approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        lockedTarget = nil
     end
 end)
 
@@ -322,8 +317,12 @@ localPlayer.Idled:Connect(function()
     end
 end)
 
-local loggedPartsCache = {}
+local spawnTimer = 0
+local activeTargetSpawn = nil
 
+-- ==========================================
+-- REAL-TIME SPAWN POINT ROUTING LOOP (V5.59)
+-- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
     
@@ -339,152 +338,130 @@ RunService.RenderStepped:Connect(function(dt)
     local maxRadius = tonumber(radiusBox.Text) or 500
     local stopDistance = tonumber(stopBox.Text) or 5
     local flySpeed = tonumber(speedBox.Text) or 44
-    local mobTimeout = tonumber(timeoutBox.Text) or 1.0
+    local spawnTimeout = tonumber(timeoutBox.Text) or 2.0
     local heightOffset = tonumber(heightBox.Text) or 4
     local targetNameInput = monsterBox.Text:lower()
     local itemPrefix = itemBox.Text:lower()
-    local minBlacklistDist = tonumber(minBlacklistDistBox.Text) or 30
     
-    local currentTime = os.clock()
-    for i = #recentTargetHistory, 1, -1 do
-        if currentTime - recentTargetHistory[i].time > 3.5 then
-            table.remove(recentTargetHistory, i)
+    -- Periodically scan and refresh spawn points within radius every 2 seconds
+    lastScanTime = lastScanTime + dt
+    if lastScanTime >= 2.0 or #spawnPointsCache == 0 then
+        lastScanTime = 0
+        local foundSpawns = {}
+        
+        local function getRecursiveDescendants(parentObj)
+            local results = {}
+            pcall(function()
+                for _, child in ipairs(parentObj:GetChildren()) do
+                    table.insert(results, child)
+                    for _, subChild in ipairs(getRecursiveDescendants(child)) do
+                        table.insert(results, subChild)
+                    end
+                end
+            end)
+            return results
         end
-    end
-    
-    if lockedTarget and (not lockedTarget.Parent or (lockedTarget.Position - myPos).Magnitude > maxRadius) then
-        lockedTarget = nil
-    end
-    
-    local closestItem = nil
-    local shortestItemDist = math.huge
-    
-    local function getRecursiveDescendants(parentObj)
-        local results = {}
-        pcall(function()
-            for _, child in ipairs(parentObj:GetChildren()) do
-                table.insert(results, child)
-                for _, subChild in ipairs(getRecursiveDescendants(child)) do
-                    table.insert(results, subChild)
-                end
-            end
-        end)
-        return results
-    end
-    
-    local allObjects = getRecursiveDescendants(workspace)
-    table.insert(allObjects, workspace)
-    
-    for _, obj in ipairs(allObjects) do
-        if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
-            local objName = obj.Name:lower()
-            local distance = (obj.Position - myPos).Magnitude
-            
-            if distance <= maxRadius then
-                local model = obj.Parent
-                local modelName = model and model.Name:lower() or ""
+        
+        local allObjects = getRecursiveDescendants(workspace)
+        table.insert(allObjects, workspace)
+        
+        for _, obj in ipairs(allObjects) do
+            if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
+                local objName = obj.Name:lower()
+                local distance = (obj.Position - myPos).Magnitude
                 
-                if mobDebugEnabled and distance <= 120 then
-                    if not loggedPartsCache[obj] then
-                        loggedPartsCache[obj] = true
-                        print(string.format("[RECURSIVE SCAN] Part: %s | Model: %s | Dist: %.1f", obj.Name, model.Name, distance))
-                    end
-                end
-                
-                if autoLootEnabled and itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
-                    if distance < shortestItemDist then
-                        shortestItemDist = distance
-                        closestItem = obj
-                    end
-                end
-                
-                if not lockedTarget and targetNameInput ~= "" then
-                    if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
-                        
-                        -- EXCLUSIVE COMBAT FX FILTER: Automatically ignores all animation/effect sub-parts including guard & bloom
-                        local isCombatFX = string.find(objName, "_ring", 1, true) or
-                                         string.find(objName, "_launch", 1, true) or
-                                         string.find(objName, "_skid", 1, true) or
-                                         string.find(objName, "_death", 1, true) or
-                                         string.find(objName, "_splash", 1, true) or
-                                         string.find(objName, "_hit", 1, true) or
-                                         string.find(objName, "_puff", 1, true) or
-                                         string.find(objName, "_slam", 1, true) or
-                                         string.find(objName, "_erupt", 1, true) or
-                                         string.find(objName, "_crumble", 1, true) or
-                                         string.find(objName, "_snap", 1, true) or
-                                         string.find(objName, "_clamp", 1, true) or
-                                         string.find(objName, "_stomp", 1, true) or
-                                         string.find(objName, "_glance", 1, true) or
-                                         string.find(objName, "_tide", 1, true) or
-                                         string.find(objName, "_guard", 1, true) or
-                                         string.find(objName, "_bloom", 1, true)
-                                         
-                        if not isCombatFX then
-                            local tooCloseToRecent = false
-                            for _, recent in ipairs(recentTargetHistory) do
-                                if (obj.Position - recent.pos).Magnitude < minBlacklistDist then
-                                    tooCloseToRecent = true
+                if distance <= maxRadius then
+                    local model = obj.Parent
+                    local modelName = model and model.Name:lower() or ""
+                    
+                    if targetNameInput ~= "" then
+                        if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) or string.find(modelName, "animal_spawnpoints", 1, true) then
+                            
+                            -- Avoid duplicate spawns within 10 studs of each other
+                            local isDuplicate = false
+                            for _, existingPos in ipairs(foundSpawns) do
+                                if (obj.Position - existingPos).Magnitude < 15 then
+                                    isDuplicate = true
                                     break
                                 end
                             end
                             
-                            if not tooCloseToRecent then
-                                lockedTarget = obj
-                                mobApproachStartTime = os.clock()
-                                table.insert(recentTargetHistory, {pos = obj.Position, time = os.clock()})
-                                print(string.format("[LOCKED] Clean Core Part Acquired -> Part: %s (Model: %s) at Dist: %.1f", obj.Name, model.Name, distance))
-                                break
+                            if not isDuplicate then
+                                table.insert(foundSpawns, obj.Position)
+                                if mobDebugEnabled then
+                                    print(string.format("[SPAWN POINT FOUND] Part: %s | Model: %s | Dist: %.1f", obj.Name, model.Name, distance))
+                                end
                             end
                         end
                     end
                 end
             end
         end
+        
+        if #foundSpawns > 0 then
+            spawnPointsCache = foundSpawns
+            if currentSpawnIndex > #spawnPointsCache then
+                currentSpawnIndex = 1
+            end
+        end
     end
     
-    local targetPart = nil
+    -- Scan for item drops if auto loot is active
+    local closestItem = nil
+    local shortestItemDist = math.huge
+    if autoLootEnabled and itemPrefix ~= "" then
+        pcall(function()
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and string.find(obj.Name:lower(), itemPrefix, 1, true) then
+                    local dist = (obj.Position - myPos).Magnitude
+                    if dist <= 35 and dist < shortestItemDist then
+                        shortestItemDist = dist
+                        closestItem = obj
+                    end
+                end
+            end
+        end)
+    end
+    
+    local targetPos = nil
+    local targetNameText = "None"
     local isLooting = false
     
-    if autoLootEnabled and closestItem and shortestItemDist <= 35 then
-        targetPart = closestItem
+    if closestItem then
+        targetPos = closestItem.Position
+        targetNameText = closestItem.Name
         isLooting = true
-    elseif lockedTarget then
-        local timeElapsed = os.clock() - mobApproachStartTime
-        if autoLootEnabled and autoApproach and timeElapsed < mobTimeout and closestItem then
-            targetPart = closestItem
-            isLooting = true
-        else
-            targetPart = lockedTarget
+    elseif #spawnPointsCache > 0 then
+        activeTargetSpawn = spawnPointsCache[currentSpawnIndex]
+        targetPos = activeTargetSpawn
+        targetNameText = "Spawn #" .. currentSpawnIndex
+        
+        -- Cycle to next spawn point when we arrive or timeout
+        local distToSpawn = (targetPos - myPos).Magnitude
+        spawnTimer = spawnTimer + dt
+        
+        if distToSpawn <= stopDistance + 5 or spawnTimer >= spawnTimeout then
+            spawnTimer = 0
+            currentSpawnIndex = currentSpawnIndex + 1
+            if currentSpawnIndex > #spawnPointsCache then
+                currentSpawnIndex = 1
+            end
         end
-    elseif autoLootEnabled and closestItem then
-        targetPart = closestItem
-        isLooting = true
-    else
-        lockedTarget = nil
-        loggedPartsCache = {}
-        clearHighlights()
     end
     
-    if targetPart then
-        local modeText = isLooting and "Item" or "Mob"
-        local statusText = autoApproach and (isLooting and "Looting Drop" or "Targeting Mob") or "Locked"
-        statusLabel.Text = string.format("Status: %s [%s] | Target: %s (%.0fm)", 
+    if targetPos then
+        local statusText = autoApproach and (isLooting and "Looting Drop" or "Cycling Spawns") or "Locked"
+        statusLabel.Text = string.format("Status: %s | Target: %s (%.0fm)", 
             statusText, 
-            modeText, 
-            targetPart.Name, 
-            (targetPart.Position - myPos).Magnitude
+            targetNameText, 
+            (targetPos - myPos).Magnitude
         )
         
         if autoApproach then
-            local currentOffset = heightOffset
-            if isLooting then
-                currentOffset = 0
-            end
-            
-            local targetPos = targetPart.Position + Vector3.new(0, currentOffset, 0)
-            local distance = (targetPos - myRoot.Position).Magnitude
-            local direction = (targetPos - myRoot.Position).Unit
+            local currentOffset = isLooting and 0 or heightOffset
+            local finalTargetPos = targetPos + Vector3.new(0, currentOffset, 0)
+            local distance = (finalTargetPos - myRoot.Position).Magnitude
+            local direction = (finalTargetPos - myRoot.Position).Unit
             
             for _, part in ipairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then part.CanCollide = false end
@@ -493,11 +470,10 @@ RunService.RenderStepped:Connect(function(dt)
             if distance > stopDistance then
                 local step = math.min(distance - stopDistance, flySpeed * dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
-                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
+                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(finalTargetPos.X, myRoot.Position.Y, finalTargetPos.Z))
             end
         end
     else
-        lockedTarget = nil
-        statusLabel.Text = "Status: Searching... | Target: None"
+        statusLabel.Text = "Status: Scanning Spawns... | Target: None"
     end
 end)
