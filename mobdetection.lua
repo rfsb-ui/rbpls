@@ -16,7 +16,7 @@ local configFileName = "RadarApproachTestConfig.json"
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.63 - Configurable Loot Radius)
+-- CREATE TEST UI (V5.64 - Clean UI & Normal Collisions)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.63]"
+titleLabel.Text = "Radar & Approach [V5.64]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -83,7 +83,7 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 340) -- Expanded slightly to fit the new loot radius row
+mainFrame.Size = UDim2.new(1, 0, 0, 310) -- Shortened back since Min Target Dist was removed
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -122,7 +122,6 @@ local timeoutBox = createConfigRow("Spawn Timeout(s):", 135, "20.0")
 local heightBox = createConfigRow("Height Offset:", 165, "4")
 local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
 local lootRadiusBox = createConfigRow("Loot Radius:", 225, "50")
-local minBlacklistDistBox = createConfigRow("Min Target Dist:", 255, "30")
 
 local rightX = 250
 local rightWidth = 255
@@ -186,8 +185,7 @@ local function saveSettings()
         MobTimeout = timeoutBox.Text,
         HeightOffset = heightBox.Text,
         ItemPrefix = itemBox.Text,
-        LootRadius = lootRadiusBox.Text,
-        MinTargetDist = minBlacklistDistBox.Text
+        LootRadius = lootRadiusBox.Text
     }
     
     pcall(function()
@@ -214,12 +212,11 @@ local function loadSettings()
                 if data.TargetName then monsterBox.Text = tostring(data.TargetName) end
                 if data.StudRadius then radiusBox.Text = tostring(data.StudRadius) end
                 if data.StopDistance then stopBox.Text = tostring(data.StopDistance) end
-                if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
+                if data.FlySpeed then flySpeedBox.Text = tostring(data.FlySpeed) end
                 if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
                 if data.HeightOffset then heightBox.Text = tostring(data.HeightOffset) end
                 if data.ItemPrefix then itemBox.Text = tostring(data.ItemPrefix) end
                 if data.LootRadius then lootRadiusBox.Text = tostring(data.LootRadius) end
-                if data.MinTargetDist then minBlacklistDistBox.Text = tostring(data.MinTargetDist) end
             end
         end
     end)
@@ -324,7 +321,7 @@ local spawnTimer = 0
 local activeTargetSpawn = nil
 
 -- ==========================================
--- REAL-TIME SPAWN & LOOT PRIORITY LOOP (V5.63)
+-- REAL-TIME SPAWN & LOOT LOOP (V5.64)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -404,7 +401,6 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
-    -- Check for loot drops within the configurable Loot Radius
     local closestItem = nil
     local shortestItemDist = math.huge
     if autoLootEnabled and itemPrefix ~= "" then
@@ -425,7 +421,6 @@ RunService.RenderStepped:Connect(function(dt)
     local targetNameText = "None"
     local isLooting = false
     
-    -- PRIORITY: Loot drop takes precedence if detected within the configured Loot Radius
     if closestItem then
         targetPos = closestItem.Position
         targetNameText = closestItem.Name
@@ -459,9 +454,7 @@ RunService.RenderStepped:Connect(function(dt)
             local distance = (finalTargetPos - myRoot.Position).Magnitude
             local direction = (finalTargetPos - myRoot.Position).Unit
             
-            for _, part in ipairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
-            end
+            -- No-clip removed: Character retains normal physical collisions
             
             if distance > stopDistance then
                 local step = math.min(distance - stopDistance, flySpeed * dt)
