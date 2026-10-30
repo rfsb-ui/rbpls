@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local HttpService = game:GetService("HttpService")
 
 local localPlayer = Players.LocalPlayer
@@ -11,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonFlowConfigV37.json"
+local configFileName = "DungeonFlowConfigV40.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -22,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE ZERO-ERROR SAFE UI (V3.7)
+-- CREATE DUNGEON BOT UI (V4.0 - Center & W-Walk)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V37"
+screenGui.Name = "DungeonFlowGui_V40"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -58,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 240, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Bot [V3.7 - Safe]"
+titleLabel.Text = "Dungeon Bot [V4.0 - Center W-Walk]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -118,12 +119,12 @@ local function createConfigRow(name, posY, defaultValue)
 end
 
 local mobPrefixBox = createConfigRow("Mob Prefix:", 15, "FX_")
-local gateBox = createConfigRow("Gate/Bridge Keyword:", 45, "door")
-local radiusBox = createConfigRow("Stud Radius:", 75, "400")
-local stopBox = createConfigRow("Stop Distance:", 105, "5")
-local speedBox = createConfigRow("Fly Speed:", 135, "44")
-local heightBox = createConfigRow("Height Offset:", 165, "4")
-local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
+local radiusBox = createConfigRow("Stud Radius:", 45, "400")
+local stopBox = createConfigRow("Stop Distance:", 75, "5")
+local speedBox = createConfigRow("Fly Speed:", 105, "44")
+local heightBox = createConfigRow("Height Offset:", 135, "4")
+local itemBox = createConfigRow("Item Prefix:", 165, "DropAura")
+local walkTimeBox = createConfigRow("W Walk Time (s):", 195, "3.5")
 
 local rightX = 250
 local rightWidth = 255
@@ -183,7 +184,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Universal Scanner V3.7 Ready..."
+logLabel.Text = "Dungeon Bot V4.0 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -213,12 +214,12 @@ end)
 saveButton.MouseButton1Click:Connect(function()
     local data = {
         mobPrefix = mobPrefixBox.Text,
-        gateKeyword = gateBox.Text,
         radius = radiusBox.Text,
         stopDist = stopBox.Text,
         speed = speedBox.Text,
         height = heightBox.Text,
-        itemPrefix = itemBox.Text
+        itemPrefix = itemBox.Text,
+        walkTime = walkTimeBox.Text
     }
     pcall(function()
         if writefile then
@@ -232,12 +233,12 @@ pcall(function()
     if readfile and isfile and isfile(configFileName) then
         local data = HttpService:JSONDecode(readfile(configFileName))
         if data.mobPrefix then mobPrefixBox.Text = data.mobPrefix end
-        if data.gateKeyword then gateBox.Text = data.gateKeyword end
         if data.radius then radiusBox.Text = data.radius end
         if data.stopDist then stopBox.Text = data.stopDist end
         if data.speed then speedBox.Text = data.speed end
         if data.height then heightBox.Text = data.height end
         if data.itemPrefix then itemBox.Text = data.itemPrefix end
+        if data.walkTime then walkTimeBox.Text = data.walkTime end
         logMessage("Loaded saved configuration.")
     end
 end)
@@ -254,7 +255,6 @@ scanButton.MouseButton1Click:Connect(function()
     
     local myPos = myRoot.Position
     local maxRadius = tonumber(radiusBox.Text) or 400
-    local keyword = gateBox.Text:lower()
     
     logMessage("------------------------------------------")
     logMessage(string.format("Running Full Scan (Radius: %d)...", maxRadius))
@@ -265,25 +265,19 @@ scanButton.MouseButton1Click:Connect(function()
             if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
                 local dist = (obj.Position - myPos).Magnitude
                 if dist <= maxRadius then
-                    local partName = obj.Name
-                    local modelName = obj.Parent and obj.Parent.Name or "Workspace"
-                    
-                    if keyword == "" or string.find(partName:lower(), keyword, 1, true) or string.find(modelName:lower(), keyword, 1, true) then
-                        table.insert(scannedResults, { Part = partName, Model = modelName, Dist = dist })
-                    end
+                    table.insert(scannedResults, { Part = obj.Name, Model = obj.Parent and obj.Parent.Name or "Workspace", Dist = dist })
                 end
             end
         end
     end)
     
     table.sort(scannedResults, function(a, b) return a.Dist < b.Dist end)
-    
-    local limit = math.min(#scannedResults, 80)
+    local limit = math.min(#scannedResults, 60)
     for i = 1, limit do
         local item = scannedResults[i]
         logMessage(string.format("[%d] Part: %s | Model: %s | Dist: %.1fm", i, item.Part, item.Model, item.Dist))
     end
-    logMessage(string.format("Scan Complete. Found %d matching objects.", #scannedResults))
+    logMessage(string.format("Scan Complete. Found %d objects.", #scannedResults))
     logMessage("------------------------------------------")
 end)
 
@@ -301,15 +295,15 @@ toggleButton.MouseButton1Click:Connect(function()
             local character = localPlayer.Character
             local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
             if rootPart then rootPart.Anchored = false end
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
         end)
         logMessage("Dungeon Flow Bot Stopped.")
     end
 end)
 
 local currentPhase = "ScanCurrentRoom"
-local targetGatePos = nil
-local lastGatePosition = nil
-local postGateWaitTimer = 0
+local roomCenterPos = nil
+local walkTimer = 0
 
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -319,14 +313,20 @@ RunService.RenderStepped:Connect(function(dt)
     
     if not myRoot then return end
     
+    -- Record room center on first run
+    if not roomCenterPos then
+        roomCenterPos = myRoot.Position
+        logMessage(string.format("Recorded Room Center at: (%.1f, %.1f, %.1f)", roomCenterPos.X, roomCenterPos.Y, roomCenterPos.Z))
+    end
+    
     local myPos = myRoot.Position
     local maxRadius = tonumber(radiusBox.Text) or 400
     local stopDistance = tonumber(stopBox.Text) or 5
     local flySpeed = tonumber(speedBox.Text) or 44
     local heightOffset = tonumber(heightBox.Text) or 4
     local mobPrefix = mobPrefixBox.Text:lower()
-    local gateKeyword = gateBox.Text:lower()
     local itemPrefix = itemBox.Text:lower()
+    local walkDuration = tonumber(walkTimeBox.Text) or 3.5
     
     local function getActiveMobsAndItems()
         local mobs = {}
@@ -354,82 +354,59 @@ RunService.RenderStepped:Connect(function(dt)
     
     local activeMobs, activeItems = getActiveMobsAndItems()
     
+    -- PHASE 1: Scan current room for mobs
     if currentPhase == "ScanCurrentRoom" then
         statusLabel.Text = string.format("Status: Scanning Room | Phase: Scan | Mobs: %d", #activeMobs)
         if #activeMobs > 0 then
             logMessage(string.format("Mobs detected (%d). Clearing room...", #activeMobs))
             currentPhase = "FarmingRoom"
         else
-            logMessage("No mobs detected. Locating furthest forward gate...")
-            currentPhase = "MovingToGate"
-            targetGatePos = nil
+            logMessage("No mobs. Returning to room center...")
+            currentPhase = "ReturnToCenter"
         end
         return
     end
     
-    if currentPhase == "MovingToGate" then
-        if not targetGatePos then
-            local bestGatePos = nil
-            local furthestDist = -math.huge
-            
-            pcall(function()
-                for _, obj in ipairs(workspace:GetDescendants()) do
-                    if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
-                        local nameLower = obj.Name:lower()
-                        local parentName = obj.Parent and obj.Parent.Name:lower() or ""
-                        
-                        if string.find(nameLower, gateKeyword, 1, true) or string.find(parentName, gateKeyword, 1, true) then
-                            local dist = (obj.Position - myPos).Magnitude
-                            local isPreviousGate = lastGatePosition and (obj.Position - lastGatePosition).Magnitude < 25
-                            
-                            if dist <= maxRadius and not isPreviousGate and dist > furthestDist then
-                                furthestDist = dist
-                                local dir = (obj.Position - myPos).Unit
-                                bestGatePos = obj.Position + (dir * 30)
-                                lastGatePosition = obj.Position
-                            end
-                        end
-                    end
-                end
-            end)
-            targetGatePos = bestGatePos
-        end
+    -- PHASE 2: Return to Room Center before walking forward
+    if currentPhase == "ReturnToCenter" then
+        statusLabel.Text = "Status: Returning to Center | Phase: Center | Mobs: 0"
+        local targetPos = roomCenterPos + Vector3.new(0, heightOffset, 0)
+        local distance = (targetPos - myRoot.Position).Magnitude
         
-        if targetGatePos then
-            statusLabel.Text = string.format("Status: Advancing Furthest Gate | Phase: Gate | Mobs: %d", #activeMobs)
-            local distance = (targetGatePos - myRoot.Position).Magnitude
-            if distance > stopDistance then
-                local direction = (targetGatePos - myRoot.Position).Unit
-                local step = math.min(distance - stopDistance, flySpeed * dt)
-                myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
-                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetGatePos.X, myRoot.Position.Y, targetGatePos.Z))
-            else
-                logMessage("Passed furthest gate +30 studs. Waiting 5 seconds...")
-                postGateWaitTimer = tick()
-                currentPhase = "WaitingPostGate"
-            end
+        if distance > stopDistance then
+            local direction = (targetPos - myRoot.Position).Unit
+            local step = math.min(distance - stopDistance, flySpeed * dt)
+            myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
+            myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(myRoot.Position.X + myRoot.CFrame.LookVector.X, myRoot.Position.Y, myRoot.Position.Z + myRoot.CFrame.LookVector.Z))
         else
-            statusLabel.Text = "Status: Searching for Furthest Gate... | Phase: Gate | Mobs: 0"
+            logMessage("At room center. Holding W key to walk forward into next room...")
+            walkTimer = tick()
+            currentPhase = "WalkForward"
         end
         return
     end
     
-    if currentPhase == "WaitingPostGate" then
-        statusLabel.Text = "Status: Waiting Post-Gate (5s)... | Phase: Wait | Mobs: 0"
-        if tick() - postGateWaitTimer >= 5.0 then
-            logMessage("Wait complete. Scanning new room for mobs...")
+    -- PHASE 3: Simulate holding W key to walk forward through the door/bridge
+    if currentPhase == "WalkForward" then
+        statusLabel.Text = "Status: Walking Forward (W)... | Phase: Walk | Mobs: 0"
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+        
+        if tick() - walkTimer >= walkDuration then
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+            logMessage("Walk duration complete. Updating room center and scanning new room...")
+            roomCenterPos = myRoot.Position -- Update center to new room
             currentPhase = "ScanCurrentRoom"
         end
         return
     end
     
+    -- PHASE 4: Farm room until all mobs & item drops disappear
     if currentPhase == "FarmingRoom" then
         statusLabel.Text = string.format("Status: Clearing Room | Phase: Combat | Mobs: %d", #activeMobs)
         
         if #activeMobs == 0 and #activeItems == 0 then
             logMessage("Room cleared - the gate unseals")
-            currentPhase = "MovingToGate"
-            targetGatePos = nil
+            currentPhase = "ReturnToCenter"
             return
         end
         
