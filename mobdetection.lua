@@ -8,7 +8,7 @@ local isRunning = false
 local autoApproach = false
 local autoLootEnabled = true
 local mobDebugEnabled = false
-local lastMobTarget = nil
+local lockedTarget = nil
 local mobApproachStartTime = 0
 local configFileName = "RadarApproachTestConfig.json"
 
@@ -16,7 +16,7 @@ local recentTargetHistory = {}
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.44 - Expanded Workspace & Folder Scanning)
+-- CREATE TEST UI (V5.45 - Target Locking)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.44]"
+titleLabel.Text = "Radar & Approach [V5.45]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -227,8 +227,8 @@ local function loadSettings()
                 if data.TargetName then monsterBox.Text = tostring(data.TargetName) end
                 if data.StudRadius then radiusBox.Text = tostring(data.StudRadius) end
                 if data.StopDistance then stopBox.Text = tostring(data.StopDistance) end
-                if data.FlySpeed then speedBox.Text = tostring(data.FlySpeed) end
-                if data.MobTimeout then mobTimeoutBox.Text = tostring(data.MobTimeout) end
+                if data.FlySpeed then flySpeedBox.Text = tostring(data.FlySpeed) end
+                if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
                 if data.HeightOffset then heightBox.Text = tostring(data.HeightOffset) end
                 if data.ItemPrefix then itemBox.Text = tostring(data.ItemPrefix) end
                 if data.MinTargetDist then minBlacklistDistBox.Text = tostring(data.MinTargetDist) end
@@ -285,7 +285,7 @@ closeButton.MouseButton1Click:Connect(function()
     autoApproach = false
     autoLootEnabled = true
     mobDebugEnabled = false
-    lastMobTarget = nil
+    lockedTarget = nil
     recentTargetHistory = {}
     clearHighlights()
     local character = localPlayer.Character
@@ -305,7 +305,7 @@ toggleButton.MouseButton1Click:Connect(function()
         toggleButton.Text = "Start Radar Test"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
         autoApproach = false
-        lastMobTarget = nil
+        lockedTarget = nil
         recentTargetHistory = {}
         clearHighlights()
         approachButton.Text = "Auto Approach: OFF"
@@ -320,11 +320,11 @@ approachButton.MouseButton1Click:Connect(function()
     if autoApproach then
         approachButton.Text = "Auto Approach: ON"
         approachButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-        lastMobTarget = nil
+        lockedTarget = nil
     else
         approachButton.Text = "Auto Approach: OFF"
         approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        lastMobTarget = nil
+        lockedTarget = nil
     end
 end)
 
@@ -392,18 +392,20 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
-    local closestMonster = nil
-    local shortestMonsterDist = math.huge
+    -- Validate current locked target: if it no longer exists, is destroyed, or is out of range, unlock it
+    if lockedTarget and (not lockedTarget.Parent or (lockedTarget.Position - myPos).Magnitude > maxRadius) then
+        lockedTarget = nil
+    end
     
     local closestItem = nil
     local shortestItemDist = math.huge
     
+    -- Scan workspace for items and available monsters
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj ~= myRoot and not obj:IsDescendantOf(character) then
             local objName = obj.Name:lower()
             local distance = (obj.Position - myPos).Magnitude
             
-            -- If the object is within the configured stud radius
             if distance <= maxRadius then
                 local model = obj.Parent
                 local modelName = model and model.Name:lower() or ""
@@ -415,7 +417,16 @@ RunService.RenderStepped:Connect(function(dt)
                     end
                 end
                 
-                if targetNameInput ~= "" then
+                -- Check Item Drop Match
+                if autoLootEnabled and itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
+                    if distance < shortestItemDist then
+                        shortestItemDist = distance
+                        closestItem = obj
+                    end
+                end
+                
+                -- If we do not have a locked monster target, search for the best candidate
+                if not lockedTarget and targetNameInput ~= "" then
                     if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) then
                         local tooCloseToRecent = false
                         for _, recent in ipairs(recentTargetHistory) do
@@ -426,18 +437,12 @@ RunService.RenderStepped:Connect(function(dt)
                         end
                         
                         if not tooCloseToRecent then
-                            if distance < shortestMonsterDist then
-                                shortestMonsterDist = distance
-                                closestMonster = obj
-                            end
+                            -- Lock onto this target and commit to it
+                            lockedTarget = obj
+                            mobApproachStartTime = os.clock()
+                            table.insert(recentTargetHistory, {pos = obj.Position, time = os.clock()})
+                            break
                         end
-                    end
-                end
-                
-                if autoLootEnabled and itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
-                    if distance < shortestItemDist then
-                        shortestItemDist = distance
-                        closestItem = obj
                     end
                 end
             end
@@ -447,29 +452,23 @@ RunService.RenderStepped:Connect(function(dt)
     local targetPart = nil
     local isLooting = false
     
+    -- Prioritize nearby item drops if auto loot is active, otherwise stick to our committed target lock
     if autoLootEnabled and closestItem and shortestItemDist <= 35 then
         targetPart = closestItem
         isLooting = true
-    elseif closestMonster then
-        if closestMonster ~= lastMobTarget then
-            lastMobTarget = closestMonster
-            mobApproachStartTime = os.clock()
-            table.insert(recentTargetHistory, {pos = closestMonster.Position, time = os.clock()})
-        end
-        
+    elseif lockedTarget then
         local timeElapsed = os.clock() - mobApproachStartTime
-        
         if autoLootEnabled and autoApproach and timeElapsed < mobTimeout and closestItem then
             targetPart = closestItem
             isLooting = true
         else
-            targetPart = closestMonster
+            targetPart = lockedTarget
         end
     elseif autoLootEnabled and closestItem then
         targetPart = closestItem
         isLooting = true
     else
-        lastMobTarget = nil
+        lockedTarget = nil
         loggedPartsCache = {}
         clearHighlights()
     end
@@ -507,7 +506,7 @@ RunService.RenderStepped:Connect(function(dt)
             end
         end
     else
-        lastMobTarget = nil
+        lockedTarget = nil
         statusLabel.Text = "Status: Searching...\nDetected: None"
     end
 end)
