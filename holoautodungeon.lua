@@ -1,10 +1,11 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
-local configFileName = "DungeonFlowConfigV32.json"
+local configFileName = "DungeonFlowConfigV33.json"
 
 local function copyToClipboard(text)
     local success = pcall(function()
@@ -20,10 +21,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON FLOW BOT UI (V3.2 - Anti-Backtrack)
+-- CREATE DUNGEON FLOW BOT UI (V3.3)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V32"
+screenGui.Name = "DungeonFlowGui_V33"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 999999
 
@@ -57,7 +58,7 @@ titleLabel.Size = UDim2.new(0, 220, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Flow Bot [V3.2]"
+titleLabel.Text = "Dungeon Debugger & Bot [V3.3]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -102,7 +103,7 @@ minimizeButton.ZIndex = 11
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 360)
+mainFrame.Size = UDim2.new(1, 0, 0, 420)
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -148,20 +149,53 @@ local rightX = 250
 local rightWidth = 255
 
 local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, rightWidth, 0, 35)
+toggleButton.Size = UDim2.new(0, rightWidth, 0, 30)
 toggleButton.Position = UDim2.new(0, rightX, 0, 15)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
-toggleButton.TextSize = 15
+toggleButton.TextSize = 14
 toggleButton.Text = "Start Dungeon Flow"
 toggleButton.ZIndex = 11
 toggleButton.Parent = mainFrame
 
+local scanButton = Instance.new("TextButton")
+scanButton.Size = UDim2.new(0, rightWidth, 0, 30)
+scanButton.Position = UDim2.new(0, rightX, 0, 55)
+scanButton.BackgroundColor3 = Color3.fromRGB(215, 120, 0)
+scanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+scanButton.Font = Enum.Font.SourceSansBold
+scanButton.TextSize = 14
+scanButton.Text = "Run Radar Scan"
+scanButton.ZIndex = 11
+scanButton.Parent = mainFrame
+
+local saveButton = Instance.new("TextButton")
+saveButton.Size = UDim2.new(0, 120, 0, 30)
+saveButton.Position = UDim2.new(0, rightX, 0, 95)
+saveButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveButton.Font = Enum.Font.SourceSansBold
+saveButton.TextSize = 14
+saveButton.Text = "Save Config"
+saveButton.ZIndex = 11
+saveButton.Parent = mainFrame
+
+local copyButton = Instance.new("TextButton")
+copyButton.Size = UDim2.new(0, 125, 0, 30)
+copyButton.Position = UDim2.new(0, rightX + 130, 0, 95)
+copyButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+copyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyButton.Font = Enum.Font.SourceSansBold
+copyButton.TextSize = 14
+copyButton.Text = "Copy Log"
+copyButton.ZIndex = 11
+copyButton.Parent = mainFrame
+
 -- Scrollable Console Log Window
 local logScrollingFrame = Instance.new("ScrollingFrame")
-logScrollingFrame.Size = UDim2.new(1, -30, 0, 115)
-logScrollingFrame.Position = UDim2.new(0, 15, 0, 230)
+logScrollingFrame.Size = UDim2.new(1, -30, 0, 160)
+logScrollingFrame.Position = UDim2.new(0, 15, 0, 240)
 logScrollingFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 logScrollingFrame.BorderSizePixel = 0
 logScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -175,7 +209,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Dungeon Flow Bot V3.2 Ready..."
+logLabel.Text = "Dungeon Debugger V3.3 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -187,7 +221,7 @@ logLabel.Parent = logScrollingFrame
 local logLines = {}
 local function logMessage(msg)
     table.insert(logLines, msg)
-    if #logLines > 150 then table.remove(logLines, 1) end
+    if #logLines > 200 then table.remove(logLines, 1) end
     logLabel.Text = table.concat(logLines, "\n")
     print(msg)
     logScrollingFrame.CanvasPosition = Vector2.new(0, logLabel.AbsoluteSize.Y)
@@ -208,6 +242,79 @@ closeButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
+-- Save Config
+saveButton.MouseButton1Click:Connect(function()
+    local data = {
+        mobPrefix = mobPrefixBox.Text,
+        gateKeyword = gateBox.Text,
+        radius = radiusBox.Text,
+        stopDist = stopBox.Text,
+        speed = speedBox.Text,
+        height = heightBox.Text,
+        itemPrefix = itemBox.Text
+    }
+    pcall(function()
+        if writefile then
+            writefile(configFileName, HttpService:JSONEncode(data))
+            logMessage("Configuration saved successfully!")
+        end
+    end)
+end)
+
+-- Load Config on Startup
+pcall(function()
+    if readfile and isfile and isfile(configFileName) then
+        local data = HttpService:JSONDecode(readfile(configFileName))
+        if data.mobPrefix then mobPrefixBox.Text = data.mobPrefix end
+        if data.gateKeyword then gateBox.Text = data.gateKeyword end
+        if data.radius then radiusBox.Text = data.radius end
+        if data.stopDist then stopBox.Text = data.stopDist end
+        if data.speed then speedBox.Text = data.speed end
+        if data.height then heightBox.Text = data.height end
+        if data.itemPrefix then itemBox.Text = data.itemPrefix end
+        logMessage("Loaded saved configuration.")
+    end
+end)
+
+copyButton.MouseButton1Click:Connect(function()
+    copyToClipboard(table.concat(logLines, "\n"))
+    logMessage("Full console log copied to clipboard!")
+end)
+
+-- Radar Scan to Inspect Gates & Objects
+scanButton.MouseButton1Click:Connect(function()
+    local character = localPlayer.Character
+    local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    if not myRoot then return end
+    
+    local myPos = myRoot.Position
+    local maxRadius = tonumber(radiusBox.Text) or 400
+    local keyword = gateBox.Text:lower()
+    
+    logMessage("------------------------------------------")
+    logMessage(string.format("Scanning for gates/doors matching '%s'...", keyword))
+    
+    local count = 0
+    pcall(function()
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
+                local nameLower = obj.Name:lower()
+                local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+                
+                if string.find(nameLower, keyword, 1, true) or string.find(parentName, keyword, 1, true) then
+                    local dist = (obj.Position - myPos).Magnitude
+                    if dist <= maxRadius then
+                        count = count + 1
+                        logMessage(string.format("[%d] Part: %s | Model: %s | Dist: %.1fm", count, obj.Name, obj.Parent.Name, dist))
+                    end
+                end
+            end
+        end
+    end)
+    logMessage(string.format("Radar Scan Complete. Found %d matching objects.", count))
+    logMessage("------------------------------------------")
+end)
+
 toggleButton.MouseButton1Click:Connect(function()
     isRunning = not isRunning
     if isRunning then
@@ -225,17 +332,9 @@ toggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
-localPlayer.Idled:Connect(function()
-    if isRunning then
-        VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-        task.wait(1)
-        VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-    end
-end)
-
 local currentPhase = "ScanCurrentRoom"
 local targetGatePos = nil
-local traversedGates = {} -- Blacklist table to ignore previously passed gates
+local lastGatePosition = nil
 local postGateWaitTimer = 0
 
 RunService.RenderStepped:Connect(function(dt)
@@ -244,13 +343,9 @@ RunService.RenderStepped:Connect(function(dt)
     local character = localPlayer.Character
     local myRoot = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
     
-    if not myRoot then
-        statusLabel.Text = "Status: Character not found"
-        return
-    end
+    if not myRoot then return end
     
     local myPos = myRoot.Position
-    local myLookVector = myRoot.CFrame.LookVector
     local maxRadius = tonumber(radiusBox.Text) or 400
     local stopDistance = tonumber(stopBox.Text) or 5
     local flySpeed = tonumber(speedBox.Text) or 44
@@ -285,26 +380,23 @@ RunService.RenderStepped:Connect(function(dt)
     
     local activeMobs, activeItems = getActiveMobsAndItems()
     
-    -- PHASE 1: Scan current room for mobs
     if currentPhase == "ScanCurrentRoom" then
         statusLabel.Text = string.format("Status: Scanning Room | Phase: Scan | Mobs: %d", #activeMobs)
         if #activeMobs > 0 then
-            logMessage(string.format("Mobs detected (%d). Starting room farm...", #activeMobs))
+            logMessage(string.format("Mobs detected (%d). Clearing room...", #activeMobs))
             currentPhase = "FarmingRoom"
         else
-            logMessage("No mobs detected. Locating forward gate...")
+            logMessage("No mobs detected. Locating next forward gate...")
             currentPhase = "MovingToGate"
             targetGatePos = nil
         end
         return
     end
     
-    -- PHASE 2: Find Forward Gate (Ignoring Blacklisted Gates) and move +30 studs past it
     if currentPhase == "MovingToGate" then
         if not targetGatePos then
             local bestGatePos = nil
-            local bestGateObj = nil
-            local highestDot = -math.huge
+            local closestDist = math.huge
             
             pcall(function()
                 for _, obj in ipairs(workspace:GetDescendants()) do
@@ -313,39 +405,22 @@ RunService.RenderStepped:Connect(function(dt)
                         local parentName = obj.Parent and obj.Parent.Name:lower() or ""
                         
                         if string.find(nameLower, gateKeyword, 1, true) or string.find(parentName, gateKeyword, 1, true) then
-                            -- Check if gate is blacklisted (already passed)
-                            local isBlacklisted = false
-                            for _, blacklistedPos in ipairs(traversedGates) do
-                                if (obj.Position - blacklistedPos).Magnitude < 15 then
-                                    isBlacklisted = true
-                                    break
-                                end
-                            end
+                            local dist = (obj.Position - myPos).Magnitude
                             
-                            if not isBlacklisted then
-                                local toGateDir = (obj.Position - myPos)
-                                local dist = toGateDir.Magnitude
-                                
-                                if dist <= maxRadius then
-                                    local unitDir = toGateDir.Unit
-                                    local dot = myLookVector:Dot(unitDir)
-                                    
-                                    if dot > highestDot then
-                                        highestDot = dot
-                                        bestGateObj = obj
-                                        bestGatePos = obj.Position + (unitDir * 30)
-                                    end
-                                end
+                            -- Ignore gate we just came from (must be at least 25 studs away from last gate)
+                            local isPreviousGate = lastGatePosition and (obj.Position - lastGatePosition).Magnitude < 25
+                            
+                            if dist <= maxRadius and not isPreviousGate and dist < closestDist then
+                                closestDist = dist
+                                local dir = (obj.Position - myPos).Unit
+                                bestGatePos = obj.Position + (dir * 30)
+                                lastGatePosition = obj.Position
                             end
                         end
                     end
                 end
             end)
-            
-            if bestGateObj and bestGatePos then
-                table.insert(traversedGates, bestGateObj.Position)
-                targetGatePos = bestGatePos
-            end
+            targetGatePos = bestGatePos
         end
         
         if targetGatePos then
@@ -357,7 +432,7 @@ RunService.RenderStepped:Connect(function(dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetGatePos.X, myRoot.Position.Y, targetGatePos.Z))
             else
-                logMessage("Passed forward gate +30 studs. Waiting 5 seconds...")
+                logMessage("Passed gate +30 studs. Waiting 5 seconds...")
                 postGateWaitTimer = tick()
                 currentPhase = "WaitingPostGate"
             end
@@ -367,7 +442,6 @@ RunService.RenderStepped:Connect(function(dt)
         return
     end
     
-    -- PHASE 3: Wait 5 seconds after passing gate
     if currentPhase == "WaitingPostGate" then
         statusLabel.Text = "Status: Waiting Post-Gate (5s)... | Phase: Wait | Mobs: 0"
         if tick() - postGateWaitTimer >= 5.0 then
@@ -377,7 +451,6 @@ RunService.RenderStepped:Connect(function(dt)
         return
     end
     
-    -- PHASE 4: Farm room until no mobs remain
     if currentPhase == "FarmingRoom" then
         statusLabel.Text = string.format("Status: Clearing Room | Phase: Combat | Mobs: %d", #activeMobs)
         
