@@ -4,16 +4,14 @@ local localPlayer = Players.LocalPlayer
 
 local isRunning = false
 local autoApproach = false
-local stopDistance = 15
 
 -- ==========================================
--- CREATE TEST UI (V5.12 - Restored Working Framework)
+-- CREATE TEST UI (V5.13 - Configurable Stop Distance)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
 screenGui.ResetOnSpawn = false
 
--- Restored successful CoreGui / gethui injection method from V5.9
 local success = pcall(function()
     screenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
 end)
@@ -35,7 +33,7 @@ titleLabel.Size = UDim2.new(1, -70, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.12]"
+titleLabel.Text = "Radar & Approach [V5.13]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -53,7 +51,7 @@ closeButton.BorderSizePixel = 0
 closeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 235)
+mainFrame.Size = UDim2.new(1, 0, 0, 275) -- Expanded to fit the new stop distance box
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -101,10 +99,31 @@ radiusBox.Font = Enum.Font.SourceSans
 radiusBox.TextSize = 14
 radiusBox.Parent = mainFrame
 
+-- Stop Distance Input Box (New!)
+local stopLabel = Instance.new("TextLabel")
+stopLabel.Size = UDim2.new(0, 130, 0, 30)
+stopLabel.Position = UDim2.new(0, 10, 0, 90)
+stopLabel.BackgroundTransparency = 1
+stopLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+stopLabel.Text = "Stop Distance:"
+stopLabel.Font = Enum.Font.SourceSansBold
+stopLabel.TextSize = 15
+stopLabel.Parent = mainFrame
+
+local stopBox = Instance.new("TextBox")
+stopBox.Size = UDim2.new(0, 100, 0, 30)
+stopBox.Position = UDim2.new(0, 150, 0, 90)
+stopBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+stopBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+stopBox.Text = "5" -- Default changed closer to 5 studs
+stopBox.Font = Enum.Font.SourceSans
+stopBox.TextSize = 14
+stopBox.Parent = mainFrame
+
 -- Test Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -20, 0, 35)
-toggleButton.Position = UDim2.new(0, 10, 0, 90)
+toggleButton.Position = UDim2.new(0, 10, 0, 130)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.SourceSansBold
@@ -115,7 +134,7 @@ toggleButton.Parent = mainFrame
 -- Auto Approach Toggle Button
 local approachButton = Instance.new("TextButton")
 approachButton.Size = UDim2.new(1, -20, 0, 35)
-approachButton.Position = UDim2.new(0, 10, 0, 135)
+approachButton.Position = UDim2.new(0, 10, 0, 175)
 approachButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 approachButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 approachButton.Font = Enum.Font.SourceSansBold
@@ -126,7 +145,7 @@ approachButton.Parent = mainFrame
 -- Live Status Readout
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 45)
-statusLabel.Position = UDim2.new(0, 10, 0, 180)
+statusLabel.Position = UDim2.new(0, 10, 0, 220)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 statusLabel.Text = "Status: Idle\nDetected: None"
@@ -193,6 +212,7 @@ RunService.RenderStepped:Connect(function()
     
     local myPos = myRoot.Position
     local maxRadius = tonumber(radiusBox.Text) or 500
+    local stopDistance = tonumber(stopBox.Text) or 5
     local targetPrefix = monsterBox.Text:lower()
     
     local closestPart = nil
