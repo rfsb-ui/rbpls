@@ -16,7 +16,7 @@ local configFileName = "RadarApproachTestConfig.json"
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.60 - Strict Spawn Timer)
+-- CREATE TEST UI (V5.63 - Configurable Loot Radius)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -43,7 +43,7 @@ titleLabel.Size = UDim2.new(0, 180, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.60]"
+titleLabel.Text = "Radar & Approach [V5.63]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -83,7 +83,7 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 310)
+mainFrame.Size = UDim2.new(1, 0, 0, 340) -- Expanded slightly to fit the new loot radius row
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -121,7 +121,8 @@ local speedBox = createConfigRow("Fly Speed:", 105, "44")
 local timeoutBox = createConfigRow("Spawn Timeout(s):", 135, "20.0")
 local heightBox = createConfigRow("Height Offset:", 165, "4")
 local itemBox = createConfigRow("Item Prefix:", 195, "DropAura")
-local minBlacklistDistBox = createConfigRow("Min Target Dist:", 225, "30")
+local lootRadiusBox = createConfigRow("Loot Radius:", 225, "50")
+local minBlacklistDistBox = createConfigRow("Min Target Dist:", 255, "30")
 
 local rightX = 250
 local rightWidth = 255
@@ -185,6 +186,7 @@ local function saveSettings()
         MobTimeout = timeoutBox.Text,
         HeightOffset = heightBox.Text,
         ItemPrefix = itemBox.Text,
+        LootRadius = lootRadiusBox.Text,
         MinTargetDist = minBlacklistDistBox.Text
     }
     
@@ -216,6 +218,7 @@ local function loadSettings()
                 if data.MobTimeout then timeoutBox.Text = tostring(data.MobTimeout) end
                 if data.HeightOffset then heightBox.Text = tostring(data.HeightOffset) end
                 if data.ItemPrefix then itemBox.Text = tostring(data.ItemPrefix) end
+                if data.LootRadius then lootRadiusBox.Text = tostring(data.LootRadius) end
                 if data.MinTargetDist then minBlacklistDistBox.Text = tostring(data.MinTargetDist) end
             end
         end
@@ -321,7 +324,7 @@ local spawnTimer = 0
 local activeTargetSpawn = nil
 
 -- ==========================================
--- REAL-TIME SPAWN POINT ROUTING LOOP (V5.60)
+-- REAL-TIME SPAWN & LOOT PRIORITY LOOP (V5.63)
 -- ==========================================
 RunService.RenderStepped:Connect(function(dt)
     if not isRunning then return end
@@ -342,8 +345,8 @@ RunService.RenderStepped:Connect(function(dt)
     local heightOffset = tonumber(heightBox.Text) or 4
     local targetNameInput = monsterBox.Text:lower()
     local itemPrefix = itemBox.Text:lower()
+    local lootRadius = tonumber(lootRadiusBox.Text) or 50
     
-    -- Periodically scan and refresh spawn points within radius every 2 seconds
     lastScanTime = lastScanTime + dt
     if lastScanTime >= 2.0 or #spawnPointsCache == 0 then
         lastScanTime = 0
@@ -376,7 +379,6 @@ RunService.RenderStepped:Connect(function(dt)
                     
                     if targetNameInput ~= "" then
                         if string.find(objName, targetNameInput, 1, true) or string.find(modelName, targetNameInput, 1, true) or string.find(modelName, "animal_spawnpoints", 1, true) then
-                            
                             local isDuplicate = false
                             for _, existingPos in ipairs(foundSpawns) do
                                 if (obj.Position - existingPos).Magnitude < 15 then
@@ -402,6 +404,7 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
+    -- Check for loot drops within the configurable Loot Radius
     local closestItem = nil
     local shortestItemDist = math.huge
     if autoLootEnabled and itemPrefix ~= "" then
@@ -409,7 +412,7 @@ RunService.RenderStepped:Connect(function(dt)
             for _, obj in ipairs(workspace:GetDescendants()) do
                 if obj:IsA("BasePart") and string.find(obj.Name:lower(), itemPrefix, 1, true) then
                     local dist = (obj.Position - myPos).Magnitude
-                    if dist <= 35 and dist < shortestItemDist then
+                    if dist <= lootRadius and dist < shortestItemDist then
                         shortestItemDist = dist
                         closestItem = obj
                     end
@@ -422,6 +425,7 @@ RunService.RenderStepped:Connect(function(dt)
     local targetNameText = "None"
     local isLooting = false
     
+    -- PRIORITY: Loot drop takes precedence if detected within the configured Loot Radius
     if closestItem then
         targetPos = closestItem.Position
         targetNameText = closestItem.Name
@@ -431,7 +435,6 @@ RunService.RenderStepped:Connect(function(dt)
         targetPos = activeTargetSpawn
         targetNameText = "Spawn #" .. currentSpawnIndex
         
-        -- STRICT TIMER: Only advances to the next spawn point when spawnTimeout has elapsed!
         spawnTimer = spawnTimer + dt
         if spawnTimer >= spawnTimeout then
             spawnTimer = 0
