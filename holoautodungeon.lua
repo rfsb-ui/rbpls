@@ -12,7 +12,7 @@ end
 
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonFlowConfigV40.json"
+local configFileName = "DungeonFlowConfigV41.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -23,10 +23,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON BOT UI (V4.0 - Center & W-Walk)
+-- CREATE DUNGEON BOT UI (V4.1 - Save Center)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V40"
+screenGui.Name = "DungeonFlowGui_V41"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
@@ -59,7 +59,7 @@ titleLabel.Size = UDim2.new(0, 240, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Bot [V4.0 - Center W-Walk]"
+titleLabel.Text = "Dungeon Bot [V4.1 - Save Center]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -184,7 +184,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Dungeon Bot V4.0 Ready..."
+logLabel.Text = "Dungeon Bot V4.1 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -211,7 +211,17 @@ closeButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
+local roomCenterPos = nil
+
+-- Save Config & Current Room Center Coordinate
 saveButton.MouseButton1Click:Connect(function()
+    local character = localPlayer.Character
+    local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    
+    if rootPart then
+        roomCenterPos = rootPart.Position
+    end
+    
     local data = {
         mobPrefix = mobPrefixBox.Text,
         radius = radiusBox.Text,
@@ -219,16 +229,21 @@ saveButton.MouseButton1Click:Connect(function()
         speed = speedBox.Text,
         height = heightBox.Text,
         itemPrefix = itemBox.Text,
-        walkTime = walkTimeBox.Text
+        walkTime = walkTimeBox.Text,
+        centerX = roomCenterPos and roomCenterPos.X or 0,
+        centerY = roomCenterPos and roomCenterPos.Y or 0,
+        centerZ = roomCenterPos and roomCenterPos.Z or 0
     }
+    
     pcall(function()
         if writefile then
             writefile(configFileName, HttpService:JSONEncode(data))
-            logMessage("Configuration saved successfully!")
+            logMessage(string.format("Config & Center Saved! (X:%.1f, Y:%.1f, Z:%.1f)", data.centerX, data.centerY, data.centerZ))
         end
     end)
 end)
 
+-- Load Config & Saved Room Center on Startup
 pcall(function()
     if readfile and isfile and isfile(configFileName) then
         local data = HttpService:JSONDecode(readfile(configFileName))
@@ -239,6 +254,10 @@ pcall(function()
         if data.height then heightBox.Text = data.height end
         if data.itemPrefix then itemBox.Text = data.itemPrefix end
         if data.walkTime then walkTimeBox.Text = data.walkTime end
+        if data.centerX and data.centerY and data.centerZ then
+            roomCenterPos = Vector3.new(data.centerX, data.centerY, data.centerZ)
+            logMessage(string.format("Loaded Saved Room Center: (%.1f, %.1f, %.1f)", roomCenterPos.X, roomCenterPos.Y, roomCenterPos.Z))
+        end
         logMessage("Loaded saved configuration.")
     end
 end)
@@ -302,7 +321,6 @@ toggleButton.MouseButton1Click:Connect(function()
 end)
 
 local currentPhase = "ScanCurrentRoom"
-local roomCenterPos = nil
 local walkTimer = 0
 
 RunService.RenderStepped:Connect(function(dt)
@@ -313,10 +331,10 @@ RunService.RenderStepped:Connect(function(dt)
     
     if not myRoot then return end
     
-    -- Record room center on first run
+    -- If no center was saved/loaded, record current position as center
     if not roomCenterPos then
         roomCenterPos = myRoot.Position
-        logMessage(string.format("Recorded Room Center at: (%.1f, %.1f, %.1f)", roomCenterPos.X, roomCenterPos.Y, roomCenterPos.Z))
+        logMessage(string.format("Auto-recorded Room Center at: (%.1f, %.1f, %.1f)", roomCenterPos.X, roomCenterPos.Y, roomCenterPos.Z))
     end
     
     local myPos = myRoot.Position
@@ -361,13 +379,13 @@ RunService.RenderStepped:Connect(function(dt)
             logMessage(string.format("Mobs detected (%d). Clearing room...", #activeMobs))
             currentPhase = "FarmingRoom"
         else
-            logMessage("No mobs. Returning to room center...")
+            logMessage("No mobs. Returning to saved room center...")
             currentPhase = "ReturnToCenter"
         end
         return
     end
     
-    -- PHASE 2: Return to Room Center before walking forward
+    -- PHASE 2: Return to Saved Room Center
     if currentPhase == "ReturnToCenter" then
         statusLabel.Text = "Status: Returning to Center | Phase: Center | Mobs: 0"
         local targetPos = roomCenterPos + Vector3.new(0, heightOffset, 0)
@@ -377,9 +395,10 @@ RunService.RenderStepped:Connect(function(dt)
             local direction = (targetPos - myRoot.Position).Unit
             local step = math.min(distance - stopDistance, flySpeed * dt)
             myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
+            -- Maintain forward orientation
             myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(myRoot.Position.X + myRoot.CFrame.LookVector.X, myRoot.Position.Y, myRoot.Position.Z + myRoot.CFrame.LookVector.Z))
         else
-            logMessage("At room center. Holding W key to walk forward into next room...")
+            logMessage("At room center. Walking forward into next room...")
             walkTimer = tick()
             currentPhase = "WalkForward"
         end
