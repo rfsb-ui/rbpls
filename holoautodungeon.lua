@@ -2,10 +2,16 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
-local localPlayer = Players.LocalPlayer
 
+local localPlayer = Players.LocalPlayer
+if not localPlayer then
+    Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+    localPlayer = Players.LocalPlayer
+end
+
+local playerGui = localPlayer:WaitForChild("PlayerGui")
 local isRunning = false
-local configFileName = "DungeonFlowConfigV36.json"
+local configFileName = "DungeonFlowConfigV37.json"
 
 local function copyToClipboard(text)
     pcall(function()
@@ -16,14 +22,13 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE ULTRA-SAFE UI (V3.6)
+-- CREATE ZERO-ERROR SAFE UI (V3.7)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V36"
+screenGui.Name = "DungeonFlowGui_V37"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+screenGui.Parent = playerGui
 
--- Floating Open/Close Toggle Button (Guaranteed to show on screen)
 local toggleOpenButton = Instance.new("TextButton")
 toggleOpenButton.Size = UDim2.new(0, 120, 0, 40)
 toggleOpenButton.Position = UDim2.new(0, 20, 0, 150)
@@ -53,7 +58,7 @@ titleLabel.Size = UDim2.new(0, 240, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Bot [V3.6 - Safe UI]"
+titleLabel.Text = "Dungeon Bot [V3.7 - Safe]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -163,7 +168,6 @@ copyButton.TextSize = 14
 copyButton.Text = "Copy Log"
 copyButton.Parent = mainFrame
 
--- Scrollable Console Log Window
 local logScrollingFrame = Instance.new("ScrollingFrame")
 logScrollingFrame.Size = UDim2.new(1, -30, 0, 160)
 logScrollingFrame.Position = UDim2.new(0, 15, 0, 240)
@@ -179,7 +183,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Universal Scanner V3.6 Ready..."
+logLabel.Text = "Universal Scanner V3.7 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -198,9 +202,11 @@ end
 
 closeButton.MouseButton1Click:Connect(function()
     isRunning = false
-    local character = localPlayer.Character
-    local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
-    if rootPart then rootPart.Anchored = false end
+    pcall(function()
+        local character = localPlayer.Character
+        local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+        if rootPart then rootPart.Anchored = false end
+    end)
     screenGui:Destroy()
 end)
 
@@ -291,9 +297,11 @@ toggleButton.MouseButton1Click:Connect(function()
         toggleButton.Text = "Start Dungeon Flow"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
         statusLabel.Text = "Status: Idle | Phase: Init | Mobs: 0"
-        local character = localPlayer.Character
-        local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
-        if rootPart then rootPart.Anchored = false end
+        pcall(function()
+            local character = localPlayer.Character
+            local rootPart = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+            if rootPart then rootPart.Anchored = false end
+        end)
         logMessage("Dungeon Flow Bot Stopped.")
     end
 end)
@@ -374,7 +382,6 @@ RunService.RenderStepped:Connect(function(dt)
                             local dist = (obj.Position - myPos).Magnitude
                             local isPreviousGate = lastGatePosition and (obj.Position - lastGatePosition).Magnitude < 25
                             
-                            -- Select the FURTHEST matching gate/bridge ahead to ensure forward progression
                             if dist <= maxRadius and not isPreviousGate and dist > furthestDist then
                                 furthestDist = dist
                                 local dir = (obj.Position - myPos).Unit
