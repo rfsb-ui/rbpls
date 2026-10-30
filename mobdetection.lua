@@ -13,7 +13,7 @@ local isRunning = false
 local configFileName = "AutoDungeonSmartConfig.json"
 
 -- ==========================================
--- 1. CREATE THE UI (V5.7)
+-- 1. CREATE THE UI (V5.8)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DungeonAutoGui"
@@ -28,7 +28,7 @@ end
 
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(0, 260, 0, 30)
-topBar.Position = UDim2.new(0.5, -130, 0.5, -100)
+topBar.Position = UDim2.new(0.5, -130, 0.5, -110)
 topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
 topBar.Active = true
@@ -68,7 +68,7 @@ minimizeButton.BorderSizePixel = 0
 minimizeButton.Parent = topBar
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(1, 0, 0, 180)
+mainFrame.Size = UDim2.new(1, 0, 0, 210) -- Expanded height to ensure all elements fit
 mainFrame.Position = UDim2.new(0, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
@@ -158,7 +158,7 @@ saveButton.Parent = mainFrame
 
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -60, 0, 20)
-statusLabel.Position = UDim2.new(0, 10, 1, -20)
+statusLabel.Position = UDim2.new(0, 10, 0, 175)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 statusLabel.Text = "Status: Idle"
@@ -169,10 +169,10 @@ statusLabel.Parent = mainFrame
 
 local versionLabel = Instance.new("TextLabel")
 versionLabel.Size = UDim2.new(0, 40, 0, 20)
-versionLabel.Position = UDim2.new(1, -45, 1, -20)
+versionLabel.Position = UDim2.new(1, -45, 0, 175)
 versionLabel.BackgroundTransparency = 1
 versionLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
-versionLabel.Text = "V5.7"
+versionLabel.Text = "V5.8"
 versionLabel.Font = Enum.Font.SourceSansBold
 versionLabel.TextSize = 14
 versionLabel.TextXAlignment = Enum.TextXAlignment.Right
@@ -371,4 +371,129 @@ local function flyToNextArea(duration, flySpeed)
             local direction = (monster.Position - rootPart.Position).Unit
             
             if distance > stopDistance then
-                bv.Velocity = direction * fly
+                bv.Velocity = direction * flySpeed
+            else
+                bv.Velocity = Vector3.zero
+            end
+            rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(monster.Position.X, monster.Position.Y, monster.Position.Z))
+        else
+            bv.Velocity = rootPart.CFrame.LookVector * flySpeed
+        end
+        task.wait(0.1) 
+    end
+    
+    if bv then bv:Destroy() end
+    if noclipConnection then noclipConnection:Disconnect() end
+    rootPart.Velocity = Vector3.zero
+    rootPart.RotVelocity = Vector3.zero
+end
+
+local function checkNotification()
+    local gui = localPlayer:FindFirstChild("PlayerGui")
+    if not gui then return false end
+    
+    for _, obj in ipairs(gui:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("TextBox") or obj:IsA("TextButton") then
+            if obj.Text then
+                local cleanText = string.gsub(obj.Text, "<[^>]+>", "")
+                if string.find(string.lower(cleanText), "room cleared") then
+                    local current = obj
+                    local isVisible = true
+                    while current and current:IsA("GuiObject") do
+                        if not current.Visible then
+                            isVisible = false
+                            break
+                        end
+                        current = current.Parent
+                    end
+                    
+                    if isVisible and obj.TextTransparency < 1 then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function waitForRoomClear()
+    task.wait(1) 
+    while isRunning do
+        if checkNotification() then
+            break 
+        end
+        task.wait(0.2) 
+    end
+end
+
+local function clickRepeatButton()
+    local playerGui = localPlayer:WaitForChild("PlayerGui")
+    for _, uiElement in ipairs(playerGui:GetDescendants()) do
+        if (uiElement:IsA("TextButton") or uiElement:IsA("TextLabel")) and uiElement.Text == "Repeat Dungeon" then
+            local targetButton = uiElement
+            if uiElement:IsA("TextLabel") and uiElement.Parent:IsA("GuiButton") then
+                targetButton = uiElement.Parent
+            end
+            
+            local success = pcall(function()
+                local centerX = targetButton.AbsolutePosition.X + (targetButton.AbsoluteSize.X / 2)
+                local centerY = targetButton.AbsolutePosition.Y + (targetButton.AbsoluteSize.Y / 2)
+                local guiInset = GuiService:GetGuiInset()
+                VirtualInputManager:SendMouseButtonEvent(centerX + guiInset.X, centerY + guiInset.Y, 0, true, game, 0)
+                task.wait(0.1)
+                VirtualInputManager:SendMouseButtonEvent(centerX + guiInset.X, centerY + guiInset.Y, 0, false, game, 0)
+            end)
+            return success
+        end
+    end
+    return false
+end
+
+local function runDungeonLoop()
+    while isRunning do
+        local currentFlyTime = tonumber(flyTimeBox.Text) or 1.5 
+        local currentFlySpeed = tonumber(flySpeedBox.Text) or 44
+
+        for stageNumber = 1, 50 do
+            if not isRunning then break end
+            
+            updateStatus("Flying to Room " .. stageNumber .. "...")
+            setAntiKnockback(false)
+            flyToNextArea(currentFlyTime, currentFlySpeed)
+            
+            if not isRunning then break end
+            
+            updateStatus("Clearing Room " .. stageNumber .. "...")
+            setAntiKnockback(true)
+            
+            waitForRoomClear()
+            
+            if clickRepeatButton() then break end
+        end
+        
+        if not isRunning then break end
+        
+        updateStatus("Restarting dungeon...")
+        setAntiKnockback(false)
+        task.wait(repeatWaitTime)
+    end
+    
+    setAntiKnockback(false)
+    if screenGui.Parent then
+        updateStatus("Idle")
+    end
+end
+
+toggleButton.MouseButton1Click:Connect(function()
+    isRunning = not isRunning
+    if isRunning then
+        toggleButton.Text = "Stop Auto"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        task.spawn(runDungeonLoop)
+    else
+        toggleButton.Text = "Start Auto"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        updateStatus("Stopping...")
+    end
+end)
