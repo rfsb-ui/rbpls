@@ -15,7 +15,7 @@ local configFileName = "RadarApproachTestConfig.json"
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.30 - All Optimizations)
+-- CREATE TEST UI (V5.31 - Deadzone Jitter Fix)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -42,7 +42,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.30]"
+titleLabel.Text = "Radar & Approach [V5.31]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -394,7 +394,6 @@ RunService.RenderStepped:Connect(function(dt)
     local targetPart = nil
     local isLooting = false
     
-    -- Smart Target Prioritization: Snatch nearby items immediately if close
     if closestItem and shortestItemDist <= 35 then
         targetPart = closestItem
         isLooting = true
@@ -448,13 +447,16 @@ RunService.RenderStepped:Connect(function(dt)
             end
             
             if distance > stopDistance then
-                -- Dynamic Speed Scaling: Slow down smoothly as we approach within 25 studs
                 local speedMultiplier = math.clamp(distance / 25, 0.25, 1.0)
                 local currentFlySpeed = baseFlySpeed * speedMultiplier
                 
                 local step = math.min(distance - stopDistance, currentFlySpeed * dt)
                 myRoot.CFrame = CFrame.new(myRoot.Position + (direction * step))
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
+            else
+                -- Deadzone filter: Freeze physics velocity completely to prevent micro-jumping upon arrival
+                myRoot.AssemblyLinearVelocity = Vector3.zero
+                myRoot.AssemblyAngularVelocity = Vector3.zero
             end
         end
     else
