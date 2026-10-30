@@ -4,7 +4,7 @@ local VirtualUser = game:GetService("VirtualUser")
 local localPlayer = Players.LocalPlayer
 
 local isRunning = false
-local configFileName = "DungeonFlowConfigV31.json"
+local configFileName = "DungeonFlowConfigV32.json"
 
 local function copyToClipboard(text)
     local success = pcall(function()
@@ -20,10 +20,10 @@ local function copyToClipboard(text)
 end
 
 -- ==========================================
--- CREATE DUNGEON FLOW BOT UI (V3.1 - Forward Gate)
+-- CREATE DUNGEON FLOW BOT UI (V3.2 - Anti-Backtrack)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DungeonFlowGui_V31"
+screenGui.Name = "DungeonFlowGui_V32"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 999999
 
@@ -57,7 +57,7 @@ titleLabel.Size = UDim2.new(0, 220, 0, 20)
 titleLabel.Position = UDim2.new(0, 10, 0, 5)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Dungeon Flow Bot [V3.1]"
+titleLabel.Text = "Dungeon Flow Bot [V3.2]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 15
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -175,7 +175,7 @@ logLabel.Size = UDim2.new(1, -10, 1, 0)
 logLabel.Position = UDim2.new(0, 5, 0, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-logLabel.Text = "Dungeon Flow Bot V3.1 Ready..."
+logLabel.Text = "Dungeon Flow Bot V3.2 Ready..."
 logLabel.Font = Enum.Font.Code
 logLabel.TextSize = 12
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -235,6 +235,7 @@ end)
 
 local currentPhase = "ScanCurrentRoom"
 local targetGatePos = nil
+local traversedGates = {} -- Blacklist table to ignore previously passed gates
 local postGateWaitTimer = 0
 
 RunService.RenderStepped:Connect(function(dt)
@@ -298,10 +299,11 @@ RunService.RenderStepped:Connect(function(dt)
         return
     end
     
-    -- PHASE 2: Find Forward Gate (Strictly ahead of character view) and move +30 studs past it
+    -- PHASE 2: Find Forward Gate (Ignoring Blacklisted Gates) and move +30 studs past it
     if currentPhase == "MovingToGate" then
         if not targetGatePos then
             local bestGatePos = nil
+            local bestGateObj = nil
             local highestDot = -math.huge
             
             pcall(function()
@@ -311,17 +313,28 @@ RunService.RenderStepped:Connect(function(dt)
                         local parentName = obj.Parent and obj.Parent.Name:lower() or ""
                         
                         if string.find(nameLower, gateKeyword, 1, true) or string.find(parentName, gateKeyword, 1, true) then
-                            local toGateDir = (obj.Position - myPos)
-                            local dist = toGateDir.Magnitude
+                            -- Check if gate is blacklisted (already passed)
+                            local isBlacklisted = false
+                            for _, blacklistedPos in ipairs(traversedGates) do
+                                if (obj.Position - blacklistedPos).Magnitude < 15 then
+                                    isBlacklisted = true
+                                    break
+                                end
+                            end
                             
-                            if dist <= maxRadius then
-                                local unitDir = toGateDir.Unit
-                                local dot = myLookVector:Dot(unitDir)
+                            if not isBlacklisted then
+                                local toGateDir = (obj.Position - myPos)
+                                local dist = toGateDir.Magnitude
                                 
-                                -- Dot > 0 means the gate is in front of the player
-                                if dot > 0 and dot > highestDot then
-                                    highestDot = dot
-                                    bestGatePos = obj.Position + (unitDir * 30)
+                                if dist <= maxRadius then
+                                    local unitDir = toGateDir.Unit
+                                    local dot = myLookVector:Dot(unitDir)
+                                    
+                                    if dot > highestDot then
+                                        highestDot = dot
+                                        bestGateObj = obj
+                                        bestGatePos = obj.Position + (unitDir * 30)
+                                    end
                                 end
                             end
                         end
@@ -329,28 +342,10 @@ RunService.RenderStepped:Connect(function(dt)
                 end
             end)
             
-            -- Fallback if no gate found in front: pick absolute closest gate
-            if not bestGatePos then
-                local closestDist = math.huge
-                pcall(function()
-                    for _, obj in ipairs(workspace:GetDescendants()) do
-                        if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
-                            local nameLower = obj.Name:lower()
-                            local parentName = obj.Parent and obj.Parent.Name:lower() or ""
-                            if string.find(nameLower, gateKeyword, 1, true) or string.find(parentName, gateKeyword, 1, true) then
-                                local dist = (obj.Position - myPos).Magnitude
-                                if dist <= maxRadius and dist < closestDist then
-                                    closestDist = dist
-                                    local dir = (obj.Position - myPos).Unit
-                                    bestGatePos = obj.Position + (dir * 30)
-                                end
-                            end
-                        end
-                    end
-                end)
+            if bestGateObj and bestGatePos then
+                table.insert(traversedGates, bestGateObj.Position)
+                targetGatePos = bestGatePos
             end
-            
-            targetGatePos = bestGatePos
         end
         
         if targetGatePos then
