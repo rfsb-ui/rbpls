@@ -15,7 +15,7 @@ local configFileName = "RadarApproachTestConfig.json"
 local activeHighlights = {}
 
 -- ==========================================
--- CREATE TEST UI (V5.33 - No Deadzone Damping)
+-- CREATE TEST UI (V5.34 - Effect Filtering)
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RadarApproachTestGui"
@@ -42,7 +42,7 @@ titleLabel.Size = UDim2.new(1, -75, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Radar & Approach [V5.33]"
+titleLabel.Text = "Radar & Approach [V5.34]"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -106,7 +106,7 @@ local function createConfigRow(name, posY, defaultValue)
 end
 
 -- Left Column Inputs
-local monsterBox = createConfigRow("Target Prefix:", 15, "A_")
+local monsterBox = createConfigRow("Target Prefix:", 15, "CTurtle") -- Updated default to match your turtle mob prefix!
 local radiusBox = createConfigRow("Stud Radius:", 45, "500")
 local stopBox = createConfigRow("Stop Distance:", 75, "5")
 local speedBox = createConfigRow("Fly Speed:", 105, "44")
@@ -374,13 +374,25 @@ RunService.RenderStepped:Connect(function(dt)
                     end
                 end
                 
+                -- Check Monster Match with Effect Part Filtering
                 if targetPrefix ~= "" and string.find(objName, targetPrefix, 1, true) then
-                    if distance < shortestMonsterDist then
-                        shortestMonsterDist = distance
-                        closestMonster = obj
+                    -- Ignore particle effect parts so we don't jitter between rings, splashes, or death animations
+                    local isEffectPart = string.find(objName, "_ring", 1, true) or
+                                         string.find(objName, "_splash", 1, true) or
+                                         string.find(objName, "_launch", 1, true) or
+                                         string.find(objName, "_death", 1, true) or
+                                         string.find(objName, "fx", 1, true) or
+                                         string.find(objName, "particle", 1, true)
+                    
+                    if not isEffectPart then
+                        if distance < shortestMonsterDist then
+                            shortestMonsterDist = distance
+                            closestMonster = obj
+                        end
                     end
                 end
                 
+                -- Check Item Drop Match
                 if itemPrefix ~= "" and string.find(objName, itemPrefix, 1, true) then
                     if distance < shortestItemDist then
                         shortestItemDist = distance
