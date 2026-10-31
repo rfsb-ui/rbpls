@@ -15,16 +15,16 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 13,
-	DetectionRadius = 100,
-	StopDistance = 3,
+	FlightSpeed = 50,
+	DetectionRadius = 500,
+	StopDistance = 6,
 	BossRoomNumber = 19
 }
 
 pcall(function()
 	if _G.DungeonSettings then
-		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.FlightSpeed
-		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DetectionRadius
+		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
+		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
 		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
 	end
@@ -145,9 +145,9 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.9 (Strict Gate)"
+titleLabel.Text = "Auto Dungeon v2.9"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 12
+titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.ZIndex = 2
@@ -416,7 +416,7 @@ local expCorner = Instance.new("UICorner")
 expCorner.CornerRadius = UDim.new(0, 4)
 expCorner.Parent = exportWpBtn
 
--- Configurable Inputs (Speed, Radius, Stop, Boss#)
+-- Configurable Inputs
 local configurableElements = {}
 
 local function createLabeledInput(posX, posY, width, labelText, defaultVal, callback)
