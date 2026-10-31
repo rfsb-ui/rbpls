@@ -5,19 +5,11 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Direct path verification to workspace.Animal_Live.Aggressors
-local animalLive = workspace:WaitForChild("Animal_Live", 30)
-local aggressorsFolder = animalLive:WaitForChild("Aggressors", 30)
-
-if not aggressorsFolder then
-	warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
-end
-
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 50,
-	DetectionRadius = 500,
-	StopDistance = 4,
+	FlightSpeed = 12,
+	DetectionRadius = 100,
+	StopDistance = 3,
 	GateTimeout = 15,
 	BossRoomNumber = 19 -- Manually set which room is the final boss
 }
@@ -82,7 +74,6 @@ end
 -- Function to check for "Dungeon Cleared" popup and auto-click "Run again"
 local function checkAndRestartDungeon()
 	if not isAutoRestartEnabled or (tick() - lastRestartAttempt < 3) then return end
-	
 	if currentWaypointIndex < CONFIG.BossRoomNumber and #waypoints > 0 then return end
 	
 	for _, gui in ipairs(playerGui:GetDescendants()) do
@@ -132,9 +123,9 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8 + Skip"
+titleLabel.Text = "Auto Dungeon v2.8.1"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 12
+titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = mainFrame
@@ -272,7 +263,7 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 5)
 btnCorner.Parent = toggleButton
 
--- Dungeon Room Controls Row (Updated with Skip Button)
+-- Dungeon Room Controls Row (Includes Save, Clear, Skip WP, Run)
 local saveWpBtn = Instance.new("TextButton")
 saveWpBtn.Size = UDim2.new(0, 52, 0, 26)
 saveWpBtn.Position = UDim2.new(0, 8, 0, 168)
@@ -637,9 +628,18 @@ RunService.Heartbeat:Connect(function(dt)
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 	
+	-- Robust fallback search for Aggressors across workspace if streaming shifts the folder
 	if not aggressorsFolder or not aggressorsFolder.Parent then
 		local live = workspace:FindFirstChild("Animal_Live")
 		if live then aggressorsFolder = live:FindFirstChild("Aggressors") end
+		if not aggressorsFolder then
+			for _, desc in ipairs(workspace:GetDescendants()) do
+				if desc.Name == "Aggressors" and desc:IsA("Folder") then
+					aggressorsFolder = desc
+					break
+				end
+			end
+		end
 	end
 	
 	local detectedCount = 0
@@ -647,22 +647,27 @@ RunService.Heartbeat:Connect(function(dt)
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	
-	-- 1. Scan for nearby monsters first (Top Priority)
-	if myHrp and aggressorsFolder then
-		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
-			if monster:IsA("Model") then
-				local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
-				local hum = monster:FindFirstChildOfClass("Humanoid")
-				
-				if hrp and hum and hum.Health > 0 then
-					local dist = (myHrp.Position - hrp.Position).Magnitude
-					if dist <= CONFIG.DetectionRadius then
-						detectedCount += 1
-						if dist < shortestDist then
-							shortestDist = dist
-							nearestMonsterPart = hrp
-							nearestMonsterName = getAnimalName(monster) .. " (" .. math.floor(dist) .. "m)"
+	-- 1. Scan for nearby monsters (Top Priority) with recursive descendant backup check
+	local searchContainer = aggressorsFolder or workspace
+	for _, monster in ipairs(searchContainer:GetDescendants()) do
+		if monster:IsA("Model") then
+			local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
+			local hum = monster:FindFirstChildOfClass("Humanoid")
+			
+			if hrp and hum and hum.Health > 0 then
+				local dist = (myHrp and (myHrp.Position - hrp.Position).Magnitude) or 0
+				if myHrp and dist <= CONFIG.DetectionRadius then
+					detectedCount += 1
+					if dist < shortestDist then
+						shortestDist = dist
+						nearestMonsterPart = hrp
+						-- Pull animal property safely
+						local animalProp = monster:GetAttribute("Animal")
+						if not animalProp then
+							local val = monster:FindFirstChild("Animal")
+							if val and val:IsA("StringValue") then animalProp = val.Value end
 						end
+						nearestMonsterName = (animalProp or monster.Name) .. " (" .. math.floor(dist) .. "m)"
 					end
 				end
 			end
@@ -674,7 +679,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local targetPos = nil
 	local targetName = "None"
 	
-	-- 2. Priority Logic: Mobs take absolute precedence over waypoints
+	-- 2. Priority Logic: If monsters exist, attack them first before continuing room route
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
