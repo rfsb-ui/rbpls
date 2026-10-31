@@ -2,8 +2,18 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Reference your specific folder
-local aggressorsFolder = workspace:WaitForChild("Animal_Live"):WaitForChild("Aggressors")
+-- Safely wait for the nested folder structure to prevent infinite yielding or nil errors
+local animalLive = workspace:WaitForChild("Animal_Live", 10)
+if not animalLive then
+	warn("Animal_Live folder not found in workspace!")
+	return
+end
+
+local aggressorsFolder = animalLive:WaitForChild("Aggressors", 10)
+if not aggressorsFolder then
+	warn("Aggressors folder not found inside Animal_Live!")
+	return
+end
 
 -- Create the main ScreenGui
 local screenGui = Instance.new("ScreenGui")
@@ -33,19 +43,20 @@ titleLabel.TextSize = 16
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.Parent = mainFrame
 
--- Scrolling Frame for Monster List (Dropdown options)
+-- Scrolling Frame for Monster List
 local scrollFrame = Instance.new("ScrollingFrame")
 scrollFrame.Size = UDim2.new(1, -20, 0, 160)
 scrollFrame.Position = UDim2.new(0, 10, 0, 45)
 scrollFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 scrollFrame.BorderSizePixel = 0
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.ScrollBarThickness = 6
 scrollFrame.Parent = mainFrame
 
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.Parent = scrollFrame
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 4)
+local uiListLayout = Instance.new("UIListLayout")
+uiListLayout.Parent = scrollFrame
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout.Padding = UDim.new(0, 4)
 
 -- Toggle Button
 local toggleButton = Instance.new("TextButton")
@@ -79,7 +90,7 @@ local isTracking = false
 
 -- Function to refresh the list of monsters from the folder
 local function refreshMonsterList()
-	-- Clear old buttons
+	-- Clear old buttons safely
 	for _, child in ipairs(scrollFrame:GetChildren()) do
 		if child:IsA("TextButton") then
 			child:Destroy()
@@ -88,12 +99,21 @@ local function refreshMonsterList()
 	
 	local count = 0
 	for _, monster in ipairs(aggressorsFolder:GetChildren()) do
+		-- Check if it's a model and has a primary root or position reference
 		if monster:IsA("Model") then
+			local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
+			local distanceStr = ""
+			
+			if hrp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				local dist = math.floor((player.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
+				distanceStr = " (" .. dist .. "m)"
+			end
+			
 			count += 1
 			local btn = Instance.new("TextButton")
 			btn.Size = UDim2.new(1, -10, 0, 30)
 			btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-			btn.Text = monster.Name .. " (" .. monster.CFrame.Position.Magnitude .. "m)"
+			btn.Text = monster.Name .. distanceStr
 			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 			btn.TextSize = 13
 			btn.Font = Enum.Font.SourceSans
@@ -111,6 +131,7 @@ local function refreshMonsterList()
 		end
 	end
 	
+	-- Explicitly update CanvasSize so scrolling works and items are fully visible
 	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, count * 34)
 end
 
@@ -131,19 +152,21 @@ task.spawn(function()
 	while true do
 		refreshMonsterList()
 		
-		if isTracking and selectedMonster and selectedMonster.Parent then
-			local hrp = selectedMonster:FindFirstChild("HumanoidRootPart")
-			local char = player.Character
-			local myHrp = char and char:FindFirstChild("HumanoidRootPart")
-			
-			if hrp and myHrp then
-				-- Example action: Point camera or character toward the targeted monster
-				myHrp.CFrame = CFrame.new(myHrp.Position, Vector3.new(hrp.Position.X, myHrp.Position.Y, hrp.Position.Z))
+		if isTracking and selectedMonster then
+			-- Verify target still exists in workspace
+			if selectedMonster.Parent then
+				local hrp = selectedMonster:FindFirstChild("HumanoidRootPart") or selectedMonster.PrimaryPart
+				local char = player.Character
+				local myHrp = char and char:FindFirstChild("HumanoidRootPart")
+				
+				if hrp and myHrp then
+					-- Keeps the player character facing/locked onto the targeted monster
+					myHrp.CFrame = CFrame.new(myHrp.Position, Vector3.new(hrp.Position.X, myHrp.Position.Y, hrp.Position.Z))
+				end
+			else
+				selectedMonster = nil
+				statusLabel.Text = "Selected: None (Target Lost)"
 			end
-		elseif isTracking and selectedMonster and not selectedMonster.Parent then
-			-- Reset if target is destroyed or removed
-			selectedMonster = nil
-			statusLabel.Text = "Selected: None (Target Lost)"
 		end
 		
 		task.wait(1)
