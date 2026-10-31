@@ -5,19 +5,11 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Direct path verification to workspace.Animal_Live.Aggressors
-local animalLive = workspace:WaitForChild("Animal_Live", 30)
-local aggressorsFolder = animalLive:WaitForChild("Aggressors", 30)
-
-if not aggressorsFolder then
-	warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
-end
-
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 50,
-	DetectionRadius = 500,
-	StopDistance = 4,
+	FlightSpeed = 13,
+	DetectionRadius = 100,
+	StopDistance = 3,
 	GateTimeout = 15,
 	BossRoomNumber = 19 -- Manually set which room is the final boss
 }
@@ -43,7 +35,7 @@ local function saveSettings()
 end
 -- ============================================================================
 
--- Strict Animal property fetcher from v2.6
+-- Strict Animal property fetcher matching external detector behavior
 local function getAnimalName(monster)
 	local animalProp = monster:GetAttribute("Animal")
 	if not animalProp then
@@ -131,9 +123,9 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.6 Mob Fix"
+titleLabel.Text = "Auto Dungeon v2.8.4"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 12
+titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = mainFrame
@@ -271,7 +263,7 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 5)
 btnCorner.Parent = toggleButton
 
--- Dungeon Room Controls Row (Includes Save, Clear, Skip WP, Run)
+-- Dungeon Room Controls Row
 local saveWpBtn = Instance.new("TextButton")
 saveWpBtn.Size = UDim2.new(0, 52, 0, 26)
 saveWpBtn.Position = UDim2.new(0, 8, 0, 168)
@@ -507,6 +499,7 @@ saveWpBtn.MouseButton1Click:Connect(function()
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	if myHrp then
 		table.insert(waypoints, myHrp.Position)
+		wpSavedLabel.Text = "Rooms Saved: " + #waypoints
 		wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
 		updateRoomListDisplay()
 	end
@@ -626,7 +619,7 @@ exportWpBtn.MouseButton1Click:Connect(function()
 	targetLabel.Text = "Rooms Exported!"
 end)
 
--- Main execution loop (Restored exact v2.6 mob scanning logic)
+-- Main execution loop using the precise v2.6/v2.7 aggressive aggregator sweep
 RunService.Heartbeat:Connect(function(dt)
 	checkAndRestartDungeon()
 	
@@ -634,6 +627,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 	
+	-- Fallback check for aggressors folder if streaming changes parents
 	if not aggressorsFolder or not aggressorsFolder.Parent then
 		local live = workspace:FindFirstChild("Animal_Live")
 		if live then aggressorsFolder = live:FindFirstChild("Aggressors") end
@@ -644,23 +638,48 @@ RunService.Heartbeat:Connect(function(dt)
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	
-	-- Exact v2.6 aggressive scanning loop for workspace.Animal_Live.Aggressors
-	if myHrp and aggressorsFolder then
-		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
-			if monster:IsA("Model") then
-				local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
-				local hum = monster:FindFirstChildOfClass("Humanoid")
+	-- UNIVERSAL SCANNER: Scans workspace.Animal_Live.Aggressors OR any model anywhere in workspace containing an Animal attribute/value
+	local function scanMonster(monster)
+		if monster:IsA("Model") then
+			local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
+			local hum = monster:FindFirstChildOfClass("Humanoid")
+			
+			if hrp and hum and hum.Health > 0 then
+				local animalProp = monster:GetAttribute("Animal")
+				if not animalProp then
+					local animalVal = monster:FindFirstChild("Animal")
+					if animalVal and animalVal:IsA("StringValue") then
+						animalProp = animalVal.Value
+					end
+				end
 				
-				if hrp and hum and hum.Health > 0 then
-					local dist = (myHrp.Position - hrp.Position).Magnitude
-					if dist <= CONFIG.DetectionRadius then
+				-- If it has an Animal tag OR is located inside the Aggressors folder, count it!
+				if animalProp or (aggressorsFolder and monster:IsDescendantOf(aggressorsFolder)) then
+					local dist = (myHrp and (myHrp.Position - hrp.Position).Magnitude) or 0
+					if myHrp and dist <= CONFIG.DetectionRadius then
 						detectedCount += 1
 						if dist < shortestDist then
 							shortestDist = dist
 							nearestMonsterPart = hrp
-							nearestMonsterName = getAnimalName(monster) .. " (" .. math.floor(dist) .. "m)"
+							nearestMonsterName = (animalProp or monster.Name) .. " (" .. math.floor(dist) .. "m)"
 						end
 					end
+				end
+			end
+		end
+	end
+	
+	if myHrp then
+		if aggressorsFolder then
+			for _, monster in ipairs(aggressorsFolder:GetChildren()) do
+				scanMonster(monster)
+			end
+		end
+		-- Deep workspace sweep fallback so it never misses mobs regardless of folder nesting
+		if detectedCount == 0 then
+			for _, desc in ipairs(workspace:GetDescendants()) do
+				if desc:IsA("Model") then
+					scanMonster(desc)
 				end
 			end
 		end
