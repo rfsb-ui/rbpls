@@ -26,7 +26,7 @@ pcall(function()
 	if _G.DungeonSettings then
 		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
 		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.DungeonSettings.StopDistance
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
 		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
 	end
@@ -83,7 +83,6 @@ end
 local function checkAndRestartDungeon()
 	if not isAutoRestartEnabled or (tick() - lastRestartAttempt < 3) then return end
 	
-	-- Only trigger restart check if we are currently at or past the designated Boss Room
 	if currentWaypointIndex < CONFIG.BossRoomNumber and #waypoints > 0 then return end
 	
 	for _, gui in ipairs(playerGui:GetDescendants()) do
@@ -133,9 +132,9 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8"
+titleLabel.Text = "Auto Dungeon v2.8 + Skip"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 13
+titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = mainFrame
@@ -202,7 +201,7 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 5)
 minCorner.Parent = minimizeButton
 
--- Compact Status Dashboard (Visible even when minimized)
+-- Compact Status Dashboard
 local statusFrame = Instance.new("Frame")
 statusFrame.Size = UDim2.new(1, -16, 0, 90)
 statusFrame.Position = UDim2.new(0, 8, 0, 35)
@@ -273,12 +272,12 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 5)
 btnCorner.Parent = toggleButton
 
--- Dungeon Room Controls Row
+-- Dungeon Room Controls Row (Updated with Skip Button)
 local saveWpBtn = Instance.new("TextButton")
-saveWpBtn.Size = UDim2.new(0, 72, 0, 26)
+saveWpBtn.Size = UDim2.new(0, 52, 0, 26)
 saveWpBtn.Position = UDim2.new(0, 8, 0, 168)
 saveWpBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 180)
-saveWpBtn.Text = "Save Room"
+saveWpBtn.Text = "Save"
 saveWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveWpBtn.TextSize = 11
 saveWpBtn.Font = Enum.Font.SourceSansBold
@@ -289,12 +288,12 @@ swpCorner.CornerRadius = UDim.new(0, 4)
 swpCorner.Parent = saveWpBtn
 
 local clearWpBtn = Instance.new("TextButton")
-clearWpBtn.Size = UDim2.new(0, 72, 0, 26)
-clearWpBtn.Position = UDim2.new(0, 84, 0, 168)
+clearWpBtn.Size = UDim2.new(0, 52, 0, 26)
+clearWpBtn.Position = UDim2.new(0, 64, 0, 168)
 clearWpBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 60)
-clearWpBtn.Text = "Clear Rooms"
+clearWpBtn.Text = "Clear"
 clearWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-clearWpBtn.TextSize = 10
+clearWpBtn.TextSize = 11
 clearWpBtn.Font = Enum.Font.SourceSansBold
 clearWpBtn.Parent = mainFrame
 
@@ -302,11 +301,25 @@ local cwpCorner = Instance.new("UICorner")
 cwpCorner.CornerRadius = UDim.new(0, 4)
 cwpCorner.Parent = clearWpBtn
 
+local skipWpBtn = Instance.new("TextButton")
+skipWpBtn.Size = UDim2.new(0, 52, 0, 26)
+skipWpBtn.Position = UDim2.new(0, 120, 0, 168)
+skipWpBtn.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
+skipWpBtn.Text = "Skip WP"
+skipWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+skipWpBtn.TextSize = 11
+skipWpBtn.Font = Enum.Font.SourceSansBold
+skipWpBtn.Parent = mainFrame
+
+local skpCorner = Instance.new("UICorner")
+skpCorner.CornerRadius = UDim.new(0, 4)
+skpCorner.Parent = skipWpBtn
+
 local loopWpBtn = Instance.new("TextButton")
-loopWpBtn.Size = UDim2.new(0, 72, 0, 26)
-loopWpBtn.Position = UDim2.new(0, 160, 0, 168)
+loopWpBtn.Size = UDim2.new(0, 52, 0, 26)
+loopWpBtn.Position = UDim2.new(0, 176, 0, 168)
 loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-loopWpBtn.Text = "Run WP: OFF"
+loopWpBtn.Text = "Run OFF"
 loopWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 loopWpBtn.TextSize = 10
 loopWpBtn.Font = Enum.Font.SourceSansBold
@@ -465,6 +478,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		toggleButton.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
+		skipWpBtn.Visible = false
 		loopWpBtn.Visible = false
 		restartToggleBtn.Visible = false
 		importBox.Visible = false
@@ -479,6 +493,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		toggleButton.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
+		skipWpBtn.Visible = true
 		loopWpBtn.Visible = true
 		restartToggleBtn.Visible = true
 		importBox.Visible = true
@@ -507,11 +522,23 @@ clearWpBtn.MouseButton1Click:Connect(function()
 	isLoopingWaypoints = false
 	roomClearedConfirmed = true
 	loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-	loopWpBtn.Text = "Run WP: OFF"
+	loopWpBtn.Text = "Run OFF"
 	wpSavedLabel.Text = "Rooms Saved: 0"
 	wpImportedLabel.Text = "Imported WPs: 0"
 	targetLabel.Text = "Rooms Cleared"
 	updateRoomListDisplay()
+end)
+
+skipWpBtn.MouseButton1Click:Connect(function()
+	if #waypoints > 0 then
+		currentWaypointIndex += 1
+		if currentWaypointIndex > #waypoints then
+			currentWaypointIndex = 1
+		end
+		roomClearedConfirmed = true
+		gateTimer = tick()
+		targetLabel.Text = "Skipped to Room " .. currentWaypointIndex
+	end
 end)
 
 loopWpBtn.MouseButton1Click:Connect(function()
@@ -526,13 +553,13 @@ loopWpBtn.MouseButton1Click:Connect(function()
 		toggleButton.Text = "Fly to All Mobs: OFF"
 		
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		loopWpBtn.Text = "Run WP: ON"
+		loopWpBtn.Text = "Run ON"
 		currentWaypointIndex = 1
 		roomClearedConfirmed = true
 		gateTimer = tick()
 	else
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		loopWpBtn.Text = "Run WP: OFF"
+		loopWpBtn.Text = "Run OFF"
 	end
 end)
 
@@ -552,7 +579,7 @@ toggleButton.MouseButton1Click:Connect(function()
 	if isTrackingAll then
 		isLoopingWaypoints = false
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		loopWpBtn.Text = "Run WP: OFF"
+		loopWpBtn.Text = "Run OFF"
 		
 		toggleButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 		toggleButton.Text = "Fly to All Mobs: ON"
@@ -604,7 +631,6 @@ end)
 
 -- Main execution loop
 RunService.Heartbeat:Connect(function(dt)
-	-- Check for dungeon completion popup and auto restart
 	checkAndRestartDungeon()
 	
 	local char = player.Character
@@ -621,7 +647,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	
-	-- 1. Scan for nearby monsters first (Priority)
+	-- 1. Scan for nearby monsters first (Top Priority)
 	if myHrp and aggressorsFolder then
 		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
 			if monster:IsA("Model") then
@@ -648,7 +674,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local targetPos = nil
 	local targetName = "None"
 	
-	-- 2. Priority Logic & Boss Room Centering
+	-- 2. Priority Logic: Mobs take absolute precedence over waypoints
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
