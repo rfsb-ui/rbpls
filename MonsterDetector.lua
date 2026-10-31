@@ -40,7 +40,7 @@ local function saveSettings()
 end
 -- ============================================================================
 
--- Helper function to fetch the Animal type name
+-- Helper function to fetch the Animal name property
 local function getAnimalName(monster)
 	local animalProp = monster:GetAttribute("Animal")
 	if not animalProp then
@@ -58,9 +58,9 @@ screenGui.Name = "MonsterTargeterGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main Panel
+-- Main Panel (Compact layout without dropdown)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 260, 0, 420)
+mainFrame.Size = UDim2.new(0, 260, 0, 310)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -70,12 +70,12 @@ local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 8)
 uiCorner.Parent = mainFrame
 
--- Title Label with Version Control (v1.6)
+-- Title Label with Version Control (v1.7)
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -75, 0, 40)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Aggressor Targeter v1.6"
+titleLabel.Text = "Aggressor Targeter v1.7"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 14
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -116,42 +116,58 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 6)
 minCorner.Parent = minimizeButton
 
--- Dropdown Main Button (Shows selected monster type)
-local dropdownButton = Instance.new("TextButton")
-dropdownButton.Size = UDim2.new(1, -20, 0, 35)
-dropdownButton.Position = UDim2.new(0, 10, 0, 45)
-dropdownButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-dropdownButton.Text = "Select Monster Type ▼"
-dropdownButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-dropdownButton.TextSize = 13
-dropdownButton.Font = Enum.Font.SourceSansBold
-dropdownButton.Parent = mainFrame
+-- Status / Dashboard Info Container
+local statusFrame = Instance.new("Frame")
+statusFrame.Size = UDim2.new(1, -20, 0, 75)
+statusFrame.Position = UDim2.new(0, 10, 0, 45)
+statusFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+statusFrame.BorderSizePixel = 0
+statusFrame.Parent = mainFrame
 
-local dropCorner = Instance.new("UICorner")
-dropCorner.CornerRadius = UDim.new(0, 6)
-dropCorner.Parent = dropdownButton
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 6)
+statusCorner.Parent = statusFrame
 
--- Dropdown Scrolling Frame (Hidden by default)
-local dropdownScroll = Instance.new("ScrollingFrame")
-dropdownScroll.Size = UDim2.new(1, -20, 0, 120)
-dropdownScroll.Position = UDim2.new(0, 10, 0, 82)
-dropdownScroll.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-dropdownScroll.BorderSizePixel = 0
-dropdownScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-dropdownScroll.ScrollBarThickness = 6
-dropdownScroll.Visible = false
-dropdownScroll.ZIndex = 5
-dropdownScroll.Parent = mainFrame
+-- Live Status Label
+local liveStatusLabel = Instance.new("TextLabel")
+liveStatusLabel.Size = UDim2.new(1, -10, 0, 22)
+liveStatusLabel.Position = UDim2.new(0, 5, 0, 4)
+liveStatusLabel.BackgroundTransparency = 1
+liveStatusLabel.Text = "Status: Idle"
+liveStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+liveStatusLabel.TextSize = 12
+liveStatusLabel.Font = Enum.Font.SourceSansBold
+liveStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+liveStatusLabel.Parent = statusFrame
 
-local dropListLayout = Instance.new("UIListLayout")
-dropListLayout.Parent = dropdownScroll
-dropListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-dropListLayout.Padding = UDim.new(0, 4)
+-- Current Target Label
+local targetLabel = Instance.new("TextLabel")
+targetLabel.Size = UDim2.new(1, -10, 0, 22)
+targetLabel.Position = UDim2.new(0, 5, 0, 26)
+targetLabel.BackgroundTransparency = 1
+targetLabel.Text = "Target: None"
+targetLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+targetLabel.TextSize = 12
+targetLabel.Font = Enum.Font.SourceSansBold
+targetLabel.TextXAlignment = Enum.TextXAlignment.Left
+targetLabel.Parent = statusFrame
+
+-- Mob Count Label
+local countLabel = Instance.new("TextLabel")
+countLabel.Size = UDim2.new(1, -10, 0, 22)
+countLabel.Position = UDim2.new(0, 5, 0, 48)
+countLabel.BackgroundTransparency = 1
+countLabel.Text = "Mobs Detected: 0"
+countLabel.TextColor3 = Color3.fromRGB(100, 220, 100)
+countLabel.TextSize = 12
+countLabel.Font = Enum.Font.SourceSansBold
+countLabel.TextXAlignment = Enum.TextXAlignment.Left
+countLabel.Parent = statusFrame
 
 -- Main Flight Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -20, 0, 35)
-toggleButton.Position = UDim2.new(0, 10, 0, 175)
+toggleButton.Position = UDim2.new(0, 10, 0, 130)
 toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 toggleButton.Text = "Fly to Target: OFF"
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -163,21 +179,10 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 6)
 btnCorner.Parent = toggleButton
 
--- Status Label
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -20, 0, 25)
-statusLabel.Position = UDim2.new(0, 10, 0, 215)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Target Type: None"
-statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-statusLabel.TextSize = 12
-statusLabel.Font = Enum.Font.SourceSans
-statusLabel.Parent = mainFrame
-
 -- Live Input Container: Speed
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(0, 110, 0, 25)
-speedLabel.Position = UDim2.new(0, 10, 0, 255)
+speedLabel.Position = UDim2.new(0, 10, 0, 175)
 speedLabel.BackgroundTransparency = 1
 speedLabel.Text = "Flight Speed:"
 speedLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -188,7 +193,7 @@ speedLabel.Parent = mainFrame
 
 local speedInput = Instance.new("TextBox")
 speedInput.Size = UDim2.new(0, 110, 0, 25)
-speedInput.Position = UDim2.new(0, 130, 0, 255)
+speedInput.Position = UDim2.new(0, 130, 0, 175)
 speedInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 speedInput.Text = tostring(CONFIG.FlightSpeed)
 speedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -208,7 +213,7 @@ end)
 -- Live Input Container: Radius
 local radiusLabel = Instance.new("TextLabel")
 radiusLabel.Size = UDim2.new(0, 110, 0, 25)
-radiusLabel.Position = UDim2.new(0, 10, 0, 290)
+radiusLabel.Position = UDim2.new(0, 10, 0, 210)
 radiusLabel.BackgroundTransparency = 1
 radiusLabel.Text = "Detection Radius:"
 radiusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -219,7 +224,7 @@ radiusLabel.Parent = mainFrame
 
 local radiusInput = Instance.new("TextBox")
 radiusInput.Size = UDim2.new(0, 110, 0, 25)
-radiusInput.Position = UDim2.new(0, 130, 0, 290)
+radiusInput.Position = UDim2.new(0, 130, 0, 210)
 radiusInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 radiusInput.Text = tostring(CONFIG.DetectionRadius)
 radiusInput.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -239,7 +244,7 @@ end)
 -- Live Input Container: Stop Distance
 local stopDistLabel = Instance.new("TextLabel")
 stopDistLabel.Size = UDim2.new(0, 110, 0, 25)
-stopDistLabel.Position = UDim2.new(0, 10, 0, 325)
+stopDistLabel.Position = UDim2.new(0, 10, 0, 245)
 stopDistLabel.BackgroundTransparency = 1
 stopDistLabel.Text = "Stop Distance:"
 stopDistLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -250,7 +255,7 @@ stopDistLabel.Parent = mainFrame
 
 local stopDistInput = Instance.new("TextBox")
 stopDistInput.Size = UDim2.new(0, 110, 0, 25)
-stopDistInput.Position = UDim2.new(0, 130, 0, 325)
+stopDistInput.Position = UDim2.new(0, 130, 0, 245)
 stopDistInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 stopDistInput.Text = tostring(CONFIG.StopDistance)
 stopDistInput.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -268,24 +273,16 @@ stopDistInput.FocusLost:Connect(function()
 end)
 
 -- State variables
-local selectedMonsterType = nil
 local isTracking = false
 local isMinimized = false
-
--- Dropdown toggle open/close
-dropdownButton.MouseButton1Click:Connect(function()
-	dropdownScroll.Visible = not dropdownScroll.Visible
-end)
 
 -- Minimize toggle logic
 minimizeButton.MouseButton1Click:Connect(function()
 	isMinimized = not isMinimized
-	dropdownScroll.Visible = false
 	if isMinimized then
 		mainFrame.Size = UDim2.new(0, 260, 0, 45)
-		dropdownButton.Visible = false
+		statusFrame.Visible = false
 		toggleButton.Visible = false
-		statusLabel.Visible = false
 		speedLabel.Visible = false
 		speedInput.Visible = false
 		radiusLabel.Visible = false
@@ -294,10 +291,9 @@ minimizeButton.MouseButton1Click:Connect(function()
 		stopDistInput.Visible = false
 		minimizeButton.Text = "+"
 	else
-		mainFrame.Size = UDim2.new(0, 260, 0, 420)
-		dropdownButton.Visible = true
+		mainFrame.Size = UDim2.new(0, 260, 0, 310)
+		statusFrame.Visible = true
 		toggleButton.Visible = true
-		statusLabel.Visible = true
 		speedLabel.Visible = true
 		speedInput.Visible = true
 		radiusLabel.Visible = true
@@ -308,63 +304,6 @@ minimizeButton.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Function to refresh dropdown list with 1 record per unique monster type
-local function refreshDropdownList()
-	if isMinimized then return end
-	
-	for _, child in ipairs(dropdownScroll:GetChildren()) do
-		if child:IsA("TextButton") then
-			child:Destroy()
-		end
-	end
-	
-	local uniqueTypes = {}
-	local char = player.Character
-	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
-	
-	for _, monster in ipairs(aggressorsFolder:GetChildren()) do
-		if monster:IsA("Model") then
-			local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
-			if hrp and myHrp then
-				local dist = (myHrp.Position - hrp.Position).Magnitude
-				if dist <= CONFIG.DetectionRadius then
-					local animalName = getAnimalName(monster)
-					if not uniqueTypes[animalName] then
-						uniqueTypes[animalName] = true
-					end
-				end
-			end
-		end
-	end
-	
-	local count = 0
-	for animalName, _ in pairs(uniqueTypes) do
-		count += 1
-		local btn = Instance.new("TextButton")
-		btn.Size = UDim2.new(1, -10, 0, 28)
-		btn.BackgroundColor3 = (selectedMonsterType == animalName) and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(60, 60, 60)
-		btn.Text = animalName
-		btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-		btn.TextSize = 13
-		btn.Font = Enum.Font.SourceSans
-		btn.ZIndex = 6
-		btn.Parent = dropdownScroll
-		
-		local btnCorner = Instance.new("UICorner")
-		btnCorner.CornerRadius = UDim.new(0, 4)
-		btnCorner.Parent = btn
-		
-		btn.MouseButton1Click:Connect(function()
-			selectedMonsterType = animalName
-			dropdownButton.Text = "Type: " .. animalName .. " ▼"
-			statusLabel.Text = "Target Type: " .. animalName
-			dropdownScroll.Visible = false
-		end)
-	end
-	
-	dropdownScroll.CanvasSize = UDim2.new(0, 0, 0, count * 32)
-end
-
 -- Toggle button click handler
 toggleButton.MouseButton1Click:Connect(function()
 	isTracking = not isTracking
@@ -374,62 +313,81 @@ toggleButton.MouseButton1Click:Connect(function()
 	else
 		toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 		toggleButton.Text = "Fly to Target: OFF"
+		liveStatusLabel.Text = "Status: Idle"
+		targetLabel.Text = "Target: None"
 	end
 end)
 
--- Main tracking and list update loop
+-- Main tracking and flight execution loop
 RunService.Heartbeat:Connect(function(dt)
-	local timeIndex = tick()
-	if math.floor(timeIndex * 2) % 2 == 0 then
-		refreshDropdownList()
-	end
+	local char = player.Character
+	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
+	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 	
-	if isTracking and selectedMonsterType then
-		local char = player.Character
-		local myHrp = char and char:FindFirstChild("HumanoidRootPart")
-		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-		
-		if myHrp and humanoid then
-			-- Find the nearest active monster matching the selected type
-			local nearestTarget = nil
-			local shortestDist = math.huge
-			
-			for _, monster in ipairs(aggressorsFolder:GetChildren()) do
-				if monster:IsA("Model") then
-					local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
-					if hrp then
-						local animalName = getAnimalName(monster)
-						if animalName == selectedMonsterType then
-							local dist = (myHrp.Position - hrp.Position).Magnitude
-							if dist < shortestDist then
-								shortestDist = dist
-								nearestTarget = hrp
-							end
+	-- Count and scan mobs
+	local detectedCount = 0
+	local nearestTargetPart = nil
+	local nearestTargetName = "None"
+	local shortestDist = math.huge
+	
+	if myHrp then
+		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
+			if monster:IsA("Model") then
+				local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
+				local hum = monster:FindFirstChildOfClass("Humanoid")
+				
+				if hrp and hum and hum.Health > 0 then
+					local dist = (myHrp.Position - hrp.Position).Magnitude
+					if dist <= CONFIG.DetectionRadius then
+						detectedCount += 1
+						if dist < shortestDist then
+							shortestDist = dist
+							shortestDist = dist
+							nearestTargetPart = hrp
+							nearestTargetName = getAnimalName(monster) .. " (" .. math.floor(dist) .. "m)"
 						end
 					end
 				end
 			end
-			
-			if nearestTarget then
-				humanoid.PlatformStand = true
-				local targetPos = nearestTarget.Position + Vector3.new(0, 2, 0)
-				local currentPos = myHrp.Position
-				local direction = (targetPos - currentPos)
-				local distance = direction.Magnitude
-				
-				if distance > CONFIG.StopDistance then
-					local moveVector = direction.Unit * math.min(CONFIG.FlightSpeed * dt, distance)
-					myHrp.CFrame = CFrame.new(currentPos + moveVector, targetPos)
-					myHrp.AssemblyLinearVelocity = Vector3.zero
-				else
-					myHrp.CFrame = CFrame.new(currentPos, targetPos)
-					myHrp.AssemblyLinearVelocity = Vector3.zero
-				end
-			end
+		end
+	end
+	
+	-- Update Dashboard Labels
+	countLabel.Text = "Mobs Detected: " .. detectedCount
+	if isTracking then
+		if nearestTargetPart then
+			liveStatusLabel.Text = "Status: Flying to Target"
+			targetLabel.Text = "Target: " .. nearestTargetName
+		else
+			liveStatusLabel.Text = "Status: Searching for Mobs..."
+			targetLabel.Text = "Target: None in Range"
 		end
 	else
-		local char = player.Character
-		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+		liveStatusLabel.Text = "Status: Idle"
+		if nearestTargetPart then
+			targetLabel.Text = "Nearest: " .. nearestTargetName
+		else
+			targetLabel.Text = "Target: None in Range"
+		end
+	end
+	
+	-- Flight Physics
+	if isTracking and nearestTargetPart and myHrp and humanoid then
+		humanoid.PlatformStand = true
+		local targetPos = nearestTargetPart.Position + Vector3.new(0, 2, 0)
+		local currentPos = myHrp.Position
+		local direction = (targetPos - currentPos)
+		local distance = direction.Magnitude
+		
+		if distance > CONFIG.StopDistance then
+			local moveVector = direction.Unit * math.min(CONFIG.FlightSpeed * dt, distance)
+			myHrp.CFrame = CFrame.new(currentPos + moveVector, targetPos)
+			myHrp.AssemblyLinearVelocity = Vector3.zero
+		else
+			myHrp.CFrame = CFrame.new(currentPos, targetPos)
+			myHrp.AssemblyLinearVelocity = Vector3.zero
+		end
+	else
 		if humanoid and humanoid.PlatformStand then
 			humanoid.PlatformStand = false
 		end
