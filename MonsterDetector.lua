@@ -43,7 +43,7 @@ local function saveSettings()
 end
 -- ============================================================================
 
--- Strict Animal property fetcher (Reads 'Animal' attribute or string child)
+-- Strict Animal property fetcher from v2.6
 local function getAnimalName(monster)
 	local animalProp = monster:GetAttribute("Animal")
 	if not animalProp then
@@ -131,9 +131,9 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.3"
+titleLabel.Text = "Auto Dungeon v2.6 Mob Fix"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 13
+titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = mainFrame
@@ -626,7 +626,7 @@ exportWpBtn.MouseButton1Click:Connect(function()
 	targetLabel.Text = "Rooms Exported!"
 end)
 
--- Main execution loop
+-- Main execution loop (Restored exact v2.6 mob scanning logic)
 RunService.Heartbeat:Connect(function(dt)
 	checkAndRestartDungeon()
 	
@@ -644,17 +644,16 @@ RunService.Heartbeat:Connect(function(dt)
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	
-	-- Scan monsters using workspace.Animal_Live.Aggressors with fallback to any model containing the Animal property
-	local function evaluateMonster(monster)
-		if monster:IsA("Model") then
-			local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
-			local hum = monster:FindFirstChildOfClass("Humanoid")
-			
-			if hrp and hum and hum.Health > 0 then
-				local animalProp = monster:GetAttribute("Animal") or monster:FindFirstChild("Animal")
-				if animalProp then
-					local dist = (myHrp and (myHrp.Position - hrp.Position).Magnitude) or 0
-					if myHrp and dist <= CONFIG.DetectionRadius then
+	-- Exact v2.6 aggressive scanning loop for workspace.Animal_Live.Aggressors
+	if myHrp and aggressorsFolder then
+		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
+			if monster:IsA("Model") then
+				local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
+				local hum = monster:FindFirstChildOfClass("Humanoid")
+				
+				if hrp and hum and hum.Health > 0 then
+					local dist = (myHrp.Position - hrp.Position).Magnitude
+					if dist <= CONFIG.DetectionRadius then
 						detectedCount += 1
 						if dist < shortestDist then
 							shortestDist = dist
@@ -667,28 +666,12 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	if myHrp then
-		if aggressorsFolder then
-			for _, monster in ipairs(aggressorsFolder:GetChildren()) do
-				evaluateMonster(monster)
-			end
-		end
-		-- Fallback sweep if none found in folder
-		if detectedCount == 0 then
-			for _, desc in ipairs(workspace:GetDescendants()) do
-				if desc:IsA("Model") then
-					evaluateMonster(desc)
-				end
-			end
-		end
-	end
-	
 	countLabel.Text = "Mobs Detected: " .. detectedCount
 	
 	local targetPos = nil
 	local targetName = "None"
 	
-	-- Priority Logic: Mobs take absolute precedence
+	-- Priority Logic & Boss Room Centering
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
