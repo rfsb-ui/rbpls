@@ -13,15 +13,17 @@ if not aggressorsFolder then
 	warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
 end
 
--- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
+-- ================= CONFIGURABLE SETTINGS & WAYPOINTS (AUTO-SAVE) =================
 local CONFIG = {
-	FlightSpeed = 14,
-	DetectionRadius = 100,
-	StopDistance = 3,
-	GateTimeout = 3,
+	FlightSpeed = 50,
+	DetectionRadius = 500,
+	StopDistance = 4,
+	GateTimeout = 15,
 	BossRoomNumber = 19,
-	NoclipOffset = 6
+	NoclipOffset = 8
 }
+
+local waypoints = {}
 
 pcall(function()
 	if _G.DungeonSettings then
@@ -31,6 +33,10 @@ pcall(function()
 		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
 		CONFIG.NoclipOffset = _G.DungeonSettings.NoclipOffset or CONFIG.NoclipOffset
+		
+		if _G.DungeonSettings.Waypoints then
+			waypoints = _G.DungeonSettings.Waypoints
+		end
 	end
 end)
 
@@ -41,7 +47,8 @@ local function saveSettings()
 		StopDistance = CONFIG.StopDistance,
 		GateTimeout = CONFIG.GateTimeout,
 		BossRoomNumber = CONFIG.BossRoomNumber,
-		NoclipOffset = CONFIG.NoclipOffset
+		NoclipOffset = CONFIG.NoclipOffset,
+		Waypoints = waypoints
 	}
 end
 -- ============================================================================
@@ -59,7 +66,6 @@ local function getAnimalName(monster)
 end
 
 -- Waypoint and Room tracking variables
-local waypoints = {}
 local currentWaypointIndex = 1
 local isLoopingWaypoints = false
 local isTrackingAll = false
@@ -154,7 +160,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.22"
+titleLabel.Text = "Auto Dungeon v2.8.24"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -261,7 +267,7 @@ local wpSavedLabel = Instance.new("TextLabel")
 wpSavedLabel.Size = UDim2.new(1, -8, 0, 18)
 wpSavedLabel.Position = UDim2.new(0, 4, 0, 44)
 wpSavedLabel.BackgroundTransparency = 1
-wpSavedLabel.Text = "Rooms Saved: 0"
+wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
 wpSavedLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
 wpSavedLabel.TextSize = 11
 wpSavedLabel.Font = Enum.Font.SourceSansBold
@@ -492,6 +498,9 @@ local function updateRoomListDisplay()
 	roomListFrame.CanvasSize = UDim2.new(0, 0, 0, #waypoints * 25)
 end
 
+-- Initialize room list display with loaded waypoints
+updateRoomListDisplay()
+
 -- State variables
 local isMinimized = false
 
@@ -537,6 +546,7 @@ saveWpBtn.MouseButton1Click:Connect(function()
 		table.insert(waypoints, myHrp.Position)
 		wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
 		updateRoomListDisplay()
+		saveSettings()
 	end
 end)
 
@@ -550,6 +560,7 @@ clearWpBtn.MouseButton1Click:Connect(function()
 	wpSavedLabel.Text = "Rooms Saved: 0"
 	targetLabel.Text = "Rooms Cleared"
 	updateRoomListDisplay()
+	saveSettings()
 end)
 
 skipWpBtn.MouseButton1Click:Connect(function()
@@ -640,6 +651,7 @@ importBox.FocusLost:Connect(function()
 	importBox.Text = ""
 	targetLabel.Text = "Imported " .. countAdded .. " Rooms!"
 	updateRoomListDisplay()
+	saveSettings()
 end)
 
 exportWpBtn.MouseButton1Click:Connect(function()
@@ -715,7 +727,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Floor 19 Boss Defeat Auto-Restart Trigger (Strictly checked when waypoints are loaded and at boss room)
+	-- Floor 19 Boss Defeat Auto-Restart Trigger
 	if isAutoRestartEnabled and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
 			bossDefeatedTimer = tick()
@@ -725,7 +737,35 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		
 		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
-			triggerRunAgainButton()
+			-- Check for Run Again button and trigger it
+			for _, gui in ipairs(playerGui:GetDescendants()) do
+				if gui:IsA("TextButton") then
+					local text = gui.Text:lower()
+					if string.find(text, "run again") then
+						if tick() - lastRestartAttempt >= 10 then
+							lastRestartAttempt = tick()
+							resetToRoomOne()
+							
+							pcall(function()
+								for _, connection in ipairs(getconnections(gui.MouseButton1Click)) do
+									connection:Fire()
+								end
+							end)
+							
+							local absPos = gui.AbsolutePosition
+							local absSize = gui.AbsoluteSize
+							local centerX = absPos.X + absSize.X / 2
+							local centerY = absPos.Y + absSize.Y / 2
+							
+							VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+							task.wait(0.05)
+							VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+							print("Auto Dungeon Restarted via Boss Timeout!")
+							break
+						end
+					end
+				end
+			end
 		end
 	end
 	
@@ -789,13 +829,12 @@ RunService.Heartbeat:Connect(function(dt)
 		targetPos = nearestMonsterPart.Position + heightOffset
 		targetName = nearestMonsterName
 	else
-		-- If Run ON is active but no waypoints are saved/loaded
 		if isLoopingWaypoints and #waypoints == 0 then
 			targetLabel.Text = "Error: No Rooms Saved!"
 		end
 	end
 	
-	targetLabel.Text = "Target: " .. targetName
+    targetLabel.Text = "Target: " .. targetName
 	
 	-- Smooth Flight Execution
 	if ((isTrackingAll or isLoopingWaypoints) and targetPos) and myHrp and humanoid then
