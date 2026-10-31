@@ -15,9 +15,9 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 50,
-	DetectionRadius = 500,
-	StopDistance = 4,
+	FlightSpeed = 12,
+	DetectionRadius = 100,
+	StopDistance = 3,
 	GateTimeout = 15,
 	BossRoomNumber = 19
 }
@@ -119,7 +119,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.8"
+titleLabel.Text = "Auto Dungeon v2.8.9"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -597,7 +597,7 @@ end)
 
 exportWpBtn.MouseButton1Click:Connect(function()
 	if #waypoints == 0 then
--		targetLabel.Text = "No Rooms to Export!"
+		targetLabel.Text = "No Rooms to Export!"
 		return
 	end
 	
@@ -632,7 +632,6 @@ RunService.Heartbeat:Connect(function(dt)
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	
-	-- Permissive scan: counts ANY model inside Aggressors that has any Part/HRP
 	if aggressorsFolder and myHrp then
 		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
 			if monster:IsA("Model") then
