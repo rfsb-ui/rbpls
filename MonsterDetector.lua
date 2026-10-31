@@ -15,16 +15,16 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 13,
-	DetectionRadius = 100,
-	StopDistance = 3,
+	FlightSpeed = 50,
+	DetectionRadius = 500,
+	StopDistance = 6,
 	BossRoomNumber = 19
 }
 
 pcall(function()
 	if _G.DungeonSettings then
 		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
-		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DetectionRadius
+		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
 		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
 	end
@@ -60,6 +60,7 @@ local isLoopingWaypoints = false
 local isTrackingAll = false
 local isAutoRestartEnabled = false
 local roomClearedConfirmed = true
+local hasReachedWaypoint = false
 local lastRestartAttempt = 0
 local restartLoadingTimeout = 0
 
@@ -94,6 +95,7 @@ local function checkAndRestartDungeon()
 							restartLoadingTimeout = tick() + 4
 							currentWaypointIndex = 1
 							roomClearedConfirmed = true
+							hasReachedWaypoint = false
 							
 							pcall(function()
 								for _, conn in ipairs(getconnections(btn.MouseButton1Click)) do
@@ -145,7 +147,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.9.1"
+titleLabel.Text = "Auto Dungeon v2.9.2"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -563,6 +565,7 @@ clearWpBtn.MouseButton1Click:Connect(function()
 	currentWaypointIndex = 1
 	isLoopingWaypoints = false
 	roomClearedConfirmed = true
+	hasReachedWaypoint = false
 	loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 	loopWpBtn.Text = "Run OFF"
 	wpSavedLabel.Text = "Rooms Saved: 0"
@@ -579,6 +582,7 @@ skipWpBtn.MouseButton1Click:Connect(function()
 			currentWaypointIndex = 1
 		end
 		roomClearedConfirmed = true
+		hasReachedWaypoint = false
 		targetLabel.Text = "Skipped to Room " .. currentWaypointIndex
 	end
 end)
@@ -598,6 +602,7 @@ loopWpBtn.MouseButton1Click:Connect(function()
 		loopWpBtn.Text = "Run ON"
 		currentWaypointIndex = 1
 		roomClearedConfirmed = true
+		hasReachedWaypoint = false
 	else
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 		loopWpBtn.Text = "Run OFF"
@@ -748,32 +753,40 @@ RunService.Heartbeat:Connect(function(dt)
 		targetName = nearestMonsterName
 	end
 	
-	-- Dungeon Room Waypoints (Strict Gate Check: Room 1 to 2 is exception, others wait indefinitely for Room Cleared message)
+	-- Dungeon Room Waypoints Logic
 	if not targetPos and isLoopingWaypoints and #waypoints > 0 and myHrp then
 		local currentWp = waypoints[currentWaypointIndex]
 		local wpDist = (myHrp.Position - currentWp).Magnitude
 		
-		if currentWaypointIndex == 1 then
-			roomClearedConfirmed = true
-		else
-			roomClearedConfirmed = checkGateUnsealed()
+		-- Check if we have arrived at the current waypoint threshold
+		if wpDist <= (CONFIG.StopDistance + 2) then
+			hasReachedWaypoint = true
 		end
 		
-		if roomClearedConfirmed then
+		if not hasReachedWaypoint then
+			-- Moving towards waypoint
 			targetPos = currentWp + Vector3.new(0, 2, 0)
 			local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
 			targetName = (isBoss and "[BOSS] " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
+		else
+			-- Arrived at waypoint: hold position and check gate clearance
+			targetPos = currentWp + Vector3.new(0, 2, 0)
 			
-			if wpDist <= (CONFIG.StopDistance + 2) then
+			if currentWaypointIndex == 1 then
+				roomClearedConfirmed = true
+			else
+				roomClearedConfirmed = checkGateUnsealed()
+			end
+			
+			if roomClearedConfirmed then
 				if currentWaypointIndex < CONFIG.BossRoomNumber then
 					currentWaypointIndex += 1
 				end
+				hasReachedWaypoint = false
 				roomClearedConfirmed = false
+			else
+				targetName = "Waiting for Room Cleared..."
 			end
-		else
-			-- While waiting for gate unseal, hold position at waypoint but KEEP mob detection running above
-			targetPos = currentWp + Vector3.new(0, 2, 0)
-			targetName = "Waiting for Room Cleared..."
 		end
 	end
 	
