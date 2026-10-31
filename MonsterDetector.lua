@@ -108,14 +108,12 @@ local function triggerRunAgainButton()
 				lastRestartAttempt = tick()
 				resetToRoomOne()
 				
-				-- Fire button connection if available
 				pcall(function()
 					for _, connection in ipairs(getconnections(gui.MouseButton1Click)) do
 						connection:Fire()
 					end
 				end)
 				
-				-- Calculate absolute center of the Run Again button on screen
 				local absPos = gui.AbsolutePosition
 				local absSize = gui.AbsoluteSize
 				local centerX = absPos.X + absSize.X / 2
@@ -156,7 +154,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.21"
+titleLabel.Text = "Auto Dungeon v2.8.22"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -717,8 +715,8 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Floor 19 Boss Defeat Auto-Restart Trigger (Strictly checked when UI screen appears)
-	if isAutoRestartEnabled and currentWaypointIndex >= CONFIG.BossRoomNumber then
+	-- Floor 19 Boss Defeat Auto-Restart Trigger (Strictly checked when waypoints are loaded and at boss room)
+	if isAutoRestartEnabled and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
 			bossDefeatedTimer = tick()
 			print("Boss defeated on Floor 19! Starting 10-second auto-restart timeout...")
@@ -731,24 +729,12 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Check for UI-based "Dungeon Cleared" popup anytime in boss room
-	if isAutoRestartEnabled and currentWaypointIndex >= CONFIG.BossRoomNumber then
-		for _, gui in ipairs(playerGui:GetDescendants()) do
-			if gui:IsA("TextLabel") or gui:IsA("TextButton") then
-				if string.find(gui.Text:lower(), "dungeon cleared") then
-					triggerRunAgainButton()
-					break
-				end
-			end
-		end
-	end
-	
 	countLabel.Text = "Mobs Detected: " .. detectedCount
 	
 	local targetPos = nil
 	local targetName = "None"
 	
-	-- Priority Logic & Boss Room Centering (Using Configurable Noclip Offset)
+	-- Priority Logic & Waypoint Room Navigation
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	local heightOffset = isNoClipEnabled and Vector3.new(0, CONFIG.NoclipOffset, 0) or Vector3.new(0, 2, 0)
 	
@@ -802,9 +788,13 @@ RunService.Heartbeat:Connect(function(dt)
 	elseif isTrackingAll and nearestMonsterPart then
 		targetPos = nearestMonsterPart.Position + heightOffset
 		targetName = nearestMonsterName
+	else
+		-- If Run ON is active but no waypoints are saved/loaded
+		if isLoopingWaypoints and #waypoints == 0 then
+			targetLabel.Text = "Error: No Rooms Saved!"
+		end
 	end
 	
-	targetLabel.Text = "Target: " + targetName -- fixed string concatenation typo just in case
 	targetLabel.Text = "Target: " .. targetName
 	
 	-- Smooth Flight Execution
