@@ -15,9 +15,9 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 50,
-	DetectionRadius = 500,
-	StopDistance = 4,
+	FlightSpeed = 13,
+	DetectionRadius = 100,
+	StopDistance = 3,
 	GateTimeout = 15,
 	BossRoomNumber = 19
 }
@@ -26,7 +26,7 @@ pcall(function()
 	if _G.DungeonSettings then
 		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
 		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.DungeonSettings.StopDistance
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
 		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
 	end
@@ -131,7 +131,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.13"
+titleLabel.Text = "Auto Dungeon v2.8.14"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -425,7 +425,7 @@ createLabeledInput(8, 312, 42, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.F
 createLabeledInput(54, 312, 42, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
 createLabeledInput(100, 312, 42, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
 createLabeledInput(146, 312, 42, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
-createLabeledInput(192, 312, 40, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
+createLabeledInput(192, 302, 40, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
 
 -- Scrollable Room List Viewer below UI
 local roomListFrame = Instance.new("ScrollingFrame")
@@ -689,8 +689,9 @@ RunService.Heartbeat:Connect(function(dt)
 	local targetPos = nil
 	local targetName = "None"
 	
-	-- Priority Logic & Boss Room Centering
+	-- Priority Logic & Boss Room Centering (With No-Clip Above Offset)
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
+	local heightOffset = isNoClipEnabled and Vector3.new(0, 8, 0) or Vector3.new(0, 2, 0)
 	
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
 		if isBossRoom and waypoints[CONFIG.BossRoomNumber] then
@@ -698,14 +699,14 @@ RunService.Heartbeat:Connect(function(dt)
 			local centerDist = (myHrp.Position - bossCenterPos).Magnitude
 			
 			if centerDist > 15 then
-				targetPos = bossCenterPos + Vector3.new(0, 2, 0)
+				targetPos = bossCenterPos + heightOffset
 				targetName = "Returning to Boss Center"
 			else
-				targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
+				targetPos = nearestMonsterPart.Position + heightOffset
 				targetName = "Fighting Boss: " .. nearestMonsterName
 			end
 		else
-			targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
+			targetPos = nearestMonsterPart.Position + heightOffset
 			targetName = "Killing Mob: " .. nearestMonsterName
 		end
 		gateTimer = tick()
@@ -725,7 +726,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		
 		if roomClearedConfirmed then
-			targetPos = currentWp + Vector3.new(0, 2, 0)
+			targetPos = currentWp + heightOffset
 			local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
 			targetName = (isBoss and "[BOSS] " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
 			
@@ -737,10 +738,10 @@ RunService.Heartbeat:Connect(function(dt)
 				gateTimer = tick()
 			end
 		else
-			targetName = "Waiting for Gate Unseal..."
+			targetName = "Waiting for Room Cleared..."
 		end
 	elseif isTrackingAll and nearestMonsterPart then
-		targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
+		targetPos = nearestMonsterPart.Position + heightOffset
 		targetName = nearestMonsterName
 	end
 	
