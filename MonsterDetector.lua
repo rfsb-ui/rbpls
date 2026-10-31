@@ -3,23 +3,18 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Safely wait for the nested folder structure
-local animalLive = workspace:WaitForChild("Animal_Live", 10)
-if not animalLive then
-	warn("Animal_Live folder not found in workspace!")
-	return
-end
+-- Direct path verification to workspace.Animal_Live.Aggressors
+local animalLive = workspace:WaitForChild("Animal_Live", 30)
+local aggressorsFolder = animalLive:WaitForChild("Aggressors", 30)
 
-local aggressorsFolder = animalLive:WaitForChild("Aggressors", 10)
 if not aggressorsFolder then
-	warn("Aggressors folder not found inside Animal_Live!")
-	return
+	warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
 end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
 	FlightSpeed = 50,
-	DetectionRadius = 100,
+	DetectionRadius = 500, -- Expanded default search radius to catch distant mobs
 	StopDistance = 4
 }
 
@@ -40,15 +35,18 @@ local function saveSettings()
 end
 -- ============================================================================
 
--- Helper function to fetch the Animal name property
+-- Strict Animal property fetcher as requested
 local function getAnimalName(monster)
+	-- 1. Check model Attribute named "Animal"
 	local animalProp = monster:GetAttribute("Animal")
 	if not animalProp then
+		-- 2. Check StringValue child named "Animal"
 		local animalVal = monster:FindFirstChild("Animal")
 		if animalVal and animalVal:IsA("StringValue") then
 			animalProp = animalVal.Value
 		end
 	end
+	-- 3. Fallback to name if property is missing
 	return animalProp or monster.Name
 end
 
@@ -58,7 +56,7 @@ screenGui.Name = "MonsterTargeterGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main Panel (Compact layout without dropdown)
+-- Main Panel
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 260, 0, 310)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
@@ -70,12 +68,12 @@ local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 8)
 uiCorner.Parent = mainFrame
 
--- Title Label with Version Control (v1.7)
+-- Title Label with Version Control (v1.8)
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -75, 0, 40)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Aggressor Targeter v1.7"
+titleLabel.Text = "Aggressor Targeter v1.8"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 14
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -324,24 +322,31 @@ RunService.Heartbeat:Connect(function(dt)
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 	
-	-- Count and scan mobs
 	local detectedCount = 0
 	local nearestTargetPart = nil
 	local nearestTargetName = "None"
 	local shortestDist = math.huge
 	
-	if myHrp then
+	-- Fallback verification if folder reference was delayed on startup
+	if not aggressorsFolder or not aggressorsFolder.Parent then
+		local live = workspace:FindFirstChild("Animal_Live")
+		if live then
+			aggressorsFolder = live:FindFirstChild("Aggressors")
+		end
+	end
+	
+	if myHrp and aggressorsFolder then
 		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
 			if monster:IsA("Model") then
 				local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
 				local hum = monster:FindFirstChildOfClass("Humanoid")
 				
-				if hrp and hum and hum.Health > 0 then
+				-- Count all valid physical models inside the directory
+				if hrp then
 					local dist = (myHrp.Position - hrp.Position).Magnitude
 					if dist <= CONFIG.DetectionRadius then
 						detectedCount += 1
 						if dist < shortestDist then
-							shortestDist = dist
 							shortestDist = dist
 							nearestTargetPart = hrp
 							nearestTargetName = getAnimalName(monster) .. " (" .. math.floor(dist) .. "m)"
@@ -371,7 +376,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Flight Physics
+	-- Flight Physics execution
 	if isTracking and nearestTargetPart and myHrp and humanoid then
 		humanoid.PlatformStand = true
 		local targetPos = nearestTargetPart.Position + Vector3.new(0, 2, 0)
