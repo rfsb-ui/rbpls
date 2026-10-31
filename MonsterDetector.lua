@@ -5,17 +5,9 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Direct path verification to workspace.Animal_Live.Aggressors
-local animalLive = workspace:WaitForChild("Animal_Live", 30)
-local aggressorsFolder = animalLive:WaitForChild("Aggressors", 30)
-
-if not aggressorsFolder then
-	warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
-end
-
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 13,
+	FlightSpeed = 12,
 	DetectionRadius = 100,
 	StopDistance = 3,
 	GateTimeout = 15,
@@ -43,7 +35,7 @@ local function saveSettings()
 end
 -- ============================================================================
 
--- Strict Animal property fetcher matching your working detector snippet
+-- Strict Animal property fetcher
 local function getAnimalName(monster)
 	local animalProp = monster:GetAttribute("Animal")
 	if not animalProp then
@@ -131,7 +123,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.5"
+titleLabel.Text = "Auto Dungeon v2.8.6"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -626,7 +618,9 @@ exportWpBtn.MouseButton1Click:Connect(function()
 	targetLabel.Text = "Rooms Exported!"
 end)
 
--- Main execution loop featuring exact MonsterDetector.lua matching logic
+-- Main execution loop with built-in debug logger
+local debugLogTimer = 0
+
 RunService.Heartbeat:Connect(function(dt)
 	checkAndRestartDungeon()
 	
@@ -634,17 +628,26 @@ RunService.Heartbeat:Connect(function(dt)
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 	
-	local liveFolder = workspace:FindFirstChild("Animal_Live")
-	local aggressors = liveFolder and liveFolder:FindFirstChild("Aggressors")
-	
 	local detectedCount = 0
 	local nearestMonsterPart = nil
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	
-	-- Exact loop configuration from MonsterDetector.lua reference
-	if aggressors and myHrp then
-		for _, monster in ipairs(aggressors:GetChildren()) do
+	-- Universal sweep matching raw MonsterDetector logic with console logging
+	local liveFolder = workspace:FindFirstChild("Animal_Live")
+	local aggressors = liveFolder and liveFolder:FindFirstChild("Aggressors")
+	
+	if tick() - debugLogTimer > 3 then
+		debugLogTimer = tick()
+		print("DEBUG: Animal_Live found:", liveFolder ~= nil, "| Aggressors found:", aggressors ~= nil)
+		if aggressors then
+			print("DEBUG: Aggressors child count:", #aggressors:GetChildren())
+		end
+	end
+	
+	local searchContainer = aggressors or workspace
+	for _, monster in ipairs(searchContainer:GetDescendants()) do
+		if monster:IsA("Model") and monster ~= char then
 			local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
 			local hum = monster:FindFirstChildOfClass("Humanoid")
 			
@@ -658,8 +661,8 @@ RunService.Heartbeat:Connect(function(dt)
 				end
 				
 				if animalProp then
-					local dist = (myHrp.Position - hrp.Position).Magnitude
-					if dist <= CONFIG.DetectionRadius then
+					local dist = (myHrp and (myHrp.Position - hrp.Position).Magnitude) or 0
+					if myHrp and dist <= CONFIG.DetectionRadius then
 						detectedCount += 1
 						if dist < shortestDist then
 							shortestDist = dist
