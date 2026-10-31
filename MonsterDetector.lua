@@ -15,12 +15,12 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 13,
+	FlightSpeed = 10,
 	DetectionRadius = 100,
 	StopDistance = 3,
-	GateTimeout = 15,
+	GateTimeout = 5,
 	BossRoomNumber = 19,
-	NoclipOffset = 4
+	NoclipOffset = 6
 }
 
 pcall(function()
@@ -69,6 +69,11 @@ local roomClearedConfirmed = true
 local gateTimer = 0
 local lastRestartAttempt = 0
 
+-- Boss Defeat & Post-Restart Timeout tracking variables
+local bossWasPresent = false
+local bossDefeatedTimer = 0
+local postRestartCooldown = 0
+
 -- Function to check if the gate unseal message is active on screen
 local function checkGateUnsealed()
 	for _, gui in ipairs(playerGui:GetDescendants()) do
@@ -84,25 +89,27 @@ end
 
 -- Function to check for "Dungeon Cleared" popup and auto-click "Run again"
 local function checkAndRestartDungeon()
-	if not isAutoRestartEnabled or (tick() - lastRestartAttempt < 3) then return end
-	if currentWaypointIndex < CONFIG.BossRoomNumber and #waypoints > 0 then return end
+	if not isAutoRestartEnabled or (tick() - lastRestartAttempt < 12) then return end
 	
 	for _, gui in ipairs(playerGui:GetDescendants()) do
 		if gui:IsA("TextButton") or gui:IsA("TextLabel") then
 			local text = gui.Text:lower()
-			if string.find(text, "dungeon cleared") then
+			if string.find(text, "dungeon cleared") or (bossDefeatedTimer > 0 and tick() - bossDefeatedTimer <= 10) then
 				for _, btn in ipairs(playerGui:GetDescendants()) do
 					if btn:IsA("TextButton") and string.find(btn.Text:lower(), "run again") then
 						lastRestartAttempt = tick()
+						postRestartCooldown = tick() -- Start 10-second loading timeout window
 						currentWaypointIndex = 1
 						roomClearedConfirmed = true
+						bossWasPresent = false
+						bossDefeatedTimer = 0
 						
 						local absPos = btn.AbsolutePosition
 						local absSize = btn.AbsoluteSize
 						VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, true, game, 1)
 						task.wait(0.05)
 						VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, false, game, 1)
-						print("Auto Dungeon Restarted via 'Run again' button!")
+						print("Auto Dungeon Restarted! Waiting 10 seconds for map load...")
 						return
 					end
 				end
@@ -134,7 +141,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.15"
+titleLabel.Text = "Auto Dungeon v2.8.17"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -658,6 +665,13 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
+	-- If 10-second post-restart cooldown is active, pause waypoint navigation & targeting temporarily
+	if tick() - postRestartCooldown < 10 then
+		targetLabel.Text = "Status: Loading Next Run..."
+		countLabel.Text = "Mobs Detected: 0"
+		return
+	end
+	
 	if not aggressorsFolder or not aggressorsFolder.Parent then
 		local live = workspace:FindFirstChild("Animal_Live")
 		if live then aggressorsFolder = live:FindFirstChild("Aggressors") end
@@ -667,6 +681,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local nearestMonsterPart = nil
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
+	local hasBossPresent = false
 	
 	if aggressorsFolder and myHrp then
 		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
@@ -676,6 +691,7 @@ RunService.Heartbeat:Connect(function(dt)
 					local dist = (myHrp.Position - hrp.Position).Magnitude
 					if dist <= CONFIG.DetectionRadius then
 						detectedCount += 1
+						hasBossPresent = true
 						if dist < shortestDist then
 							shortestDist = dist
 							nearestMonsterPart = hrp
@@ -683,6 +699,37 @@ RunService.Heartbeat:Connect(function(dt)
 							nearestMonsterName = animalName .. " (" .. math.floor(dist) .. "m)"
 						end
 					end
+				end
+			end
+		end
+	end
+	
+	-- Floor 19 Boss Defeat Auto-Restart Trigger
+	if isAutoRestartEnabled and currentWaypointIndex >= CONFIG.BossRoomNumber then
+		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
+			bossDefeatedTimer = tick()
+			print("Boss defeated on Floor 19! Starting 10-second auto-restart timeout...")
+		elseif hasBossPresent then
+			bossWasPresent = true
+		end
+		
+		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
+			for _, btn in ipairs(playerGui:GetDescendants()) do
+				if btn:IsA("TextButton") and string.find(btn.Text:lower(), "run again") then
+					lastRestartAttempt = tick()
+					postRestartCooldown = tick()
+					currentWaypointIndex = 1
+					roomClearedConfirmed = true
+					bossWasPresent = false
+					bossDefeatedTimer = 0
+					
+					local absPos = btn.AbsolutePosition
+					local absSize = btn.AbsoluteSize
+					VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, true, game, 1)
+					task.wait(0.05)
+					VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, false, game, 1)
+					print("Auto Dungeon Restarted via Boss Timeout!")
+					break
 				end
 			end
 		end
