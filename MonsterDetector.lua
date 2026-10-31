@@ -15,9 +15,9 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 12,
-	DetectionRadius = 100,
-	StopDistance = 3,
+	FlightSpeed = 50,
+	DetectionRadius = 500,
+	StopDistance = 4,
 	GateTimeout = 15,
 	BossRoomNumber = 19
 }
@@ -42,6 +42,18 @@ local function saveSettings()
 	}
 end
 -- ============================================================================
+
+-- Strict Animal property fetcher for clean display names
+local function getAnimalName(monster)
+	local animalProp = monster:GetAttribute("Animal")
+	if not animalProp then
+		local animalVal = monster:FindFirstChild("Animal")
+		if animalVal and animalVal:IsA("StringValue") then
+			animalProp = animalVal.Value
+		end
+	end
+	return animalProp or monster.Name
+end
 
 -- Waypoint and Room tracking variables
 local waypoints = {}
@@ -119,7 +131,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.9"
+titleLabel.Text = "Auto Dungeon v2.8.11"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -614,7 +626,7 @@ exportWpBtn.MouseButton1Click:Connect(function()
 	targetLabel.Text = "Rooms Exported!"
 end)
 
--- Main execution loop with ultra-permissive Aggressors scanner
+-- Main execution loop with clean Animal property naming for target display
 RunService.Heartbeat:Connect(function(dt)
 	checkAndRestartDungeon()
 	
@@ -643,7 +655,8 @@ RunService.Heartbeat:Connect(function(dt)
 						if dist < shortestDist then
 							shortestDist = dist
 							nearestMonsterPart = hrp
-							nearestMonsterName = monster.Name .. " (" .. math.floor(dist) .. "m)"
+							local animalName = getAnimalName(monster)
+							nearestMonsterName = animalName .. " (" .. math.floor(dist) .. "m)"
 						end
 					end
 				end
@@ -694,6 +707,7 @@ RunService.Heartbeat:Connect(function(dt)
 		if roomClearedConfirmed then
 			targetPos = currentWp + Vector3.new(0, 2, 0)
 			local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
+			targetName = (isBoss and "[BOSS] " or "") + "Room " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
 			targetName = (isBoss and "[BOSS] " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
 			
 			if wpDist <= (CONFIG.StopDistance + 2) then
