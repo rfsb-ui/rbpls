@@ -18,7 +18,7 @@ local CONFIG = {
 	FlightSpeed = 13,
 	DetectionRadius = 100,
 	StopDistance = 3,
-	GateTimeout = 8,
+	GateTimeout = 15,
 	BossRoomNumber = 19,
 	LootRadius = 150,
 	LootTimeout = 3
@@ -158,7 +158,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v3.5"
+titleLabel.Text = "Auto Dungeon v3.6"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -611,7 +611,7 @@ loopWpBtn.MouseButton1Click:Connect(function()
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 		loopWpBtn.Text = "Run ON"
 		currentWaypointIndex = 1
-		roomClearedConfirmed = true -- Instantly set true to allow immediate movement on Run ON
+		roomClearedConfirmed = true
 		isLootingActive = false
 		gateTimer = tick()
 	else
@@ -727,6 +727,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 	
+	-- Re-verify folder reference dynamically in case of streaming/respawn changes
 	if not aggressorsFolder or not aggressorsFolder.Parent then
 		local live = workspace:FindFirstChild("Animal_Live")
 		if live then aggressorsFolder = live:FindFirstChild("Aggressors") end
@@ -773,7 +774,7 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 	currentWpLabel.Text = "Current WP: " .. currentWpName
 	
-	-- 2. Priority Queue: Monsters -> Timed Loot -> Waypoints
+	-- 2. Priority Queue: Monsters -> Timed Loot -> Waypoints / Fly to All Mobs
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
@@ -816,7 +817,13 @@ RunService.Heartbeat:Connect(function(dt)
 		isLootingActive = false
 	end
 	
-	-- Priority 3: Dungeon Room Waypoints (If no monsters and not actively looting)
+	-- Priority 3: Fly to All Mobs mode (if toggled ON without waypoints)
+	if not targetPos and not isLootingActive and isTrackingAll and nearestMonsterPart then
+		targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
+		targetName = nearestMonsterName
+	end
+	
+	-- Priority 4: Dungeon Room Waypoints (If no monsters and not actively looting)
 	if not targetPos and not isLootingActive and isLoopingWaypoints and #waypoints > 0 and myHrp then
 		local currentWp = waypoints[currentWaypointIndex]
 		local wpDist = (myHrp.Position - currentWp).Magnitude
@@ -846,9 +853,6 @@ RunService.Heartbeat:Connect(function(dt)
 		else
 			targetName = "Waiting for Gate Unseal..."
 		end
-	elseif not targetPos and not isLootingActive and isTrackingAll and nearestMonsterPart then
-		targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
-		targetName = nearestMonsterName
 	end
 	
 	targetLabel.Text = "Target: " .. targetName
