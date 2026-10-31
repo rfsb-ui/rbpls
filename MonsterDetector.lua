@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -13,44 +14,70 @@ if not aggressorsFolder then
 	warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
 end
 
--- ================= CONFIGURABLE SETTINGS & WAYPOINTS (AUTO-SAVE) =================
+-- ================= FILE-BASED CONFIG & WAYPOINT SYSTEM =================
+local CONFIG_FOLDER = "AutoDungeonConfigs"
+local CONFIG_FILE = CONFIG_FOLDER .. "/dungeon_config.json"
+
 local CONFIG = {
-	FlightSpeed = 50,
-	DetectionRadius = 500,
+	FlightSpeed = 14,
+	DetectionRadius = 100,
 	StopDistance = 4,
-	GateTimeout = 15,
+	GateTimeout = 4,
 	BossRoomNumber = 19,
-	NoclipOffset = 8
+	NoclipOffset = 6
 }
 
 local waypoints = {}
 
-pcall(function()
-	if _G.DungeonSettings then
-		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.FlightSpeed
-		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
-		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
-		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
-		CONFIG.NoclipOffset = _G.DungeonSettings.NoclipOffset or CONFIG.NoclipOffset
-		
-		if _G.DungeonSettings.Waypoints then
-			waypoints = _G.DungeonSettings.Waypoints
+local function saveToDevice()
+	pcall(function()
+		if not isfolder(CONFIG_FOLDER) then
+			makefolder(CONFIG_FOLDER)
 		end
-	end
-end)
-
-local function saveSettings()
-	_G.DungeonSettings = {
-		FlightSpeed = CONFIG.FlightSpeed,
-		DetectionRadius = CONFIG.DetectionRadius,
-		StopDistance = CONFIG.StopDistance,
-		GateTimeout = CONFIG.GateTimeout,
-		BossRoomNumber = CONFIG.BossRoomNumber,
-		NoclipOffset = CONFIG.NoclipOffset,
-		Waypoints = waypoints
-	}
+		
+		local dataToSave = {
+			Settings = CONFIG,
+			Waypoints = {}
+		}
+		
+		-- Convert Vector3 waypoints into a serializable table format
+		for _, pos in ipairs(waypoints) do
+			table.insert(dataToSave.Waypoints, {X = pos.X, Y = pos.Y, Z = pos.Z})
+		end
+		
+		writefile(CONFIG_FILE, HttpService:JSONEncode(dataToSave))
+		print("Config and waypoints successfully saved to device file:", CONFIG_FILE)
+	end)
 end
+
+local function loadFromDevice()
+	pcall(function()
+		if isfile(CONFIG_FILE) then
+			local content = readfile(CONFIG_FILE)
+			local decoded = HttpService:JSONDecode(content)
+			
+			if decoded and decoded.Settings then
+				CONFIG.FlightSpeed = decoded.Settings.FlightSpeed or CONFIG.FlightSpeed
+				CONFIG.DetectionRadius = decoded.Settings.DetectionRadius or CONFIG.DetectionRadius
+				CONFIG.StopDistance = decoded.Settings.StopDistance or CONFIG.StopDistance
+				CONFIG.GateTimeout = decoded.Settings.GateTimeout or CONFIG.GateTimeout
+				CONFIG.BossRoomNumber = decoded.Settings.BossRoomNumber or CONFIG.BossRoomNumber
+				CONFIG.NoclipOffset = decoded.Settings.NoclipOffset or CONFIG.NoclipOffset
+			end
+			
+			if decoded and decoded.Waypoints then
+				waypoints = {}
+				for _, wp in ipairs(decoded.Waypoints) do
+					table.insert(waypoints, Vector3.new(wp.X, wp.Y, wp.Z))
+				end
+			end
+			print("Config and waypoints successfully loaded from device file!")
+		end
+	end)
+end
+
+-- Load configuration immediately on startup
+loadFromDevice()
 -- ============================================================================
 
 -- Strict Animal property fetcher for clean display names
@@ -160,7 +187,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.24"
+titleLabel.Text = "Auto Dungeon v2.8.25"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -441,7 +468,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 		local val = tonumber(box.Text)
 		if val then
 			callback(val)
-			saveSettings()
+			saveToDevice()
 		else
 			box.Text = tostring(defaultVal)
 		end
@@ -496,9 +523,10 @@ local function updateRoomListDisplay()
 	end
 	
 	roomListFrame.CanvasSize = UDim2.new(0, 0, 0, #waypoints * 25)
+	wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
 end
 
--- Initialize room list display with loaded waypoints
+-- Initialize room list display with loaded device waypoints
 updateRoomListDisplay()
 
 -- State variables
@@ -544,9 +572,8 @@ saveWpBtn.MouseButton1Click:Connect(function()
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	if myHrp then
 		table.insert(waypoints, myHrp.Position)
-		wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
 		updateRoomListDisplay()
-		saveSettings()
+		saveToDevice()
 	end
 end)
 
@@ -557,10 +584,9 @@ clearWpBtn.MouseButton1Click:Connect(function()
 	roomClearedConfirmed = true
 	loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 	loopWpBtn.Text = "Run OFF"
-	wpSavedLabel.Text = "Rooms Saved: 0"
-	targetLabel.Text = "Rooms Cleared"
 	updateRoomListDisplay()
-	saveSettings()
+	targetLabel.Text = "Rooms Cleared"
+	saveToDevice()
 end)
 
 skipWpBtn.MouseButton1Click:Connect(function()
@@ -647,11 +673,10 @@ importBox.FocusLost:Connect(function()
 		end
 	end
 	
-	wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
 	importBox.Text = ""
 	targetLabel.Text = "Imported " .. countAdded .. " Rooms!"
 	updateRoomListDisplay()
-	saveSettings()
+	saveToDevice()
 end)
 
 exportWpBtn.MouseButton1Click:Connect(function()
@@ -737,7 +762,6 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		
 		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
-			-- Check for Run Again button and trigger it
 			for _, gui in ipairs(playerGui:GetDescendants()) do
 				if gui:IsA("TextButton") then
 					local text = gui.Text:lower()
@@ -834,7 +858,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-    targetLabel.Text = "Target: " .. targetName
+	targetLabel.Text = "Target: " .. targetName
 	
 	-- Smooth Flight Execution
 	if ((isTrackingAll or isLoopingWaypoints) and targetPos) and myHrp and humanoid then
