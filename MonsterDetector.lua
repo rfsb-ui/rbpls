@@ -15,20 +15,22 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 50,
-	DetectionRadius = 500,
-	StopDistance = 4,
+	FlightSpeed = 13,
+	DetectionRadius = 100,
+	StopDistance = 3,
 	GateTimeout = 15,
-	BossRoomNumber = 19
+	BossRoomNumber = 19,
+	NoclipOffset = 4
 }
 
 pcall(function()
 	if _G.DungeonSettings then
 		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
 		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
-		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.DungeonSettings.StopDistance
+		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.DungeonSettings.GateTimeout
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
+		CONFIG.NoclipOffset = _G.DungeonSettings.NoclipOffset or CONFIG.DungeonSettings.NoclipOffset
 	end
 end)
 
@@ -38,7 +40,8 @@ local function saveSettings()
 		DetectionRadius = CONFIG.DetectionRadius,
 		StopDistance = CONFIG.StopDistance,
 		GateTimeout = CONFIG.GateTimeout,
-		BossRoomNumber = CONFIG.BossRoomNumber
+		BossRoomNumber = CONFIG.BossRoomNumber,
+		NoclipOffset = CONFIG.NoclipOffset
 	}
 end
 -- ============================================================================
@@ -131,7 +134,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.14"
+titleLabel.Text = "Auto Dungeon v2.8.15"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -399,7 +402,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	box.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 	box.Text = tostring(defaultVal)
 	box.TextColor3 = Color3.fromRGB(255, 255, 255)
-	box.TextSize = 11
+	box.TextSize = 10
 	box.Font = Enum.Font.SourceSans
 	box.Parent = mainFrame
 	table.insert(configurableElements, box)
@@ -421,11 +424,12 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
-createLabeledInput(8, 312, 42, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
-createLabeledInput(54, 312, 42, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
-createLabeledInput(100, 312, 42, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
-createLabeledInput(146, 312, 42, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
-createLabeledInput(192, 302, 40, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
+createLabeledInput(8, 312, 33, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(45, 312, 33, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(82, 312, 33, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(119, 312, 33, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
+createLabeledInput(156, 312, 33, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
+createLabeledInput(193, 312, 39, "Offset", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
 
 -- Scrollable Room List Viewer below UI
 local roomListFrame = Instance.new("ScrollingFrame")
@@ -689,9 +693,9 @@ RunService.Heartbeat:Connect(function(dt)
 	local targetPos = nil
 	local targetName = "None"
 	
-	-- Priority Logic & Boss Room Centering (With No-Clip Above Offset)
+	-- Priority Logic & Boss Room Centering (Using Configurable Noclip Offset)
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
-	local heightOffset = isNoClipEnabled and Vector3.new(0, 8, 0) or Vector3.new(0, 2, 0)
+	local heightOffset = isNoClipEnabled and Vector3.new(0, CONFIG.NoclipOffset, 0) or Vector3.new(0, 2, 0)
 	
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
 		if isBossRoom and waypoints[CONFIG.BossRoomNumber] then
