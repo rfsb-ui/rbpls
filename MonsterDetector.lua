@@ -15,9 +15,9 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 13,
-	DetectionRadius = 100,
-	StopDistance = 3,
+	FlightSpeed = 50,
+	DetectionRadius = 500,
+	StopDistance = 4,
 	GateTimeout = 15,
 	BossRoomNumber = 19
 }
@@ -26,7 +26,7 @@ pcall(function()
 	if _G.DungeonSettings then
 		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
 		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.DungeonSettings.StopDistance
 		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
 	end
@@ -61,6 +61,7 @@ local currentWaypointIndex = 1
 local isLoopingWaypoints = false
 local isTrackingAll = false
 local isAutoRestartEnabled = false
+local isNoClipEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastRestartAttempt = 0
@@ -115,7 +116,7 @@ screenGui.Parent = playerGui
 
 -- Main Compact Panel
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 540)
+mainFrame.Size = UDim2.new(0, 240, 0, 570)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -130,7 +131,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.12"
+titleLabel.Text = "Auto Dungeon v2.8.13"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -259,10 +260,25 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 5)
 btnCorner.Parent = toggleButton
 
+-- No-Clip Toggle Button
+local noclipToggleBtn = Instance.new("TextButton")
+noclipToggleBtn.Size = UDim2.new(1, -16, 0, 26)
+noclipToggleBtn.Position = UDim2.new(0, 8, 0, 146)
+noclipToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+noclipToggleBtn.Text = "No-Clip: OFF"
+noclipToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+noclipToggleBtn.TextSize = 11
+noclipToggleBtn.Font = Enum.Font.SourceSansBold
+noclipToggleBtn.Parent = mainFrame
+
+local nclCorner = Instance.new("UICorner")
+nclCorner.CornerRadius = UDim.new(0, 4)
+nclCorner.Parent = noclipToggleBtn
+
 -- Dungeon Room Controls Row
 local saveWpBtn = Instance.new("TextButton")
 saveWpBtn.Size = UDim2.new(0, 52, 0, 26)
-saveWpBtn.Position = UDim2.new(0, 8, 0, 148)
+saveWpBtn.Position = UDim2.new(0, 8, 0, 178)
 saveWpBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 180)
 saveWpBtn.Text = "Save"
 saveWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -276,7 +292,7 @@ swpCorner.Parent = saveWpBtn
 
 local clearWpBtn = Instance.new("TextButton")
 clearWpBtn.Size = UDim2.new(0, 52, 0, 26)
-clearWpBtn.Position = UDim2.new(0, 64, 0, 148)
+clearWpBtn.Position = UDim2.new(0, 64, 0, 178)
 clearWpBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 60)
 clearWpBtn.Text = "Clear"
 clearWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -290,7 +306,7 @@ cwpCorner.Parent = clearWpBtn
 
 local skipWpBtn = Instance.new("TextButton")
 skipWpBtn.Size = UDim2.new(0, 52, 0, 26)
-skipWpBtn.Position = UDim2.new(0, 120, 0, 148)
+skipWpBtn.Position = UDim2.new(0, 120, 0, 178)
 skipWpBtn.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
 skipWpBtn.Text = "Skip WP"
 skipWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -304,7 +320,7 @@ skpCorner.Parent = skipWpBtn
 
 local loopWpBtn = Instance.new("TextButton")
 loopWpBtn.Size = UDim2.new(0, 52, 0, 26)
-loopWpBtn.Position = UDim2.new(0, 176, 0, 148)
+loopWpBtn.Position = UDim2.new(0, 176, 0, 178)
 loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 loopWpBtn.Text = "Run OFF"
 loopWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -319,7 +335,7 @@ lwpCorner.Parent = loopWpBtn
 -- Auto Restart Toggle Button
 local restartToggleBtn = Instance.new("TextButton")
 restartToggleBtn.Size = UDim2.new(1, -16, 0, 26)
-restartToggleBtn.Position = UDim2.new(0, 8, 0, 182)
+restartToggleBtn.Position = UDim2.new(0, 8, 0, 212)
 restartToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 restartToggleBtn.Text = "Auto Restart: OFF"
 restartToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -334,7 +350,7 @@ rstCorner.Parent = restartToggleBtn
 -- Waypoint Import Box
 local importBox = Instance.new("TextBox")
 importBox.Size = UDim2.new(1, -16, 0, 26)
-importBox.Position = UDim2.new(0, 8, 0, 216)
+importBox.Position = UDim2.new(0, 8, 0, 246)
 importBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 importBox.PlaceholderText = "Paste Waypoints/Coordinates..."
 importBox.Text = ""
@@ -350,7 +366,7 @@ impCorner.Parent = importBox
 -- Export Rooms Button
 local exportWpBtn = Instance.new("TextButton")
 exportWpBtn.Size = UDim2.new(1, -16, 0, 26)
-exportWpBtn.Position = UDim2.new(0, 8, 0, 248)
+exportWpBtn.Position = UDim2.new(0, 8, 0, 278)
 exportWpBtn.BackgroundColor3 = Color3.fromRGB(50, 140, 100)
 exportWpBtn.Text = "Export Rooms"
 exportWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -405,16 +421,16 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
-createLabeledInput(8, 282, 42, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
-createLabeledInput(54, 282, 42, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
-createLabeledInput(100, 282, 42, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
-createLabeledInput(146, 282, 42, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
-createLabeledInput(192, 282, 40, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
+createLabeledInput(8, 312, 42, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(54, 312, 42, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(100, 312, 42, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(146, 312, 42, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
+createLabeledInput(192, 312, 40, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
 
 -- Scrollable Room List Viewer below UI
 local roomListFrame = Instance.new("ScrollingFrame")
-roomListFrame.Size = UDim2.new(1, -16, 0, 180)
-roomListFrame.Position = UDim2.new(0, 8, 0, 324)
+roomListFrame.Size = UDim2.new(1, -16, 0, 175)
+roomListFrame.Position = UDim2.new(0, 8, 0, 354)
 roomListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 roomListFrame.BorderSizePixel = 0
 roomListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -460,6 +476,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 	if isMinimized then
 		mainFrame.Size = UDim2.new(0, 240, 0, 115)
 		toggleButton.Visible = false
+		noclipToggleBtn.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
 		skipWpBtn.Visible = false
@@ -472,8 +489,9 @@ minimizeButton.MouseButton1Click:Connect(function()
 		end
 		minimizeButton.Text = "+"
 	else
-		mainFrame.Size = UDim2.new(0, 240, 0, 540)
+		mainFrame.Size = UDim2.new(0, 240, 0, 570)
 		toggleButton.Visible = true
+		noclipToggleBtn.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
 		skipWpBtn.Visible = true
@@ -570,6 +588,17 @@ toggleButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+noclipToggleBtn.MouseButton1Click:Connect(function()
+	isNoClipEnabled = not isNoClipEnabled
+	if isNoClipEnabled then
+		noclipToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		noclipToggleBtn.Text = "No-Clip: ON"
+	else
+		noclipToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		noclipToggleBtn.Text = "No-Clip: OFF"
+	end
+end)
+
 importBox.FocusLost:Connect(function()
 	local text = importBox.Text
 	if text == "" then return end
@@ -615,6 +644,15 @@ RunService.Heartbeat:Connect(function(dt)
 	local char = player.Character
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+	
+	-- No-Clip execution loop
+	if isNoClipEnabled and char then
+		for _, part in ipairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+			end
+		end
+	end
 	
 	if not aggressorsFolder or not aggressorsFolder.Parent then
 		local live = workspace:FindFirstChild("Animal_Live")
