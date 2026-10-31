@@ -16,14 +16,16 @@ end
 local CONFIG = {
 	FlightSpeed = 50,
 	DetectionRadius = 500,
-	StopDistance = 4
+	StopDistance = 4,
+	GateTimeout = 15 -- Seconds before bypassing stuck gate check
 }
 
 pcall(function()
 	if _G.DungeonSettings then
-		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or _G.DungeonSettings.FlightSpeed
-		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or _G.DungeonSettings.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or _G.StopDistance
+		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
+		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
+		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
 	end
 end)
 
@@ -31,7 +33,8 @@ local function saveSettings()
 	_G.DungeonSettings = {
 		FlightSpeed = CONFIG.FlightSpeed,
 		DetectionRadius = CONFIG.DetectionRadius,
-		StopDistance = CONFIG.StopDistance
+		StopDistance = CONFIG.StopDistance,
+		GateTimeout = CONFIG.GateTimeout
 	}
 end
 -- ============================================================================
@@ -55,6 +58,7 @@ local currentWaypointIndex = 1
 local isLoopingWaypoints = false
 local isTrackingAll = false
 local roomClearedConfirmed = true
+local gateTimer = 0
 
 -- Function to check if the gate unseal message is active on screen
 local function checkGateUnsealed()
@@ -75,9 +79,9 @@ screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main Compact Panel (Height expanded slightly to fit export button)
+-- Main Compact Panel
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 445)
+mainFrame.Size = UDim2.new(0, 240, 0, 500)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -92,7 +96,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.5"
+titleLabel.Text = "Auto Dungeon v2.6"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -280,7 +284,7 @@ local importBox = Instance.new("TextBox")
 importBox.Size = UDim2.new(1, -16, 0, 26)
 importBox.Position = UDim2.new(0, 8, 0, 202)
 importBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-importBox.PlaceholderText = "Paste Waypoints/Coordinates to Import..."
+importBox.PlaceholderText = "Paste Waypoints/Coordinates..."
 importBox.Text = ""
 importBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 importBox.TextSize = 11
@@ -296,7 +300,7 @@ local exportWpBtn = Instance.new("TextButton")
 exportWpBtn.Size = UDim2.new(1, -16, 0, 26)
 exportWpBtn.Position = UDim2.new(0, 8, 0, 234)
 exportWpBtn.BackgroundColor3 = Color3.fromRGB(50, 140, 100)
-exportWpBtn.Text = "Export Rooms to Clipboard"
+exportWpBtn.Text = "Export Rooms"
 exportWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 exportWpBtn.TextSize = 11
 exportWpBtn.Font = Enum.Font.SourceSansBold
@@ -306,7 +310,9 @@ local expCorner = Instance.new("UICorner")
 expCorner.CornerRadius = UDim.new(0, 4)
 expCorner.Parent = exportWpBtn
 
--- Configurable Inputs
+-- Configurable Inputs (Stored in a table so they can be hidden/shown on minimize)
+local configurableElements = {}
+
 local function createLabeledInput(posX, posY, width, labelText, defaultVal, callback)
 	local lbl = Instance.new("TextLabel")
 	lbl.Size = UDim2.new(0, width, 0, 15)
@@ -318,6 +324,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	lbl.Font = Enum.Font.SourceSansBold
 	lbl.TextXAlignment = Enum.TextXAlignment.Left
 	lbl.Parent = mainFrame
+	table.insert(configurableElements, lbl)
 	
 	local box = Instance.new("TextBox")
 	box.Size = UDim2.new(0, width, 0, 24)
@@ -328,6 +335,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	box.TextSize = 11
 	box.Font = Enum.Font.SourceSans
 	box.Parent = mainFrame
+	table.insert(configurableElements, box)
 	
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 4)
@@ -346,9 +354,52 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
-createLabeledInput(8, 268, 72, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
-createLabeledInput(84, 268, 72, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
-createLabeledInput(160, 268, 72, "Stop Dist", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(8, 268, 52, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(64, 268, 52, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(120, 268, 52, "StopDist", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(176, 268, 56, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
+
+-- Scrollable Room List Viewer below UI
+local roomListFrame = Instance.new("ScrollingFrame")
+roomListFrame.Size = UDim2.new(1, -16, 0, 150)
+roomListFrame.Position = UDim2.new(0, 8, 0, 310)
+roomListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+roomListFrame.BorderSizePixel = 0
+roomListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+roomListFrame.ScrollBarThickness = 5
+roomListFrame.Parent = mainFrame
+table.insert(configurableElements, roomListFrame)
+
+local roomListLayout = Instance.new("UIListLayout")
+roomListLayout.Parent = roomListFrame
+roomListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+roomListLayout.Padding = UDim.new(0, 3)
+
+local function updateRoomListDisplay()
+	for _, child in ipairs(roomListFrame:GetChildren()) do
+		if child:IsA("TextLabel") then
+			child:Destroy()
+		end
+	end
+	
+	for i, pos in ipairs(waypoints) do
+		local item = Instance.new("TextLabel")
+		item.Size = UDim2.new(1, -6, 0, 22)
+		item.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		item.Text = string.format("Room %d: (%.1f, %.1f, %.1f)", i, pos.X, pos.Y, pos.Z)
+		item.TextColor3 = Color3.fromRGB(220, 220, 220)
+		item.TextSize = 10
+		item.Font = Enum.Font.SourceSans
+		item.TextXAlignment = Enum.TextXAlignment.Left
+		item.Parent = roomListFrame
+		
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 3)
+		corner.Parent = item
+	end
+	
+	roomListFrame.CanvasSize = UDim2.new(0, 0, 0, #waypoints * 25)
+end
 
 -- State variables
 local isMinimized = false
@@ -364,9 +415,12 @@ minimizeButton.MouseButton1Click:Connect(function()
 		loopWpBtn.Visible = false
 		importBox.Visible = false
 		exportWpBtn.Visible = false
+		for _, el in ipairs(configurableElements) do
+			el.Visible = false
+		end
 		minimizeButton.Text = "+"
 	else
-		mainFrame.Size = UDim2.new(0, 240, 0, 445)
+		mainFrame.Size = UDim2.new(0, 240, 0, 500)
 		statusFrame.Visible = true
 		toggleButton.Visible = true
 		saveWpBtn.Visible = true
@@ -374,6 +428,9 @@ minimizeButton.MouseButton1Click:Connect(function()
 		loopWpBtn.Visible = true
 		importBox.Visible = true
 		exportWpBtn.Visible = true
+		for _, el in ipairs(configurableElements) do
+			el.Visible = true
+		end
 		minimizeButton.Text = "-"
 	end
 end)
@@ -384,6 +441,7 @@ saveWpBtn.MouseButton1Click:Connect(function()
 	if myHrp then
 		table.insert(waypoints, myHrp.Position)
 		wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
+		updateRoomListDisplay()
 	end
 end)
 
@@ -398,6 +456,7 @@ clearWpBtn.MouseButton1Click:Connect(function()
 	wpSavedLabel.Text = "Rooms Saved: 0"
 	wpImportedLabel.Text = "Imported WPs: 0"
 	targetLabel.Text = "Rooms Cleared"
+	updateRoomListDisplay()
 end)
 
 loopWpBtn.MouseButton1Click:Connect(function()
@@ -415,6 +474,7 @@ loopWpBtn.MouseButton1Click:Connect(function()
 		loopWpBtn.Text = "Run WP: ON"
 		currentWaypointIndex = 1
 		roomClearedConfirmed = true
+		gateTimer = tick()
 	else
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 		loopWpBtn.Text = "Run WP: OFF"
@@ -454,6 +514,7 @@ importBox.FocusLost:Connect(function()
 	wpImportedLabel.Text = "Imported WPs: " .. importedWaypointsCount
 	importBox.Text = ""
 	targetLabel.Text = "Imported " .. countAdded .. " Rooms!"
+	updateRoomListDisplay()
 end)
 
 exportWpBtn.MouseButton1Click:Connect(function()
@@ -463,7 +524,7 @@ exportWpBtn.MouseButton1Click:Connect(function()
 	end
 	
 	local exportStr = ""
-	for i, pos in ipairs(waypoints) do
+	for _, pos in ipairs(waypoints) do
 		exportStr = exportStr .. string.format("%.2f, %.2f, %.2f\n", pos.X, pos.Y, pos.Z)
 	end
 	
@@ -472,7 +533,7 @@ exportWpBtn.MouseButton1Click:Connect(function()
 	end)
 	print("--- EXPORTED DUNGEON ROOMS ---")
 	print(exportStr)
-	targetLabel.Text = "Rooms Exported to Output/Clipboard!"
+	targetLabel.Text = "Rooms Exported!"
 end)
 
 -- Main execution loop
@@ -522,15 +583,20 @@ RunService.Heartbeat:Connect(function(dt)
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
 		targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
 		targetName = "Killing Mob: " .. nearestMonsterName
+		gateTimer = tick() -- Reset gate timer while combat is active
 	elseif isLoopingWaypoints and #waypoints > 0 and myHrp then
 		local currentWp = waypoints[currentWaypointIndex]
 		local wpDist = (myHrp.Position - currentWp).Magnitude
 		
-		-- Room 1 proceeds right away; Room 2 onwards waits for gate clearance trigger
+		-- Room 1 proceeds right away. Room 2 onwards waits for gate clearance or timeout
 		if currentWaypointIndex == 1 then
 			roomClearedConfirmed = true
 		else
-			roomClearedConfirmed = checkGateUnsealed()
+			if checkGateUnsealed() or (tick() - gateTimer >= CONFIG.GateTimeout) then
+				roomClearedConfirmed = true
+			else
+				roomClearedConfirmed = false
+			end
 		end
 		
 		if roomClearedConfirmed then
@@ -543,6 +609,7 @@ RunService.Heartbeat:Connect(function(dt)
 					currentWaypointIndex = 1
 				end
 				roomClearedConfirmed = false
+				gateTimer = tick()
 			end
 		else
 			targetName = "Waiting for Gate Unseal..."
