@@ -15,17 +15,19 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 13,
-	DetectionRadius = 100,
-	StopDistance = 3,
-	BossRoomNumber = 19
+	FlightSpeed = 50,
+	DetectionRadius = 500,
+	StopDistance = 4,
+	GateTimeout = 15,
+	BossRoomNumber = 19 -- Manually set which room is the final boss
 }
 
 pcall(function()
 	if _G.DungeonSettings then
 		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
 		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.DungeonSettings.StopDistance
+		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
 	end
 end)
@@ -35,6 +37,7 @@ local function saveSettings()
 		FlightSpeed = CONFIG.FlightSpeed,
 		DetectionRadius = CONFIG.DetectionRadius,
 		StopDistance = CONFIG.StopDistance,
+		GateTimeout = CONFIG.GateTimeout,
 		BossRoomNumber = CONFIG.BossRoomNumber
 	}
 end
@@ -60,9 +63,8 @@ local isLoopingWaypoints = false
 local isTrackingAll = false
 local isAutoRestartEnabled = false
 local roomClearedConfirmed = true
-local hasReachedWaypoint = false
+local gateTimer = 0
 local lastRestartAttempt = 0
-local restartLoadingTimeout = 0
 
 -- Function to check if the gate unseal message is active on screen
 local function checkGateUnsealed()
@@ -77,43 +79,30 @@ local function checkGateUnsealed()
 	return false
 end
 
--- Function to check for "Dungeon Cleared" popup and auto-click "Run again" (Restricted to Boss Room)
+-- Function to check for "Dungeon Cleared" popup and auto-click "Run again"
 local function checkAndRestartDungeon()
-	if not isAutoRestartEnabled or (tick() - lastRestartAttempt < 6) then return end
+	if not isAutoRestartEnabled or (tick() - lastRestartAttempt < 3) then return end
+	
+	-- Only trigger restart check if we are currently at or past the designated Boss Room
 	if currentWaypointIndex < CONFIG.BossRoomNumber and #waypoints > 0 then return end
-	if tick() < restartLoadingTimeout then return end
 	
 	for _, gui in ipairs(playerGui:GetDescendants()) do
 		if gui:IsA("TextButton") or gui:IsA("TextLabel") then
 			local text = gui.Text:lower()
-			if string.find(text, "dungeon cleared") or string.find(text, "victory") then
+			if string.find(text, "dungeon cleared") then
 				for _, btn in ipairs(playerGui:GetDescendants()) do
-					if btn:IsA("TextButton") then
-						local btnText = btn.Text:lower()
-						if string.find(btnText, "run") or string.find(btnText, "again") or string.find(btnText, "restart") then
-							lastRestartAttempt = tick()
-							restartLoadingTimeout = tick() + 4
-							currentWaypointIndex = 1
-							roomClearedConfirmed = true
-							hasReachedWaypoint = false
-							
-							pcall(function()
-								for _, conn in ipairs(getconnections(btn.MouseButton1Click)) do
-									conn:Fire()
-								end
-							end)
-							
-							local absPos = btn.AbsolutePosition
-							local absSize = btn.AbsoluteSize
-							local clickX = absPos.X + absSize.X/2
-							local clickY = absPos.Y + absSize.Y/2
-							
-							VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
-							task.wait(0.05)
-							VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
-							print("Auto Dungeon Restarted via button: " .. btn.Name)
-							return
-						end
+					if btn:IsA("TextButton") and string.find(btn.Text:lower(), "run again") then
+						lastRestartAttempt = tick()
+						currentWaypointIndex = 1
+						roomClearedConfirmed = true
+						
+						local absPos = btn.AbsolutePosition
+						local absSize = btn.AbsoluteSize
+						VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, true, game, 1)
+						task.wait(0.05)
+						VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, false, game, 1)
+						print("Auto Dungeon Restarted via 'Run again' button!")
+						return
 					end
 				end
 			end
@@ -121,21 +110,18 @@ local function checkAndRestartDungeon()
 	end
 end
 
--- Create the main ScreenGui safely with explicit ZIndex
+-- Create the main ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
-screenGui.DisplayOrder = 999
 screenGui.Parent = playerGui
 
 -- Main Compact Panel
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 530)
+mainFrame.Size = UDim2.new(0, 240, 0, 540)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-mainFrame.BackgroundTransparency = 0
 mainFrame.BorderSizePixel = 0
-mainFrame.ZIndex = 1
 mainFrame.Parent = screenGui
 
 local uiCorner = Instance.new("UICorner")
@@ -147,12 +133,11 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.9.2"
+titleLabel.Text = "Auto Dungeon v2.8"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.ZIndex = 2
 titleLabel.Parent = mainFrame
 
 -- Draggable Window Logic
@@ -192,7 +177,6 @@ closeButton.Text = "X"
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.TextSize = 12
 closeButton.Font = Enum.Font.SourceSansBold
-closeButton.ZIndex = 2
 closeButton.Parent = mainFrame
 
 local closeCorner = Instance.new("UICorner")
@@ -212,20 +196,18 @@ minimizeButton.Text = "-"
 minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 minimizeButton.TextSize = 14
 minimizeButton.Font = Enum.Font.SourceSansBold
-minimizeButton.ZIndex = 2
 minimizeButton.Parent = mainFrame
 
 local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 5)
 minCorner.Parent = minimizeButton
 
--- Compact Status Dashboard
+-- Compact Status Dashboard (Visible even when minimized)
 local statusFrame = Instance.new("Frame")
-statusFrame.Size = UDim2.new(1, -16, 0, 110)
+statusFrame.Size = UDim2.new(1, -16, 0, 90)
 statusFrame.Position = UDim2.new(0, 8, 0, 35)
 statusFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 statusFrame.BorderSizePixel = 0
-statusFrame.ZIndex = 2
 statusFrame.Parent = mainFrame
 
 local statusCorner = Instance.new("UICorner")
@@ -241,67 +223,50 @@ targetLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
 targetLabel.TextSize = 11
 targetLabel.Font = Enum.Font.SourceSansBold
 targetLabel.TextXAlignment = Enum.TextXAlignment.Left
-targetLabel.ZIndex = 3
 targetLabel.Parent = statusFrame
-
-local currentWpLabel = Instance.new("TextLabel")
-currentWpLabel.Size = UDim2.new(1, -8, 0, 18)
-currentWpLabel.Position = UDim2.new(0, 4, 0, 24)
-currentWpLabel.BackgroundTransparency = 1
-currentWpLabel.Text = "Current WP: None"
-currentWpLabel.TextColor3 = Color3.fromRGB(255, 150, 220)
-currentWpLabel.TextSize = 11
-currentWpLabel.Font = Enum.Font.SourceSansBold
-currentWpLabel.TextXAlignment = Enum.TextXAlignment.Left
-currentWpLabel.ZIndex = 3
-currentWpLabel.Parent = statusFrame
 
 local countLabel = Instance.new("TextLabel")
 countLabel.Size = UDim2.new(1, -8, 0, 18)
-countLabel.Position = UDim2.new(0, 4, 0, 44)
+countLabel.Position = UDim2.new(0, 4, 0, 24)
 countLabel.BackgroundTransparency = 1
 countLabel.Text = "Mobs Detected: 0"
 countLabel.TextColor3 = Color3.fromRGB(100, 220, 100)
 countLabel.TextSize = 11
 countLabel.Font = Enum.Font.SourceSansBold
 countLabel.TextXAlignment = Enum.TextXAlignment.Left
-countLabel.ZIndex = 3
 countLabel.Parent = statusFrame
 
 local wpSavedLabel = Instance.new("TextLabel")
 wpSavedLabel.Size = UDim2.new(1, -8, 0, 18)
-wpSavedLabel.Position = UDim2.new(0, 4, 0, 64)
+wpSavedLabel.Position = UDim2.new(0, 4, 0, 44)
 wpSavedLabel.BackgroundTransparency = 1
 wpSavedLabel.Text = "Rooms Saved: 0"
 wpSavedLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
 wpSavedLabel.TextSize = 11
 wpSavedLabel.Font = Enum.Font.SourceSansBold
 wpSavedLabel.TextXAlignment = Enum.TextXAlignment.Left
-wpSavedLabel.ZIndex = 3
 wpSavedLabel.Parent = statusFrame
 
 local wpImportedLabel = Instance.new("TextLabel")
 wpImportedLabel.Size = UDim2.new(1, -8, 0, 18)
-wpImportedLabel.Position = UDim2.new(0, 4, 0, 84)
+wpImportedLabel.Position = UDim2.new(0, 4, 0, 64)
 wpImportedLabel.BackgroundTransparency = 1
 wpImportedLabel.Text = "Imported WPs: 0"
 wpImportedLabel.TextColor3 = Color3.fromRGB(220, 150, 255)
 wpImportedLabel.TextSize = 11
 wpImportedLabel.Font = Enum.Font.SourceSansBold
 wpImportedLabel.TextXAlignment = Enum.TextXAlignment.Left
-wpImportedLabel.ZIndex = 3
 wpImportedLabel.Parent = statusFrame
 
 -- Main Fly to All Mobs Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -16, 0, 28)
-toggleButton.Position = UDim2.new(0, 8, 0, 152)
+toggleButton.Position = UDim2.new(0, 8, 0, 132)
 toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 toggleButton.Text = "Fly to All Mobs: OFF"
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.TextSize = 12
 toggleButton.Font = Enum.Font.SourceSansBold
-toggleButton.ZIndex = 2
 toggleButton.Parent = mainFrame
 
 local btnCorner = Instance.new("UICorner")
@@ -310,14 +275,13 @@ btnCorner.Parent = toggleButton
 
 -- Dungeon Room Controls Row
 local saveWpBtn = Instance.new("TextButton")
-saveWpBtn.Size = UDim2.new(0, 52, 0, 26)
-saveWpBtn.Position = UDim2.new(0, 8, 0, 188)
+saveWpBtn.Size = UDim2.new(0, 72, 0, 26)
+saveWpBtn.Position = UDim2.new(0, 8, 0, 168)
 saveWpBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 180)
-saveWpBtn.Text = "Save"
+saveWpBtn.Text = "Save Room"
 saveWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveWpBtn.TextSize = 11
 saveWpBtn.Font = Enum.Font.SourceSansBold
-saveWpBtn.ZIndex = 2
 saveWpBtn.Parent = mainFrame
 
 local swpCorner = Instance.new("UICorner")
@@ -325,44 +289,27 @@ swpCorner.CornerRadius = UDim.new(0, 4)
 swpCorner.Parent = saveWpBtn
 
 local clearWpBtn = Instance.new("TextButton")
-clearWpBtn.Size = UDim2.new(0, 52, 0, 26)
-clearWpBtn.Position = UDim2.new(0, 64, 0, 188)
+clearWpBtn.Size = UDim2.new(0, 72, 0, 26)
+clearWpBtn.Position = UDim2.new(0, 84, 0, 168)
 clearWpBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 60)
-clearWpBtn.Text = "Clear"
+clearWpBtn.Text = "Clear Rooms"
 clearWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-clearWpBtn.TextSize = 11
+clearWpBtn.TextSize = 10
 clearWpBtn.Font = Enum.Font.SourceSansBold
-clearWpBtn.ZIndex = 2
 clearWpBtn.Parent = mainFrame
 
 local cwpCorner = Instance.new("UICorner")
 cwpCorner.CornerRadius = UDim.new(0, 4)
 cwpCorner.Parent = clearWpBtn
 
-local skipWpBtn = Instance.new("TextButton")
-skipWpBtn.Size = UDim2.new(0, 52, 0, 26)
-skipWpBtn.Position = UDim2.new(0, 120, 0, 188)
-skipWpBtn.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
-skipWpBtn.Text = "Skip WP"
-skipWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-skipWpBtn.TextSize = 11
-skipWpBtn.Font = Enum.Font.SourceSansBold
-skipWpBtn.ZIndex = 2
-skipWpBtn.Parent = mainFrame
-
-local skpCorner = Instance.new("UICorner")
-skpCorner.CornerRadius = UDim.new(0, 4)
-skpCorner.Parent = skipWpBtn
-
 local loopWpBtn = Instance.new("TextButton")
-loopWpBtn.Size = UDim2.new(0, 52, 0, 26)
-loopWpBtn.Position = UDim2.new(0, 176, 0, 188)
+loopWpBtn.Size = UDim2.new(0, 72, 0, 26)
+loopWpBtn.Position = UDim2.new(0, 160, 0, 168)
 loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-loopWpBtn.Text = "Run OFF"
+loopWpBtn.Text = "Run WP: OFF"
 loopWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 loopWpBtn.TextSize = 10
 loopWpBtn.Font = Enum.Font.SourceSansBold
-loopWpBtn.ZIndex = 2
 loopWpBtn.Parent = mainFrame
 
 local lwpCorner = Instance.new("UICorner")
@@ -372,13 +319,12 @@ lwpCorner.Parent = loopWpBtn
 -- Auto Restart Toggle Button
 local restartToggleBtn = Instance.new("TextButton")
 restartToggleBtn.Size = UDim2.new(1, -16, 0, 26)
-restartToggleBtn.Position = UDim2.new(0, 8, 0, 222)
+restartToggleBtn.Position = UDim2.new(0, 8, 0, 202)
 restartToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 restartToggleBtn.Text = "Auto Restart: OFF"
 restartToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 restartToggleBtn.TextSize = 11
 restartToggleBtn.Font = Enum.Font.SourceSansBold
-restartToggleBtn.ZIndex = 2
 restartToggleBtn.Parent = mainFrame
 
 local rstCorner = Instance.new("UICorner")
@@ -388,14 +334,13 @@ rstCorner.Parent = restartToggleBtn
 -- Waypoint Import Box
 local importBox = Instance.new("TextBox")
 importBox.Size = UDim2.new(1, -16, 0, 26)
-importBox.Position = UDim2.new(0, 8, 0, 256)
+importBox.Position = UDim2.new(0, 8, 0, 236)
 importBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 importBox.PlaceholderText = "Paste Waypoints/Coordinates..."
 importBox.Text = ""
 importBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 importBox.TextSize = 11
 importBox.Font = Enum.Font.SourceSans
-importBox.ZIndex = 2
 importBox.Parent = mainFrame
 
 local impCorner = Instance.new("UICorner")
@@ -405,13 +350,12 @@ impCorner.Parent = importBox
 -- Export Rooms Button
 local exportWpBtn = Instance.new("TextButton")
 exportWpBtn.Size = UDim2.new(1, -16, 0, 26)
-exportWpBtn.Position = UDim2.new(0, 8, 0, 288)
+exportWpBtn.Position = UDim2.new(0, 8, 0, 268)
 exportWpBtn.BackgroundColor3 = Color3.fromRGB(50, 140, 100)
 exportWpBtn.Text = "Export Rooms"
 exportWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 exportWpBtn.TextSize = 11
 exportWpBtn.Font = Enum.Font.SourceSansBold
-exportWpBtn.ZIndex = 2
 exportWpBtn.Parent = mainFrame
 
 local expCorner = Instance.new("UICorner")
@@ -428,10 +372,9 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	lbl.BackgroundTransparency = 1
 	lbl.Text = labelText
 	lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-	lbl.TextSize = 8
+	lbl.TextSize = 9
 	lbl.Font = Enum.Font.SourceSansBold
 	lbl.TextXAlignment = Enum.TextXAlignment.Left
-	lbl.ZIndex = 2
 	lbl.Parent = mainFrame
 	table.insert(configurableElements, lbl)
 	
@@ -441,9 +384,8 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	box.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 	box.Text = tostring(defaultVal)
 	box.TextColor3 = Color3.fromRGB(255, 255, 255)
-	box.TextSize = 10
+	box.TextSize = 11
 	box.Font = Enum.Font.SourceSans
-	box.ZIndex = 2
 	box.Parent = mainFrame
 	table.insert(configurableElements, box)
 	
@@ -464,20 +406,20 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
-createLabeledInput(8, 322, 52, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
-createLabeledInput(64, 322, 52, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
-createLabeledInput(120, 322, 52, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
-createLabeledInput(176, 322, 56, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
+createLabeledInput(8, 302, 42, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(54, 302, 42, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(100, 302, 42, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(146, 302, 42, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
+createLabeledInput(192, 302, 40, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
 
 -- Scrollable Room List Viewer below UI
 local roomListFrame = Instance.new("ScrollingFrame")
-roomListFrame.Size = UDim2.new(1, -16, 0, 130)
-roomListFrame.Position = UDim2.new(0, 8, 0, 364)
+roomListFrame.Size = UDim2.new(1, -16, 0, 120)
+roomListFrame.Position = UDim2.new(0, 8, 0, 344)
 roomListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 roomListFrame.BorderSizePixel = 0
 roomListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 roomListFrame.ScrollBarThickness = 5
-roomListFrame.ZIndex = 2
 roomListFrame.Parent = mainFrame
 table.insert(configurableElements, roomListFrame)
 
@@ -502,7 +444,6 @@ local function updateRoomListDisplay()
 		item.TextSize = 10
 		item.Font = Enum.Font.SourceSans
 		item.TextXAlignment = Enum.TextXAlignment.Left
-		item.ZIndex = 3
 		item.Parent = roomListFrame
 		
 		local corner = Instance.new("UICorner")
@@ -519,11 +460,11 @@ local isMinimized = false
 minimizeButton.MouseButton1Click:Connect(function()
 	isMinimized = not isMinimized
 	if isMinimized then
-		mainFrame.Size = UDim2.new(0, 240, 0, 150)
+		mainFrame.Size = UDim2.new(0, 240, 0, 36)
+		statusFrame.Visible = false
 		toggleButton.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
-		skipWpBtn.Visible = false
 		loopWpBtn.Visible = false
 		restartToggleBtn.Visible = false
 		importBox.Visible = false
@@ -533,11 +474,11 @@ minimizeButton.MouseButton1Click:Connect(function()
 		end
 		minimizeButton.Text = "+"
 	else
-		mainFrame.Size = UDim2.new(0, 240, 0, 530)
+		mainFrame.Size = UDim2.new(0, 240, 0, 540)
+		statusFrame.Visible = true
 		toggleButton.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
-		skipWpBtn.Visible = true
 		loopWpBtn.Visible = true
 		restartToggleBtn.Visible = true
 		importBox.Visible = true
@@ -565,26 +506,12 @@ clearWpBtn.MouseButton1Click:Connect(function()
 	currentWaypointIndex = 1
 	isLoopingWaypoints = false
 	roomClearedConfirmed = true
-	hasReachedWaypoint = false
 	loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-	loopWpBtn.Text = "Run OFF"
+	loopWpBtn.Text = "Run WP: OFF"
 	wpSavedLabel.Text = "Rooms Saved: 0"
 	wpImportedLabel.Text = "Imported WPs: 0"
 	targetLabel.Text = "Rooms Cleared"
-	currentWpLabel.Text = "Current WP: None"
 	updateRoomListDisplay()
-end)
-
-skipWpBtn.MouseButton1Click:Connect(function()
-	if #waypoints > 0 then
-		currentWaypointIndex += 1
-		if currentWaypointIndex > #waypoints then
-			currentWaypointIndex = 1
-		end
-		roomClearedConfirmed = true
-		hasReachedWaypoint = false
-		targetLabel.Text = "Skipped to Room " .. currentWaypointIndex
-	end
 end)
 
 loopWpBtn.MouseButton1Click:Connect(function()
@@ -599,13 +526,13 @@ loopWpBtn.MouseButton1Click:Connect(function()
 		toggleButton.Text = "Fly to All Mobs: OFF"
 		
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		loopWpBtn.Text = "Run ON"
+		loopWpBtn.Text = "Run WP: ON"
 		currentWaypointIndex = 1
 		roomClearedConfirmed = true
-		hasReachedWaypoint = false
+		gateTimer = tick()
 	else
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		loopWpBtn.Text = "Run OFF"
+		loopWpBtn.Text = "Run WP: OFF"
 	end
 end)
 
@@ -625,7 +552,7 @@ toggleButton.MouseButton1Click:Connect(function()
 	if isTrackingAll then
 		isLoopingWaypoints = false
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		loopWpBtn.Text = "Run OFF"
+		loopWpBtn.Text = "Run WP: OFF"
 		
 		toggleButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 		toggleButton.Text = "Fly to All Mobs: ON"
@@ -677,6 +604,7 @@ end)
 
 -- Main execution loop
 RunService.Heartbeat:Connect(function(dt)
+	-- Check for dungeon completion popup and auto restart
 	checkAndRestartDungeon()
 	
 	local char = player.Character
@@ -693,7 +621,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	
-	-- 1. Scan for nearby monsters first (Top Priority)
+	-- 1. Scan for nearby monsters first (Priority)
 	if myHrp and aggressorsFolder then
 		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
 			if monster:IsA("Model") then
@@ -719,17 +647,8 @@ RunService.Heartbeat:Connect(function(dt)
 	
 	local targetPos = nil
 	local targetName = "None"
-	local currentWpName = "None"
 	
-	-- Update Current Waypoint Destination Display
-	if isLoopingWaypoints and #waypoints > 0 then
-		local currWp = waypoints[currentWaypointIndex]
-		local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
-		currentWpName = string.format("Room %d%s (%.1f, %.1f, %.1f)", currentWaypointIndex, (isBoss and " [BOSS]" or ""), currWp.X, currWp.Y, currWp.Z)
-	end
-	currentWpLabel.Text = "Current WP: " .. currentWpName
-	
-	-- 2. Priority Queue: Monsters -> Waypoints
+	-- 2. Priority Logic & Boss Room Centering
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
@@ -748,51 +667,45 @@ RunService.Heartbeat:Connect(function(dt)
 			targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
 			targetName = "Killing Mob: " .. nearestMonsterName
 		end
-	elseif not targetPos and isTrackingAll and nearestMonsterPart then
+		gateTimer = tick()
+	elseif isLoopingWaypoints and #waypoints > 0 and myHrp then
+		local currentWp = waypoints[currentWaypointIndex]
+		local wpDist = (myHrp.Position - currentWp).Magnitude
+		
+		-- Room 1 proceeds right away. Room 2 onwards waits for gate clearance or timeout
+		if currentWaypointIndex == 1 then
+			roomClearedConfirmed = true
+		else
+			if checkGateUnsealed() or (tick() - gateTimer >= CONFIG.GateTimeout) then
+				roomClearedConfirmed = true
+			else
+				roomClearedConfirmed = false
+			end
+		end
+		
+		if roomClearedConfirmed then
+			targetPos = currentWp + Vector3.new(0, 2, 0)
+			local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
+			targetName = (isBoss and "[BOSS] " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
+			
+			if wpDist <= (CONFIG.StopDistance + 2) then
+				if currentWaypointIndex < CONFIG.BossRoomNumber then
+					currentWaypointIndex += 1
+				end
+				roomClearedConfirmed = false
+				gateTimer = tick()
+			end
+		else
+			targetName = "Waiting for Gate Unseal..."
+		end
+	elseif isTrackingAll and nearestMonsterPart then
 		targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
 		targetName = nearestMonsterName
 	end
 	
-	-- Dungeon Room Waypoints Logic
-	if not targetPos and isLoopingWaypoints and #waypoints > 0 and myHrp then
-		local currentWp = waypoints[currentWaypointIndex]
-		local wpDist = (myHrp.Position - currentWp).Magnitude
-		
-		-- Check if we have arrived at the current waypoint threshold
-		if wpDist <= (CONFIG.StopDistance + 2) then
-			hasReachedWaypoint = true
-		end
-		
-		if not hasReachedWaypoint then
-			-- Moving towards waypoint
-			targetPos = currentWp + Vector3.new(0, 2, 0)
-			local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
-			targetName = (isBoss and "[BOSS] " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
-		else
-			-- Arrived at waypoint: hold position and check gate clearance
-			targetPos = currentWp + Vector3.new(0, 2, 0)
-			
-			if currentWaypointIndex == 1 then
-				roomClearedConfirmed = true
-			else
-				roomClearedConfirmed = checkGateUnsealed()
-			end
-			
-			if roomClearedConfirmed then
-				if currentWaypointIndex < CONFIG.BossRoomNumber then
-					currentWaypointIndex += 1
-				end
-				hasReachedWaypoint = false
-				roomClearedConfirmed = false
-			else
-				targetName = "Waiting for Room Cleared..."
-			end
-		end
-	end
-	
 	targetLabel.Text = "Target: " .. targetName
 	
-	-- 3. Smooth Flight Execution with anti-clipping
+	-- 3. Smooth Flight Execution
 	if ((isTrackingAll or isLoopingWaypoints) and targetPos) and myHrp and humanoid then
 		humanoid.PlatformStand = true
 		local currentPos = myHrp.Position
