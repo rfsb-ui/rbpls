@@ -15,22 +15,22 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 10,
-	DetectionRadius = 100,
+	FlightSpeed = 50,
+	DetectionRadius = 500,
 	StopDistance = 4,
-	GateTimeout = 6,
+	GateTimeout = 15,
 	BossRoomNumber = 19,
 	NoclipOffset = 8
 }
 
 pcall(function()
 	if _G.DungeonSettings then
-		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
-		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.DungeonSettings.StopDistance
+		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.FlightSpeed
+		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DetectionRadius
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
 		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
-		CONFIG.NoclipOffset = _G.DungeonSettings.NoclipOffset or CONFIG.DungeonSettings.NoclipOffset
+		CONFIG.NoclipOffset = _G.DungeonSettings.NoclipOffset or CONFIG.NoclipOffset
 	end
 end)
 
@@ -97,25 +97,25 @@ local function checkGateUnsealed()
 	return false
 end
 
--- Robust function to trigger "Run again" button via multiple methods (Strictly restricted to Boss Room)
+-- Direct UI button clicker targeting "Run again"
 local function triggerRunAgainButton()
-	-- Prevent firing unless we are in the boss room or beyond, and cooldown has passed
-	if currentWaypointIndex < CONFIG.BossRoomNumber then return false end
-	if tick() - lastRestartAttempt < 12 then return false end
+	if tick() - lastRestartAttempt < 10 then return false end
 	
 	for _, gui in ipairs(playerGui:GetDescendants()) do
 		if gui:IsA("TextButton") then
 			local text = gui.Text:lower()
-			if string.find(text, "run again") or string.find(text, "restart") then
+			if string.find(text, "run again") then
 				lastRestartAttempt = tick()
 				resetToRoomOne()
 				
+				-- Fire button connection if available
 				pcall(function()
 					for _, connection in ipairs(getconnections(gui.MouseButton1Click)) do
 						connection:Fire()
 					end
 				end)
 				
+				-- Calculate absolute center of the Run Again button on screen
 				local absPos = gui.AbsolutePosition
 				local absSize = gui.AbsoluteSize
 				local centerX = absPos.X + absSize.X / 2
@@ -125,7 +125,7 @@ local function triggerRunAgainButton()
 				task.wait(0.05)
 				VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
 				
-				print("Successfully triggered 'Run again' button!")
+				print("Successfully clicked 'Run again' button at coordinates:", centerX, centerY)
 				return true
 			end
 		end
@@ -156,7 +156,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.20"
+titleLabel.Text = "Auto Dungeon v2.8.21"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -717,7 +717,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Floor 19 Boss Defeat Auto-Restart Trigger (Strictly checked)
+	-- Floor 19 Boss Defeat Auto-Restart Trigger (Strictly checked when UI screen appears)
 	if isAutoRestartEnabled and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
 			bossDefeatedTimer = tick()
@@ -728,6 +728,18 @@ RunService.Heartbeat:Connect(function(dt)
 		
 		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
 			triggerRunAgainButton()
+		end
+	end
+	
+	-- Check for UI-based "Dungeon Cleared" popup anytime in boss room
+	if isAutoRestartEnabled and currentWaypointIndex >= CONFIG.BossRoomNumber then
+		for _, gui in ipairs(playerGui:GetDescendants()) do
+			if gui:IsA("TextLabel") or gui:IsA("TextButton") then
+				if string.find(gui.Text:lower(), "dungeon cleared") then
+					triggerRunAgainButton()
+					break
+				end
+			end
 		end
 	end
 	
@@ -792,6 +804,7 @@ RunService.Heartbeat:Connect(function(dt)
 		targetName = nearestMonsterName
 	end
 	
+	targetLabel.Text = "Target: " + targetName -- fixed string concatenation typo just in case
 	targetLabel.Text = "Target: " .. targetName
 	
 	-- Smooth Flight Execution
