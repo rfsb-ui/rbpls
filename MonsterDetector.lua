@@ -19,7 +19,8 @@ local CONFIG = {
 	DetectionRadius = 500,
 	StopDistance = 4,
 	GateTimeout = 15,
-	BossRoomNumber = 19 -- Manually set which room is the final boss
+	BossRoomNumber = 19,
+	LootRadius = 150 -- Detection radius for dropped loot parts
 }
 
 pcall(function()
@@ -29,6 +30,7 @@ pcall(function()
 		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
 		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
+		CONFIG.LootRadius = _G.DungeonSettings.LootRadius or CONFIG.LootRadius
 	end
 end)
 
@@ -38,7 +40,8 @@ local function saveSettings()
 		DetectionRadius = CONFIG.DetectionRadius,
 		StopDistance = CONFIG.StopDistance,
 		GateTimeout = CONFIG.GateTimeout,
-		BossRoomNumber = CONFIG.BossRoomNumber
+		BossRoomNumber = CONFIG.BossRoomNumber,
+		LootRadius = CONFIG.LootRadius
 	}
 end
 -- ============================================================================
@@ -62,6 +65,7 @@ local currentWaypointIndex = 1
 local isLoopingWaypoints = false
 local isTrackingAll = false
 local isAutoRestartEnabled = false
+local isLootPickupEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastRestartAttempt = 0
@@ -83,26 +87,35 @@ end
 local function checkAndRestartDungeon()
 	if not isAutoRestartEnabled or (tick() - lastRestartAttempt < 3) then return end
 	
-	-- Only trigger restart check if we are currently at or past the designated Boss Room
-	if currentWaypointIndex < CONFIG.BossRoomNumber and #waypoints > 0 then return end
-	
 	for _, gui in ipairs(playerGui:GetDescendants()) do
 		if gui:IsA("TextButton") or gui:IsA("TextLabel") then
 			local text = gui.Text:lower()
-			if string.find(text, "dungeon cleared") then
+			if string.find(text, "dungeon cleared") or string.find(text, "victory") then
 				for _, btn in ipairs(playerGui:GetDescendants()) do
-					if btn:IsA("TextButton") and string.find(btn.Text:lower(), "run again") then
-						lastRestartAttempt = tick()
-						currentWaypointIndex = 1
-						roomClearedConfirmed = true
-						
-						local absPos = btn.AbsolutePosition
-						local absSize = btn.AbsoluteSize
-						VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, true, game, 1)
-						task.wait(0.05)
-						VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, false, game, 1)
-						print("Auto Dungeon Restarted via 'Run again' button!")
-						return
+					if btn:IsA("TextButton") then
+						local btnText = btn.Text:lower()
+						if string.find(btnText, "run") or string.find(btnText, "again") or string.find(btnText, "restart") then
+							lastRestartAttempt = tick()
+							currentWaypointIndex = 1
+							roomClearedConfirmed = true
+							
+							pcall(function()
+								for _, conn in ipairs(getconnections(btn.MouseButton1Click)) do
+									conn:Fire()
+								end
+							end)
+							
+							local absPos = btn.AbsolutePosition
+							local absSize = btn.AbsoluteSize
+							local clickX = absPos.X + absSize.X/2
+							local clickY = absPos.Y + absSize.Y/2
+							
+							VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
+							task.wait(0.05)
+							VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
+							print("Auto Dungeon Restarted via button: " .. btn.Name)
+							return
+						end
 					end
 				end
 			end
@@ -116,9 +129,9 @@ screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main Compact Panel
+-- Main Compact Panel (Expanded slightly to accommodate extra toggle & config input)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 540)
+mainFrame.Size = UDim2.new(0, 240, 0, 570)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -133,7 +146,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8"
+titleLabel.Text = "Auto Dungeon v3.1"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -202,7 +215,7 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 5)
 minCorner.Parent = minimizeButton
 
--- Compact Status Dashboard
+-- Compact Status Dashboard (Visible even when minimized)
 local statusFrame = Instance.new("Frame")
 statusFrame.Size = UDim2.new(1, -16, 0, 90)
 statusFrame.Position = UDim2.new(0, 8, 0, 35)
@@ -331,10 +344,25 @@ local rstCorner = Instance.new("UICorner")
 rstCorner.CornerRadius = UDim.new(0, 4)
 rstCorner.Parent = restartToggleBtn
 
+-- Loot Pickup Toggle Button
+local lootToggleBtn = Instance.new("TextButton")
+lootToggleBtn.Size = UDim2.new(1, -16, 0, 26)
+lootToggleBtn.Position = UDim2.new(0, 8, 0, 234)
+lootToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+lootToggleBtn.Text = "Loot Pickup: OFF"
+lootToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+lootToggleBtn.TextSize = 11
+lootToggleBtn.Font = Enum.Font.SourceSansBold
+lootToggleBtn.Parent = mainFrame
+
+local ltCorner = Instance.new("UICorner")
+ltCorner.CornerRadius = UDim.new(0, 4)
+ltCorner.Parent = lootToggleBtn
+
 -- Waypoint Import Box
 local importBox = Instance.new("TextBox")
 importBox.Size = UDim2.new(1, -16, 0, 26)
-importBox.Position = UDim2.new(0, 8, 0, 236)
+importBox.Position = UDim2.new(0, 8, 0, 268)
 importBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 importBox.PlaceholderText = "Paste Waypoints/Coordinates..."
 importBox.Text = ""
@@ -350,7 +378,7 @@ impCorner.Parent = importBox
 -- Export Rooms Button
 local exportWpBtn = Instance.new("TextButton")
 exportWpBtn.Size = UDim2.new(1, -16, 0, 26)
-exportWpBtn.Position = UDim2.new(0, 8, 0, 268)
+exportWpBtn.Position = UDim2.new(0, 8, 0, 300)
 exportWpBtn.BackgroundColor3 = Color3.fromRGB(50, 140, 100)
 exportWpBtn.Text = "Export Rooms"
 exportWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -362,7 +390,7 @@ local expCorner = Instance.new("UICorner")
 expCorner.CornerRadius = UDim.new(0, 4)
 expCorner.Parent = exportWpBtn
 
--- Configurable Inputs (Now including BossRoomNumber)
+-- Configurable Inputs (Expanded to 6 columns: Speed, Radius, Stop, GateSec, Boss#, LootRad)
 local configurableElements = {}
 
 local function createLabeledInput(posX, posY, width, labelText, defaultVal, callback)
@@ -372,7 +400,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	lbl.BackgroundTransparency = 1
 	lbl.Text = labelText
 	lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-	lbl.TextSize = 9
+	lbl.TextSize = 8
 	lbl.Font = Enum.Font.SourceSansBold
 	lbl.TextXAlignment = Enum.TextXAlignment.Left
 	lbl.Parent = mainFrame
@@ -384,7 +412,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	box.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 	box.Text = tostring(defaultVal)
 	box.TextColor3 = Color3.fromRGB(255, 255, 255)
-	box.TextSize = 11
+	box.TextSize = 10
 	box.Font = Enum.Font.SourceSans
 	box.Parent = mainFrame
 	table.insert(configurableElements, box)
@@ -406,16 +434,17 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
-createLabeledInput(8, 302, 42, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
-createLabeledInput(54, 302, 42, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
-createLabeledInput(100, 302, 42, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
-createLabeledInput(146, 302, 42, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
-createLabeledInput(192, 302, 40, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
+createLabeledInput(8, 334, 35, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(47, 334, 35, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(86, 334, 35, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(125, 334, 35, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
+createLabeledInput(164, 334, 33, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
+createLabeledInput(201, 334, 31, "LootRad", CONFIG.LootRadius, function(v) CONFIG.LootRadius = v end)
 
 -- Scrollable Room List Viewer below UI
 local roomListFrame = Instance.new("ScrollingFrame")
-roomListFrame.Size = UDim2.new(1, -16, 0, 120)
-roomListFrame.Position = UDim2.new(0, 8, 0, 344)
+roomListFrame.Size = UDim2.new(1, -16, 0, 150)
+roomListFrame.Position = UDim2.new(0, 8, 0, 376)
 roomListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 roomListFrame.BorderSizePixel = 0
 roomListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -460,13 +489,13 @@ local isMinimized = false
 minimizeButton.MouseButton1Click:Connect(function()
 	isMinimized = not isMinimized
 	if isMinimized then
-		mainFrame.Size = UDim2.new(0, 240, 0, 36)
-		statusFrame.Visible = false
+		mainFrame.Size = UDim2.new(0, 240, 0, 130) -- Compact size (Title + Status visible)
 		toggleButton.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
 		loopWpBtn.Visible = false
 		restartToggleBtn.Visible = false
+		lootToggleBtn.Visible = false
 		importBox.Visible = false
 		exportWpBtn.Visible = false
 		for _, el in ipairs(configurableElements) do
@@ -474,13 +503,13 @@ minimizeButton.MouseButton1Click:Connect(function()
 		end
 		minimizeButton.Text = "+"
 	else
-		mainFrame.Size = UDim2.new(0, 240, 0, 540)
-		statusFrame.Visible = true
+		mainFrame.Size = UDim2.new(0, 240, 0, 570)
 		toggleButton.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
 		loopWpBtn.Visible = true
 		restartToggleBtn.Visible = true
+		lootToggleBtn.Visible = true
 		importBox.Visible = true
 		exportWpBtn.Visible = true
 		for _, el in ipairs(configurableElements) do
@@ -547,6 +576,17 @@ restartToggleBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
+lootToggleBtn.MouseButton1Click:Connect(function()
+	isLootPickupEnabled = not isLootPickupEnabled
+	if isLootPickupEnabled then
+		lootToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		lootToggleBtn.Text = "Loot Pickup: ON"
+	else
+		lootToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		lootToggleBtn.Text = "Loot Pickup: OFF"
+	end
+end)
+
 toggleButton.MouseButton1Click:Connect(function()
 	isTrackingAll = not isTrackingAll
 	if isTrackingAll then
@@ -602,9 +642,31 @@ exportWpBtn.MouseButton1Click:Connect(function()
 	targetLabel.Text = "Rooms Exported!"
 end)
 
+-- Helper function to scan for nearby dropped loot parts in workspace
+local function getNearestLootPart(myPos)
+	if not isLootPickupEnabled then return nil end
+	local nearestPart = nil
+	local shortestDist = CONFIG.LootRadius
+	
+	-- Scan workspace descendants for typical loot parts (TouchInterest or specific names)
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("BasePart") and obj.Parent ~= player.Character then
+			-- Check if it's a pickup item (has TouchInterest or is named Coin/Gem/Loot/Drop/Gold/Item)
+			local nameLower = obj.Name:lower()
+			if obj:FindFirstChildOfClass("TouchInterest") or nameLower:find("loot") or nameLower:find("coin") or nameLower:find("gem") or nameLower:find("drop") or nameLower:find("gold") or nameLower:find("item") then
+				local dist = (myPos - obj.Position).Magnitude
+				if dist <= shortestDist then
+					shortestDist = dist
+					nearestPart = obj
+				end
+			end
+		end
+	end
+	return nearestPart
+end
+
 -- Main execution loop
 RunService.Heartbeat:Connect(function(dt)
-	-- Check for dungeon completion popup and auto restart
 	checkAndRestartDungeon()
 	
 	local char = player.Character
@@ -621,7 +683,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	
-	-- 1. Scan for nearby monsters first (Priority)
+	-- 1. Scan for nearby monsters first (Top Priority)
 	if myHrp and aggressorsFolder then
 		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
 			if monster:IsA("Model") then
@@ -648,16 +710,41 @@ RunService.Heartbeat:Connect(function(dt)
 	local targetPos = nil
 	local targetName = "None"
 	
-	-- 2. Priority Logic: If monsters exist, attack them first before continuing room route
+	-- 2. Priority Queue: Monsters -> Loot -> Waypoints
+	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
+	
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
-		targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
-		targetName = "Killing Mob: " .. nearestMonsterName
+		-- Priority 1: Kill Monsters
+		if isBossRoom and waypoints[CONFIG.BossRoomNumber] then
+			local bossCenterPos = waypoints[CONFIG.BossRoomNumber]
+			local centerDist = (myHrp.Position - bossCenterPos).Magnitude
+			
+			if centerDist > 15 then
+				targetPos = bossCenterPos + Vector3.new(0, 2, 0)
+				targetName = "Returning to Boss Center"
+			else
+				targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
+				targetName = "Fighting Boss: " .. nearestMonsterName
+			end
+		else
+			targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
+			targetName = "Killing Mob: " .. nearestMonsterName
+		end
 		gateTimer = tick()
-	elseif isLoopingWaypoints and #waypoints > 0 and myHrp then
+	elseif isLootPickupEnabled and myHrp and not nearestMonsterPart then
+		-- Priority 2: Collect Loot (Only if no monsters are nearby)
+		local nearestLoot = getNearestLootPart(myHrp.Position)
+		if nearestLoot then
+			targetPos = nearestLoot.Position
+			targetName = "Collecting Loot..."
+		end
+	end
+	
+	-- Priority 3: Dungeon Room Waypoints (If no monsters and no loot)
+	if not targetPos and isLoopingWaypoints and #waypoints > 0 and myHrp then
 		local currentWp = waypoints[currentWaypointIndex]
 		local wpDist = (myHrp.Position - currentWp).Magnitude
 		
-		-- Room 1 proceeds right away. Room 2 onwards waits for gate clearance or timeout
 		if currentWaypointIndex == 1 then
 			roomClearedConfirmed = true
 		else
@@ -670,13 +757,12 @@ RunService.Heartbeat:Connect(function(dt)
 		
 		if roomClearedConfirmed then
 			targetPos = currentWp + Vector3.new(0, 2, 0)
-			local isBoss = (currentWaypointIndex == CONFIG.BossRoomNumber)
+			local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
 			targetName = (isBoss and "[BOSS] " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
 			
 			if wpDist <= (CONFIG.StopDistance + 2) then
-				currentWaypointIndex += 1
-				if currentWaypointIndex > #waypoints then
-					currentWaypointIndex = 1
+				if currentWaypointIndex < CONFIG.BossRoomNumber then
+					currentWaypointIndex += 1
 				end
 				roomClearedConfirmed = false
 				gateTimer = tick()
@@ -684,7 +770,7 @@ RunService.Heartbeat:Connect(function(dt)
 		else
 			targetName = "Waiting for Gate Unseal..."
 		end
-	elseif isTrackingAll and nearestMonsterPart then
+	elseif not targetPos and isTrackingAll and nearestMonsterPart then
 		targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
 		targetName = nearestMonsterName
 	end
@@ -692,7 +778,7 @@ RunService.Heartbeat:Connect(function(dt)
 	targetLabel.Text = "Target: " .. targetName
 	
 	-- 3. Smooth Flight Execution
-	if ((isTrackingAll or isLoopingWaypoints) and targetPos) and myHrp and humanoid then
+	if ((isTrackingAll or isLoopingWaypoints or isLootPickupEnabled) and targetPos) and myHrp and humanoid then
 		humanoid.PlatformStand = true
 		local currentPos = myHrp.Position
 		local direction = (targetPos - currentPos)
