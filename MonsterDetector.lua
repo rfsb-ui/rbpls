@@ -18,7 +18,7 @@ local CONFIG = {
 	FlightSpeed = 10,
 	DetectionRadius = 100,
 	StopDistance = 3,
-	GateTimeout = 5,
+	GateTimeout = 15,
 	BossRoomNumber = 19,
 	NoclipOffset = 6
 }
@@ -27,8 +27,8 @@ pcall(function()
 	if _G.DungeonSettings then
 		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
 		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.DungeonSettings.StopDistance
-		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.DungeonSettings.GateTimeout
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
+		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
 		CONFIG.NoclipOffset = _G.DungeonSettings.NoclipOffset or CONFIG.DungeonSettings.NoclipOffset
 	end
@@ -74,6 +74,16 @@ local bossWasPresent = false
 local bossDefeatedTimer = 0
 local postRestartCooldown = 0
 
+-- Function to completely reset state back to Room 1
+local function resetToRoomOne()
+	currentWaypointIndex = 1
+	roomClearedConfirmed = true
+	bossWasPresent = false
+	bossDefeatedTimer = 0
+	postRestartCooldown = tick()
+	print("Dungeon state fully reset to Room 1.")
+end
+
 -- Function to check if the gate unseal message is active on screen
 local function checkGateUnsealed()
 	for _, gui in ipairs(playerGui:GetDescendants()) do
@@ -87,35 +97,40 @@ local function checkGateUnsealed()
 	return false
 end
 
--- Function to check for "Dungeon Cleared" popup and auto-click "Run again"
-local function checkAndRestartDungeon()
-	if not isAutoRestartEnabled or (tick() - lastRestartAttempt < 12) then return end
+-- Robust function to trigger "Run again" button via multiple methods
+local function triggerRunAgainButton()
+	if tick() - lastRestartAttempt < 12 then return false end
 	
 	for _, gui in ipairs(playerGui:GetDescendants()) do
-		if gui:IsA("TextButton") or gui:IsA("TextLabel") then
+		if gui:IsA("TextButton") then
 			local text = gui.Text:lower()
-			if string.find(text, "dungeon cleared") or (bossDefeatedTimer > 0 and tick() - bossDefeatedTimer <= 10) then
-				for _, btn in ipairs(playerGui:GetDescendants()) do
-					if btn:IsA("TextButton") and string.find(btn.Text:lower(), "run again") then
-						lastRestartAttempt = tick()
-						postRestartCooldown = tick() -- Start 10-second loading timeout window
-						currentWaypointIndex = 1
-						roomClearedConfirmed = true
-						bossWasPresent = false
-						bossDefeatedTimer = 0
-						
-						local absPos = btn.AbsolutePosition
-						local absSize = btn.AbsoluteSize
-						VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, true, game, 1)
-						task.wait(0.05)
-						VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, false, game, 1)
-						print("Auto Dungeon Restarted! Waiting 10 seconds for map load...")
-						return
+			if string.find(text, "run again") or string.find(text, "restart") then
+				lastRestartAttempt = tick()
+				resetToRoomOne()
+				
+				-- Method 1: Direct MouseButton1Click event firing if supported by UI
+				pcall(function()
+					for _, connection in ipairs(getconnections(gui.MouseButton1Click)) do
+						connection:Fire()
 					end
-				end
+				end)
+				
+				-- Method 2: Virtual Mouse Click via Absolute Position
+				local absPos = gui.AbsolutePosition
+				local absSize = gui.AbsoluteSize
+				local centerX = absPos.X + absSize.X / 2
+				local centerY = absPos.Y + absSize.Y / 2
+				
+				VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+				task.wait(0.05)
+				VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+				
+				print("Successfully triggered 'Run again' button!")
+				return true
 			end
 		end
 	end
+	return false
 end
 
 -- Create the main ScreenGui
@@ -141,7 +156,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.17"
+titleLabel.Text = "Auto Dungeon v2.8.18"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -650,8 +665,6 @@ end)
 
 -- Main execution loop
 RunService.Heartbeat:Connect(function(dt)
-	checkAndRestartDungeon()
-	
 	local char = player.Character
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
@@ -665,9 +678,9 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- If 10-second post-restart cooldown is active, pause waypoint navigation & targeting temporarily
+	-- If post-restart cooldown is active, pause navigation and show status
 	if tick() - postRestartCooldown < 10 then
-		targetLabel.Text = "Status: Loading Next Run..."
+		targetLabel.Text = "Status: Restarting Room 1..."
 		countLabel.Text = "Mobs Detected: 0"
 		return
 	end
@@ -714,21 +727,16 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		
 		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
-			for _, btn in ipairs(playerGui:GetDescendants()) do
-				if btn:IsA("TextButton") and string.find(btn.Text:lower(), "run again") then
-					lastRestartAttempt = tick()
-					postRestartCooldown = tick()
-					currentWaypointIndex = 1
-					roomClearedConfirmed = true
-					bossWasPresent = false
-					bossDefeatedTimer = 0
-					
-					local absPos = btn.AbsolutePosition
-					local absSize = btn.AbsoluteSize
-					VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, true, game, 1)
-					task.wait(0.05)
-					VirtualInputManager:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, false, game, 1)
-					print("Auto Dungeon Restarted via Boss Timeout!")
+			triggerRunAgainButton()
+		end
+	end
+	
+	-- Check for UI-based "Dungeon Cleared" popups anytime
+	if isAutoRestartEnabled then
+		for _, gui in ipairs(playerGui:GetDescendants()) do
+			if gui:IsA("TextLabel") or gui:IsA("TextButton") then
+				if string.find(gui.Text:lower(), "dungeon cleared") then
+					triggerRunAgainButton()
 					break
 				end
 			end
