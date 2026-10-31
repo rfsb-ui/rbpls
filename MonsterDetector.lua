@@ -43,18 +43,6 @@ local function saveSettings()
 end
 -- ============================================================================
 
--- Strict Animal property fetcher
-local function getAnimalName(monster)
-	local animalProp = monster:GetAttribute("Animal")
-	if not animalProp then
-		local animalVal = monster:FindFirstChild("Animal")
-		if animalVal and animalVal:IsA("StringValue") then
-			animalProp = animalVal.Value
-		end
-	end
-	return animalProp or monster.Name
-end
-
 -- Waypoint and Room tracking variables
 local waypoints = {}
 local importedWaypointsCount = 0
@@ -131,7 +119,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.7"
+titleLabel.Text = "Auto Dungeon v2.8.8"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -609,7 +597,7 @@ end)
 
 exportWpBtn.MouseButton1Click:Connect(function()
 	if #waypoints == 0 then
-		targetLabel.Text = "No Rooms to Export!"
+-		targetLabel.Text = "No Rooms to Export!"
 		return
 	end
 	
@@ -626,7 +614,7 @@ exportWpBtn.MouseButton1Click:Connect(function()
 	targetLabel.Text = "Rooms Exported!"
 end)
 
--- Main execution loop using the verified working Aggressors child scan loop
+-- Main execution loop with ultra-permissive Aggressors scanner
 RunService.Heartbeat:Connect(function(dt)
 	checkAndRestartDungeon()
 	
@@ -644,21 +632,19 @@ RunService.Heartbeat:Connect(function(dt)
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	
+	-- Permissive scan: counts ANY model inside Aggressors that has any Part/HRP
 	if aggressorsFolder and myHrp then
 		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
-			local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
-			local hum = monster:FindFirstChildOfClass("Humanoid")
-			
-			if hrp and hum and hum.Health > 0 then
-				local animalProp = getAnimalName(monster)
-				if animalProp then
+			if monster:IsA("Model") then
+				local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart or monster:FindFirstChildWhichIsA("BasePart")
+				if hrp then
 					local dist = (myHrp.Position - hrp.Position).Magnitude
 					if dist <= CONFIG.DetectionRadius then
 						detectedCount += 1
 						if dist < shortestDist then
 							shortestDist = dist
 							nearestMonsterPart = hrp
-							nearestMonsterName = animalProp .. " (" .. math.floor(dist) .. "m)"
+							nearestMonsterName = monster.Name .. " (" .. math.floor(dist) .. "m)"
 						end
 					end
 				end
