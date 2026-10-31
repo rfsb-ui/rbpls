@@ -5,20 +5,28 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
+-- Direct path verification to workspace.Animal_Live.Aggressors
+local animalLive = workspace:WaitForChild("Animal_Live", 30)
+local aggressorsFolder = animalLive:WaitForChild("Aggressors", 30)
+
+if not aggressorsFolder then
+	warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
+end
+
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 13,
-	DetectionRadius = 100,
-	StopDistance = 3,
+	FlightSpeed = 50,
+	DetectionRadius = 500,
+	StopDistance = 4,
 	GateTimeout = 15,
-	BossRoomNumber = 19 -- Manually set which room is the final boss
+	BossRoomNumber = 19
 }
 
 pcall(function()
 	if _G.DungeonSettings then
-		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
-		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.DungeonSettings.StopDistance
+		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.FlightSpeed
+		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DetectionRadius
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
 		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
 	end
@@ -35,7 +43,7 @@ local function saveSettings()
 end
 -- ============================================================================
 
--- Strict Animal property fetcher matching external detector behavior
+-- Strict Animal property fetcher matching your working detector snippet
 local function getAnimalName(monster)
 	local animalProp = monster:GetAttribute("Animal")
 	if not animalProp then
@@ -123,7 +131,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.4"
+titleLabel.Text = "Auto Dungeon v2.8.5"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -499,7 +507,6 @@ saveWpBtn.MouseButton1Click:Connect(function()
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	if myHrp then
 		table.insert(waypoints, myHrp.Position)
-		wpSavedLabel.Text = "Rooms Saved: " + #waypoints
 		wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
 		updateRoomListDisplay()
 	end
@@ -619,7 +626,7 @@ exportWpBtn.MouseButton1Click:Connect(function()
 	targetLabel.Text = "Rooms Exported!"
 end)
 
--- Main execution loop using the precise v2.6/v2.7 aggressive aggregator sweep
+-- Main execution loop featuring exact MonsterDetector.lua matching logic
 RunService.Heartbeat:Connect(function(dt)
 	checkAndRestartDungeon()
 	
@@ -627,20 +634,17 @@ RunService.Heartbeat:Connect(function(dt)
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 	
-	-- Fallback check for aggressors folder if streaming changes parents
-	if not aggressorsFolder or not aggressorsFolder.Parent then
-		local live = workspace:FindFirstChild("Animal_Live")
-		if live then aggressorsFolder = live:FindFirstChild("Aggressors") end
-	end
+	local liveFolder = workspace:FindFirstChild("Animal_Live")
+	local aggressors = liveFolder and liveFolder:FindFirstChild("Aggressors")
 	
 	local detectedCount = 0
 	local nearestMonsterPart = nil
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	
-	-- UNIVERSAL SCANNER: Scans workspace.Animal_Live.Aggressors OR any model anywhere in workspace containing an Animal attribute/value
-	local function scanMonster(monster)
-		if monster:IsA("Model") then
+	-- Exact loop configuration from MonsterDetector.lua reference
+	if aggressors and myHrp then
+		for _, monster in ipairs(aggressors:GetChildren()) do
 			local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
 			local hum = monster:FindFirstChildOfClass("Humanoid")
 			
@@ -653,33 +657,16 @@ RunService.Heartbeat:Connect(function(dt)
 					end
 				end
 				
-				-- If it has an Animal tag OR is located inside the Aggressors folder, count it!
-				if animalProp or (aggressorsFolder and monster:IsDescendantOf(aggressorsFolder)) then
-					local dist = (myHrp and (myHrp.Position - hrp.Position).Magnitude) or 0
-					if myHrp and dist <= CONFIG.DetectionRadius then
+				if animalProp then
+					local dist = (myHrp.Position - hrp.Position).Magnitude
+					if dist <= CONFIG.DetectionRadius then
 						detectedCount += 1
 						if dist < shortestDist then
 							shortestDist = dist
 							nearestMonsterPart = hrp
-							nearestMonsterName = (animalProp or monster.Name) .. " (" .. math.floor(dist) .. "m)"
+							nearestMonsterName = animalProp .. " (" .. math.floor(dist) .. "m)"
 						end
 					end
-				end
-			end
-		end
-	end
-	
-	if myHrp then
-		if aggressorsFolder then
-			for _, monster in ipairs(aggressorsFolder:GetChildren()) do
-				scanMonster(monster)
-			end
-		end
-		-- Deep workspace sweep fallback so it never misses mobs regardless of folder nesting
-		if detectedCount == 0 then
-			for _, desc in ipairs(workspace:GetDescendants()) do
-				if desc:IsA("Model") then
-					scanMonster(desc)
 				end
 			end
 		end
