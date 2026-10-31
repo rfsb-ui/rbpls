@@ -19,7 +19,7 @@ local CONFIG_FOLDER = "AutoDungeonConfigs"
 local CONFIG_FILE = CONFIG_FOLDER .. "/dungeon_config.json"
 
 local CONFIG = {
-	FlightSpeed = 14,
+	FlightSpeed = 12,
 	DetectionRadius = 100,
 	StopDistance = 4,
 	GateTimeout = 4,
@@ -40,13 +40,11 @@ local function saveToDevice()
 			Waypoints = {}
 		}
 		
-		-- Convert Vector3 waypoints into a serializable table format
 		for _, pos in ipairs(waypoints) do
 			table.insert(dataToSave.Waypoints, {X = pos.X, Y = pos.Y, Z = pos.Z})
 		end
 		
 		writefile(CONFIG_FILE, HttpService:JSONEncode(dataToSave))
-		print("Config and waypoints successfully saved to device file:", CONFIG_FILE)
 	end)
 end
 
@@ -71,12 +69,10 @@ local function loadFromDevice()
 					table.insert(waypoints, Vector3.new(wp.X, wp.Y, wp.Z))
 				end
 			end
-			print("Config and waypoints successfully loaded from device file!")
 		end
 	end)
 end
 
--- Load configuration immediately on startup
 loadFromDevice()
 -- ============================================================================
 
@@ -102,7 +98,6 @@ local roomClearedConfirmed = true
 local gateTimer = 0
 local lastRestartAttempt = 0
 
--- Boss Defeat & Post-Restart Timeout tracking variables
 local bossWasPresent = false
 local bossDefeatedTimer = 0
 local postRestartCooldown = 0
@@ -130,14 +125,14 @@ local function checkGateUnsealed()
 	return false
 end
 
--- Direct UI button clicker targeting "Run again"
+-- Robust function to trigger "Run again" button
 local function triggerRunAgainButton()
 	if tick() - lastRestartAttempt < 10 then return false end
 	
 	for _, gui in ipairs(playerGui:GetDescendants()) do
 		if gui:IsA("TextButton") then
 			local text = gui.Text:lower()
-			if string.find(text, "run again") then
+			if string.find(text, "run again") or string.find(text, "restart") then
 				lastRestartAttempt = tick()
 				resetToRoomOne()
 				
@@ -164,17 +159,18 @@ local function triggerRunAgainButton()
 	return false
 end
 
--- Create the main ScreenGui
+-- Create the main ScreenGui (70% opacity applied via BackgroundTransparency = 0.3)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main Compact Panel
+-- Main Compact Panel (70% Opacity)
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 240, 0, 570)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BackgroundTransparency = 0.3
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 
@@ -187,7 +183,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.25"
+titleLabel.Text = "Auto Dungeon v2.8.26"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -227,6 +223,7 @@ local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.new(0, 26, 0, 26)
 closeButton.Position = UDim2.new(1, -30, 0, 3)
 closeButton.BackgroundColor3 = Color3.fromRGB(140, 40, 40)
+closeButton.BackgroundTransparency = 0.3
 closeButton.Text = "X"
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.TextSize = 12
@@ -246,6 +243,7 @@ local minimizeButton = Instance.new("TextButton")
 minimizeButton.Size = UDim2.new(0, 26, 0, 26)
 minimizeButton.Position = UDim2.new(1, -60, 0, 3)
 minimizeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+minimizeButton.BackgroundTransparency = 0.3
 minimizeButton.Text = "-"
 minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 minimizeButton.TextSize = 14
@@ -256,11 +254,12 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 5)
 minCorner.Parent = minimizeButton
 
--- Compact Status Dashboard (Visible even when minimized)
+-- Compact Status Dashboard (70% Opacity)
 local statusFrame = Instance.new("Frame")
 statusFrame.Size = UDim2.new(1, -16, 0, 70)
 statusFrame.Position = UDim2.new(0, 8, 0, 35)
 statusFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+statusFrame.BackgroundTransparency = 0.3
 statusFrame.BorderSizePixel = 0
 statusFrame.Parent = mainFrame
 
@@ -306,6 +305,7 @@ local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -16, 0, 28)
 toggleButton.Position = UDim2.new(0, 8, 0, 112)
 toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+toggleButton.BackgroundTransparency = 0.3
 toggleButton.Text = "Fly to All Mobs: OFF"
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.TextSize = 12
@@ -321,6 +321,7 @@ local noclipToggleBtn = Instance.new("TextButton")
 noclipToggleBtn.Size = UDim2.new(1, -16, 0, 26)
 noclipToggleBtn.Position = UDim2.new(0, 8, 0, 146)
 noclipToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+noclipToggleBtn.BackgroundTransparency = 0.3
 noclipToggleBtn.Text = "No-Clip: OFF"
 noclipToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 noclipToggleBtn.TextSize = 11
@@ -336,6 +337,7 @@ local saveWpBtn = Instance.new("TextButton")
 saveWpBtn.Size = UDim2.new(0, 52, 0, 26)
 saveWpBtn.Position = UDim2.new(0, 8, 0, 178)
 saveWpBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 180)
+saveWpBtn.BackgroundTransparency = 0.3
 saveWpBtn.Text = "Save"
 saveWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveWpBtn.TextSize = 11
@@ -350,6 +352,7 @@ local clearWpBtn = Instance.new("TextButton")
 clearWpBtn.Size = UDim2.new(0, 52, 0, 26)
 clearWpBtn.Position = UDim2.new(0, 64, 0, 178)
 clearWpBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 60)
+clearWpBtn.BackgroundTransparency = 0.3
 clearWpBtn.Text = "Clear"
 clearWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 clearWpBtn.TextSize = 11
@@ -364,6 +367,7 @@ local skipWpBtn = Instance.new("TextButton")
 skipWpBtn.Size = UDim2.new(0, 52, 0, 26)
 skipWpBtn.Position = UDim2.new(0, 120, 0, 178)
 skipWpBtn.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
+skipWpBtn.BackgroundTransparency = 0.3
 skipWpBtn.Text = "Skip WP"
 skipWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 skipWpBtn.TextSize = 11
@@ -378,6 +382,7 @@ local loopWpBtn = Instance.new("TextButton")
 loopWpBtn.Size = UDim2.new(0, 52, 0, 26)
 loopWpBtn.Position = UDim2.new(0, 176, 0, 178)
 loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+loopWpBtn.BackgroundTransparency = 0.3
 loopWpBtn.Text = "Run OFF"
 loopWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 loopWpBtn.TextSize = 10
@@ -393,6 +398,7 @@ local restartToggleBtn = Instance.new("TextButton")
 restartToggleBtn.Size = UDim2.new(1, -16, 0, 26)
 restartToggleBtn.Position = UDim2.new(0, 8, 0, 212)
 restartToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+restartToggleBtn.BackgroundTransparency = 0.3
 restartToggleBtn.Text = "Auto Restart: OFF"
 restartToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 restartToggleBtn.TextSize = 11
@@ -408,6 +414,7 @@ local importBox = Instance.new("TextBox")
 importBox.Size = UDim2.new(1, -16, 0, 26)
 importBox.Position = UDim2.new(0, 8, 0, 246)
 importBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+importBox.BackgroundTransparency = 0.3
 importBox.PlaceholderText = "Paste Waypoints/Coordinates..."
 importBox.Text = ""
 importBox.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -424,6 +431,7 @@ local exportWpBtn = Instance.new("TextButton")
 exportWpBtn.Size = UDim2.new(1, -16, 0, 26)
 exportWpBtn.Position = UDim2.new(0, 8, 0, 278)
 exportWpBtn.BackgroundColor3 = Color3.fromRGB(50, 140, 100)
+exportWpBtn.BackgroundTransparency = 0.3
 exportWpBtn.Text = "Export Rooms"
 exportWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 exportWpBtn.TextSize = 11
@@ -453,6 +461,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	box.Size = UDim2.new(0, width, 0, 24)
 	box.Position = UDim2.new(0, posX, 0, posY + 15)
 	box.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	box.BackgroundTransparency = 0.3
 	box.Text = tostring(defaultVal)
 	box.TextColor3 = Color3.fromRGB(255, 255, 255)
 	box.TextSize = 10
@@ -484,11 +493,12 @@ createLabeledInput(119, 312, 33, "GateSec", CONFIG.GateTimeout, function(v) CONF
 createLabeledInput(156, 312, 33, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
 createLabeledInput(193, 312, 39, "Offset", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
 
--- Scrollable Room List Viewer below UI
+-- Scrollable Room List Viewer below UI (70% Opacity)
 local roomListFrame = Instance.new("ScrollingFrame")
 roomListFrame.Size = UDim2.new(1, -16, 0, 175)
 roomListFrame.Position = UDim2.new(0, 8, 0, 354)
 roomListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+roomListFrame.BackgroundTransparency = 0.3
 roomListFrame.BorderSizePixel = 0
 roomListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 roomListFrame.ScrollBarThickness = 5
@@ -511,6 +521,7 @@ local function updateRoomListDisplay()
 		local item = Instance.new("TextLabel")
 		item.Size = UDim2.new(1, -6, 0, 22)
 		item.BackgroundColor3 = (i == CONFIG.BossRoomNumber) and Color3.fromRGB(100, 50, 50) or Color3.fromRGB(50, 50, 50)
+		item.BackgroundTransparency = 0.3
 		item.Text = string.format("Room %d%s: (%.1f, %.1f, %.1f)", i, (i == CONFIG.BossRoomNumber and " [BOSS]" or ""), pos.X, pos.Y, pos.Z)
 		item.TextColor3 = Color3.fromRGB(220, 220, 220)
 		item.TextSize = 10
@@ -526,7 +537,6 @@ local function updateRoomListDisplay()
 	wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
 end
 
--- Initialize room list display with loaded device waypoints
 updateRoomListDisplay()
 
 -- State variables
@@ -579,9 +589,8 @@ end)
 
 clearWpBtn.MouseButton1Click:Connect(function()
 	waypoints = {}
-	currentWaypointIndex = 1
+	resetToRoomOne()
 	isLoopingWaypoints = false
-	roomClearedConfirmed = true
 	loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 	loopWpBtn.Text = "Run OFF"
 	updateRoomListDisplay()
@@ -614,8 +623,7 @@ loopWpBtn.MouseButton1Click:Connect(function()
 		
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 		loopWpBtn.Text = "Run ON"
-		currentWaypointIndex = 1
-		roomClearedConfirmed = true
+		resetToRoomOne()
 		gateTimer = tick()
 	else
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
@@ -713,6 +721,23 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
+	-- Continuous check for manual or automatic "Run again" button clicks to force Room 1 reset
+	for _, gui in ipairs(playerGui:GetDescendants()) do
+		if gui:IsA("TextButton") then
+			local text = gui.Text:lower()
+			if string.find(text, "run again") then
+				-- Check if user clicked it manually or if auto-restart is scanning
+				local absoluteSize = gui.AbsoluteSize
+				-- Detect if mouse is interacting or if auto restart triggered
+				if isAutoRestartEnabled and (tick() - lastRestartAttempt >= 10) then
+					if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
+						triggerRunAgainButton()
+					end
+				end
+			end
+		end
+	end
+	
 	-- If post-restart cooldown is active, pause navigation and show status
 	if tick() - postRestartCooldown < 10 then
 		targetLabel.Text = "Status: Restarting Room 1..."
@@ -762,34 +787,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		
 		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
-			for _, gui in ipairs(playerGui:GetDescendants()) do
-				if gui:IsA("TextButton") then
-					local text = gui.Text:lower()
-					if string.find(text, "run again") then
-						if tick() - lastRestartAttempt >= 10 then
-							lastRestartAttempt = tick()
-							resetToRoomOne()
-							
-							pcall(function()
-								for _, connection in ipairs(getconnections(gui.MouseButton1Click)) do
-									connection:Fire()
-								end
-							end)
-							
-							local absPos = gui.AbsolutePosition
-							local absSize = gui.AbsoluteSize
-							local centerX = absPos.X + absSize.X / 2
-							local centerY = absPos.Y + absSize.Y / 2
-							
-							VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
-							task.wait(0.05)
-							VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
-							print("Auto Dungeon Restarted via Boss Timeout!")
-							break
-						end
-					end
-				end
-			end
+			triggerRunAgainButton()
 		end
 	end
 	
