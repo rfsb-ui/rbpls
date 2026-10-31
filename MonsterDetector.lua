@@ -20,15 +20,15 @@ local CONFIG = {
 }
 
 pcall(function()
-	if _G.TargeterSettings then
-		CONFIG.FlightSpeed = _G.TargeterSettings.FlightSpeed or CONFIG.FlightSpeed
-		CONFIG.DetectionRadius = _G.TargeterSettings.DetectionRadius or CONFIG.DetectionRadius
-		CONFIG.StopDistance = _G.TargeterSettings.StopDistance or CONFIG.StopDistance
+	if _G.DungeonSettings then
+		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.FlightSpeed
+		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DetectionRadius
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
 	end
 end)
 
 local function saveSettings()
-	_G.TargeterSettings = {
+	_G.DungeonSettings = {
 		FlightSpeed = CONFIG.FlightSpeed,
 		DetectionRadius = CONFIG.DetectionRadius,
 		StopDistance = CONFIG.StopDistance
@@ -48,20 +48,21 @@ local function getAnimalName(monster)
 	return animalProp or monster.Name
 end
 
--- Waypoint variables
+-- Waypoint variables (Each waypoint represents a Dungeon Room)
 local waypoints = {}
 local currentWaypointIndex = 1
 local isLoopingWaypoints = false
+local isTrackingAll = false
 
 -- Create the main ScreenGui
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "MonsterTargeterGui"
+screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main Compact Panel (Slightly taller to fit waypoint controls)
+-- Main Compact Panel (Height expanded to fit labels and import box)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 340)
+mainFrame.Size = UDim2.new(0, 240, 0, 390)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -76,7 +77,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Aggressor Targeter v2.1"
+titleLabel.Text = "Auto Dungeon v2.2"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -145,9 +146,9 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 5)
 minCorner.Parent = minimizeButton
 
--- Compact Status Dashboard
+-- Compact Status Dashboard (Includes Live Rooms/Waypoints Count)
 local statusFrame = Instance.new("Frame")
-statusFrame.Size = UDim2.new(1, -16, 0, 55)
+statusFrame.Size = UDim2.new(1, -16, 0, 72)
 statusFrame.Position = UDim2.new(0, 8, 0, 35)
 statusFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 statusFrame.BorderSizePixel = 0
@@ -170,7 +171,7 @@ targetLabel.Parent = statusFrame
 
 local countLabel = Instance.new("TextLabel")
 countLabel.Size = UDim2.new(1, -8, 0, 18)
-countLabel.Position = UDim2.new(0, 4, 0, 22)
+countLabel.Position = UDim2.new(0, 4, 0, 24)
 countLabel.BackgroundTransparency = 1
 countLabel.Text = "Mobs Detected: 0"
 countLabel.TextColor3 = Color3.fromRGB(100, 220, 100)
@@ -179,10 +180,21 @@ countLabel.Font = Enum.Font.SourceSansBold
 countLabel.TextXAlignment = Enum.TextXAlignment.Left
 countLabel.Parent = statusFrame
 
--- Main Fly to All Toggle Button
+local wpSavedLabel = Instance.new("TextLabel")
+wpSavedLabel.Size = UDim2.new(1, -8, 0, 18)
+wpSavedLabel.Position = UDim2.new(0, 4, 0, 44)
+wpSavedLabel.BackgroundTransparency = 1
+wpSavedLabel.Text = "Rooms Saved: 0"
+wpSavedLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
+wpSavedLabel.TextSize = 11
+wpSavedLabel.Font = Enum.Font.SourceSansBold
+wpSavedLabel.TextXAlignment = Enum.TextXAlignment.Left
+wpSavedLabel.Parent = statusFrame
+
+-- Main Fly to All Mobs Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -16, 0, 28)
-toggleButton.Position = UDim2.new(0, 8, 0, 96)
+toggleButton.Position = UDim2.new(0, 8, 0, 114)
 toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 toggleButton.Text = "Fly to All Mobs: OFF"
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -194,42 +206,12 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 5)
 btnCorner.Parent = toggleButton
 
--- Manual Prefix Function Box Container
-local prefixBox = Instance.new("TextBox")
-prefixBox.Size = UDim2.new(0, 130, 0, 26)
-prefixBox.Position = UDim2.new(0, 8, 0, 132)
-prefixBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-prefixBox.PlaceholderText = "Enter Name Prefix"
-prefixBox.Text = ""
-prefixBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-prefixBox.TextSize = 11
-prefixBox.Font = Enum.Font.SourceSans
-prefixBox.Parent = mainFrame
-
-local prefixCorner = Instance.new("UICorner")
-prefixCorner.CornerRadius = UDim.new(0, 4)
-prefixCorner.Parent = prefixBox
-
-local prefixToggleBtn = Instance.new("TextButton")
-prefixToggleBtn.Size = UDim2.new(0, 86, 0, 26)
-prefixToggleBtn.Position = UDim2.new(0, 142, 0, 132)
-prefixToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-prefixToggleBtn.Text = "Fly Prefix: OFF"
-prefixToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-prefixToggleBtn.TextSize = 11
-prefixToggleBtn.Font = Enum.Font.SourceSansBold
-prefixToggleBtn.Parent = mainFrame
-
-local pBtnCorner = Instance.new("UICorner")
-pBtnCorner.CornerRadius = UDim.new(0, 4)
-pBtnCorner.Parent = prefixToggleBtn
-
--- Waypoint Controls Row
+-- Dungeon Room Controls Row (Save Room, Clear Rooms, Loop Rooms)
 local saveWpBtn = Instance.new("TextButton")
 saveWpBtn.Size = UDim2.new(0, 72, 0, 26)
-saveWpBtn.Position = UDim2.new(0, 8, 0, 168)
+saveWpBtn.Position = UDim2.new(0, 8, 0, 150)
 saveWpBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 180)
-saveWpBtn.Text = "Save WP"
+saveWpBtn.Text = "Save Room"
 saveWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveWpBtn.TextSize = 11
 saveWpBtn.Font = Enum.Font.SourceSansBold
@@ -241,11 +223,11 @@ swpCorner.Parent = saveWpBtn
 
 local clearWpBtn = Instance.new("TextButton")
 clearWpBtn.Size = UDim2.new(0, 72, 0, 26)
-clearWpBtn.Position = UDim2.new(0, 84, 0, 168)
+clearWpBtn.Position = UDim2.new(0, 84, 0, 150)
 clearWpBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 60)
-clearWpBtn.Text = "Clear WPs"
+clearWpBtn.Text = "Clear Rooms"
 clearWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-clearWpBtn.TextSize = 11
+clearWpBtn.TextSize = 10
 clearWpBtn.Font = Enum.Font.SourceSansBold
 clearWpBtn.Parent = mainFrame
 
@@ -255,9 +237,9 @@ cwpCorner.Parent = clearWpBtn
 
 local loopWpBtn = Instance.new("TextButton")
 loopWpBtn.Size = UDim2.new(0, 72, 0, 26)
-loopWpBtn.Position = UDim2.new(0, 160, 0, 168)
+loopWpBtn.Position = UDim2.new(0, 160, 0, 150)
 loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-loopWpBtn.Text = "Loop: OFF"
+loopWpBtn.Text = "Dungeon: OFF"
 loopWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 loopWpBtn.TextSize = 10
 loopWpBtn.Font = Enum.Font.SourceSansBold
@@ -267,70 +249,67 @@ local lwpCorner = Instance.new("UICorner")
 lwpCorner.CornerRadius = UDim.new(0, 4)
 lwpCorner.Parent = loopWpBtn
 
--- Compact Config Inputs (Speed, Radius, Stop Dist)
-local speedInput = Instance.new("TextBox")
-speedInput.Size = UDim2.new(0, 72, 0, 24)
-speedInput.Position = UDim2.new(0, 8, 0, 204)
-speedInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-speedInput.Text = tostring(CONFIG.FlightSpeed)
-speedInput.PlaceholderText = "Speed"
-speedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedInput.TextSize = 11
-speedInput.Font = Enum.Font.SourceSans
-speedInput.Parent = mainFrame
+-- Waypoint Import Box
+local importBox = Instance.new("TextBox")
+importBox.Size = UDim2.new(1, -16, 0, 26)
+importBox.Position = UDim2.new(0, 8, 0, 184)
+importBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+importBox.PlaceholderText = "Paste Waypoints/Coordinates to Import..."
+importBox.Text = ""
+importBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+importBox.TextSize = 11
+importBox.Font = Enum.Font.SourceSans
+importBox.Parent = mainFrame
 
-local sCorner = Instance.new("UICorner")
-sCorner.CornerRadius = UDim.new(0, 4)
-sCorner.Parent = speedInput
+local impCorner = Instance.new("UICorner")
+impCorner.CornerRadius = UDim.new(0, 4)
+impCorner.Parent = importBox
 
-speedInput.FocusLost:Connect(function()
-	local val = tonumber(speedInput.Text)
-	if val then CONFIG.FlightSpeed = val; saveSettings() else speedInput.Text = tostring(CONFIG.FlightSpeed) end
-end)
+-- Configurable Inputs with Clear Labels
+local function createLabeledInput(posX, posY, width, labelText, defaultVal, callback)
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(0, width, 0, 15)
+	lbl.Position = UDim2.new(0, posX, 0, posY)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = labelText
+	lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+	lbl.TextSize = 10
+	lbl.Font = Enum.Font.SourceSansBold
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = mainFrame
+	
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(0, width, 0, 24)
+	box.Position = UDim2.new(0, posX, 0, posY + 16)
+	box.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	box.Text = tostring(defaultVal)
+	box.TextColor3 = Color3.fromRGB(255, 255, 255)
+	box.TextSize = 11
+	box.Font = Enum.Font.SourceSans
+	box.Parent = mainFrame
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 4)
+	corner.Parent = box
+	
+	box.FocusLost:Connect(function()
+		local val = tonumber(box.Text)
+		if val then
+			callback(val)
+			saveSettings()
+		else
+			box.Text = tostring(defaultVal)
+		end
+	end)
+	
+	return box
+end
 
-local radiusInput = Instance.new("TextBox")
-radiusInput.Size = UDim2.new(0, 72, 0, 24)
-radiusInput.Position = UDim2.new(0, 84, 0, 204)
-radiusInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-radiusInput.Text = tostring(CONFIG.DetectionRadius)
-radiusInput.PlaceholderText = "Radius"
-radiusInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-radiusInput.TextSize = 11
-radiusInput.Font = Enum.Font.SourceSans
-radiusInput.Parent = mainFrame
-
-local rCorner = Instance.new("UICorner")
-rCorner.CornerRadius = UDim.new(0, 4)
-rCorner.Parent = radiusInput
-
-radiusInput.FocusLost:Connect(function()
-	local val = tonumber(radiusInput.Text)
-	if val then CONFIG.DetectionRadius = val; saveSettings() else radiusInput.Text = tostring(CONFIG.DetectionRadius) end
-end)
-
-local stopInput = Instance.new("TextBox")
-stopInput.Size = UDim2.new(0, 72, 0, 24)
-stopInput.Position = UDim2.new(0, 160, 0, 204)
-stopInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-stopInput.Text = tostring(CONFIG.StopDistance)
-stopInput.PlaceholderText = "Stop Dist"
-stopInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-stopInput.TextSize = 11
-stopInput.Font = Enum.Font.SourceSans
-stopInput.Parent = mainFrame
-
-local stCorner = Instance.new("UICorner")
-stCorner.CornerRadius = UDim.new(0, 4)
-stCorner.Parent = stopInput
-
-stopInput.FocusLost:Connect(function()
-	local val = tonumber(stopInput.Text)
-	if val then CONFIG.StopDistance = val; saveSettings() else stopInput.Text = tostring(CONFIG.StopDistance) end
-end)
+createLabeledInput(8, 216, 72, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(84, 216, 72, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(160, 216, 72, "Stop Dist", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
 
 -- State variables
-local isTrackingAll = false
-local isTrackingPrefix = false
 local isMinimized = false
 
 minimizeButton.MouseButton1Click:Connect(function()
@@ -339,27 +318,19 @@ minimizeButton.MouseButton1Click:Connect(function()
 		mainFrame.Size = UDim2.new(0, 240, 0, 36)
 		statusFrame.Visible = false
 		toggleButton.Visible = false
-		prefixBox.Visible = false
-		prefixToggleBtn.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
 		loopWpBtn.Visible = false
-		speedInput.Visible = false
-		radiusInput.Visible = false
-		stopInput.Visible = false
+		importBox.Visible = false
 		minimizeButton.Text = "+"
 	else
-		mainFrame.Size = UDim2.new(0, 240, 0, 340)
+		mainFrame.Size = UDim2.new(0, 240, 0, 390)
 		statusFrame.Visible = true
 		toggleButton.Visible = true
-		prefixBox.Visible = true
-		prefixToggleBtn.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
 		loopWpBtn.Visible = true
-		speedInput.Visible = true
-		radiusInput.Visible = true
-		stopInput.Visible = true
+		importBox.Visible = true
 		minimizeButton.Text = "-"
 	end
 end)
@@ -370,7 +341,7 @@ saveWpBtn.MouseButton1Click:Connect(function()
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	if myHrp then
 		table.insert(waypoints, myHrp.Position)
-		targetLabel.Text = "WP Saved! Total: " .. #waypoints
+		wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
 	end
 end)
 
@@ -379,42 +350,37 @@ clearWpBtn.MouseButton1Click:Connect(function()
 	currentWaypointIndex = 1
 	isLoopingWaypoints = false
 	loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-	loopWpBtn.Text = "Loop: OFF"
-	targetLabel.Text = "Waypoints Cleared"
+	loopWpBtn.Text = "Dungeon: OFF"
+	wpSavedLabel.Text = "Rooms Saved: 0"
+	targetLabel.Text = "Rooms Cleared"
 end)
 
 loopWpBtn.MouseButton1Click:Connect(function()
 	if #waypoints == 0 then
-		targetLabel.Text = "No Waypoints Saved!"
+		targetLabel.Text = "No Dungeon Rooms Saved!"
 		return
 	end
 	isLoopingWaypoints = not isLoopingWaypoints
 	if isLoopingWaypoints then
 		isTrackingAll = false
-		isTrackingPrefix = false
 		toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 		toggleButton.Text = "Fly to All Mobs: OFF"
-		prefixToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		prefixToggleBtn.Text = "Fly Prefix: OFF"
 		
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		loopWpBtn.Text = "Loop: ON"
+		loopWpBtn.Text = "Dungeon: ON"
 		currentWaypointIndex = 1
 	else
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		loopWpBtn.Text = "Loop: OFF"
+		loopWpBtn.Text = "Dungeon: OFF"
 	end
 end)
 
 toggleButton.MouseButton1Click:Connect(function()
 	isTrackingAll = not isTrackingAll
 	if isTrackingAll then
-		isTrackingPrefix = false
 		isLoopingWaypoints = false
-		prefixToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		prefixToggleBtn.Text = "Fly Prefix: OFF"
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		loopWpBtn.Text = "Loop: OFF"
+		loopWpBtn.Text = "Dungeon: OFF"
 		
 		toggleButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 		toggleButton.Text = "Fly to All Mobs: ON"
@@ -424,23 +390,22 @@ toggleButton.MouseButton1Click:Connect(function()
 	end
 end)
 
-prefixToggleBtn.MouseButton1Click:Connect(function()
-	if prefixBox.Text == "" then return end
-	isTrackingPrefix = not isTrackingPrefix
-	if isTrackingPrefix then
-		isTrackingAll = false
-		isLoopingWaypoints = false
-		toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		toggleButton.Text = "Fly to All Mobs: OFF"
-		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		loopWpBtn.Text = "Loop: OFF"
-		
-		prefixToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		prefixToggleBtn.Text = "Fly Prefix: ON"
-	else
-		prefixToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		prefixToggleBtn.Text = "Fly Prefix: OFF"
+-- Waypoint Import handler (Parses pasted Vector3 coordinates or JSON-like arrays)
+importBox.FocusLost:Connect(function()
+	local text = importBox.Text
+	if text == "" then return end
+	
+	-- Simple pattern matching for Vector3 coordinates e.g., Vector3.new(x, y, z) or x, y, z
+	for x, y, z in string.gmatch(text, "([%-?%d%.]+)%s*,%s*([%-?%d%.]+)%s*,%s*([%-?%d%.]+)") do
+		local numX, numY, numZ = tonumber(x), tonumber(y), tonumber(z)
+		if numX and numY and numZ then
+			table.insert(waypoints, Vector3.new(numX, numY, numZ))
+		end
 	end
+	
+	wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
+	importBox.Text = ""
+	targetLabel.Text = "Imported Rooms Successfully!"
 end)
 
 -- Main loop
@@ -475,15 +440,6 @@ RunService.Heartbeat:Connect(function(dt)
 								targetPos = hrp.Position + Vector3.new(0, 2, 0)
 								targetName = animalName .. " (" .. math.floor(dist) .. "m)"
 							end
-						elseif isTrackingPrefix and prefixBox.Text ~= "" then
-							local prefix = prefixBox.Text:lower()
-							if string.sub(animalName:lower(), 1, string.len(prefix)) == prefix or string.find(animalName:lower(), prefix) then
-								if dist < shortestDist then
-									shortestDist = dist
-									targetPos = hrp.Position + Vector3.new(0, 2, 0)
-									targetName = animalName .. " (" .. math.floor(dist) .. "m)"
-								end
-							end
 						end
 					end
 				end
@@ -491,30 +447,31 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Handle Waypoint Looping logic
+	-- Handle Dungeon Room Waypoint Looping logic
 	if isLoopingWaypoints and #waypoints > 0 and myHrp then
 		local currentWp = waypoints[currentWaypointIndex]
 		targetPos = currentWp + Vector3.new(0, 2, 0)
 		local wpDist = (myHrp.Position - currentWp).Magnitude
-		targetName = "WP " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
+		targetName = "Room " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
 		
 		if wpDist <= (CONFIG.StopDistance + 2) then
 			currentWaypointIndex += 1
 			if currentWaypointIndex > #waypoints then
-				currentWaypointIndex = 1 -- Loop back to start
+				currentWaypointIndex = 1 -- Loop back to room 1
 			end
 		end
 	end
 	
+	countLabel.Text = "Mobs Detected: " + detectedCount -- (Fixed string display below)
 	countLabel.Text = "Mobs Detected: " .. detectedCount
-	if (isTrackingAll or isTrackingPrefix or isLoopingWaypoints) and targetName ~= "None" then
+	if (isTrackingAll or isLoopingWaypoints) and targetName ~= "None" then
 		targetLabel.Text = "Target: " .. targetName
 	else
 		targetLabel.Text = "Target: None"
 	end
 	
 	-- Flight execution
-	if (isTrackingAll or isTrackingPrefix or isLoopingWaypoints) and targetPos and myHrp and humanoid then
+	if (isTrackingAll or isLoopingWaypoints) and targetPos and myHrp and humanoid then
 		humanoid.PlatformStand = true
 		local currentPos = myHrp.Position
 		local direction = (targetPos - currentPos)
