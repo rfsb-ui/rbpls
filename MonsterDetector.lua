@@ -15,10 +15,10 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 50,
-	DetectionRadius = 500,
-	StopDistance = 4,
-	GateTimeout = 15,
+	FlightSpeed = 13,
+	DetectionRadius = 100,
+	StopDistance = 3,
+	GateTimeout = 8,
 	BossRoomNumber = 19,
 	LootRadius = 150,
 	LootTimeout = 3
