@@ -17,17 +17,17 @@ end
 local CONFIG = {
 	FlightSpeed = 10,
 	DetectionRadius = 100,
-	StopDistance = 3,
-	GateTimeout = 15,
+	StopDistance = 4,
+	GateTimeout = 6,
 	BossRoomNumber = 19,
-	NoclipOffset = 6
+	NoclipOffset = 8
 }
 
 pcall(function()
 	if _G.DungeonSettings then
 		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
 		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.DungeonSettings.StopDistance
 		CONFIG.GateTimeout = _G.DungeonSettings.GateTimeout or CONFIG.GateTimeout
 		CONFIG.BossRoomNumber = _G.DungeonSettings.BossRoomNumber or CONFIG.BossRoomNumber
 		CONFIG.NoclipOffset = _G.DungeonSettings.NoclipOffset or CONFIG.DungeonSettings.NoclipOffset
@@ -97,8 +97,10 @@ local function checkGateUnsealed()
 	return false
 end
 
--- Robust function to trigger "Run again" button via multiple methods
+-- Robust function to trigger "Run again" button via multiple methods (Strictly restricted to Boss Room)
 local function triggerRunAgainButton()
+	-- Prevent firing unless we are in the boss room or beyond, and cooldown has passed
+	if currentWaypointIndex < CONFIG.BossRoomNumber then return false end
 	if tick() - lastRestartAttempt < 12 then return false end
 	
 	for _, gui in ipairs(playerGui:GetDescendants()) do
@@ -108,14 +110,12 @@ local function triggerRunAgainButton()
 				lastRestartAttempt = tick()
 				resetToRoomOne()
 				
-				-- Method 1: Direct MouseButton1Click event firing if supported by UI
 				pcall(function()
 					for _, connection in ipairs(getconnections(gui.MouseButton1Click)) do
 						connection:Fire()
 					end
 				end)
 				
-				-- Method 2: Virtual Mouse Click via Absolute Position
 				local absPos = gui.AbsolutePosition
 				local absSize = gui.AbsoluteSize
 				local centerX = absPos.X + absSize.X / 2
@@ -156,7 +156,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.18"
+titleLabel.Text = "Auto Dungeon v2.8.20"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -717,7 +717,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Floor 19 Boss Defeat Auto-Restart Trigger
+	-- Floor 19 Boss Defeat Auto-Restart Trigger (Strictly checked)
 	if isAutoRestartEnabled and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
 			bossDefeatedTimer = tick()
@@ -728,18 +728,6 @@ RunService.Heartbeat:Connect(function(dt)
 		
 		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
 			triggerRunAgainButton()
-		end
-	end
-	
-	-- Check for UI-based "Dungeon Cleared" popups anytime
-	if isAutoRestartEnabled then
-		for _, gui in ipairs(playerGui:GetDescendants()) do
-			if gui:IsA("TextLabel") or gui:IsA("TextButton") then
-				if string.find(gui.Text:lower(), "dungeon cleared") then
-					triggerRunAgainButton()
-					break
-				end
-			end
 		end
 	end
 	
