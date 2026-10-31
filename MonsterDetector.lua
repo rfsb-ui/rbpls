@@ -15,10 +15,10 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 13,
-	DetectionRadius = 100,
-	StopDistance = 3,
-	GateTimeout = 8,
+	FlightSpeed = 50,
+	DetectionRadius = 500,
+	StopDistance = 4,
+	GateTimeout = 15,
 	BossRoomNumber = 19,
 	LootRadius = 150,
 	LootTimeout = 3
@@ -141,7 +141,7 @@ screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main Compact Panel (Expanded slightly to include current waypoint status label)
+-- Main Compact Panel
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 240, 0, 595)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
@@ -158,7 +158,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v3.4"
+titleLabel.Text = "Auto Dungeon v3.5"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -227,7 +227,7 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 5)
 minCorner.Parent = minimizeButton
 
--- Compact Status Dashboard (Includes Current Waypoint Destination Indicator)
+-- Compact Status Dashboard
 local statusFrame = Instance.new("Frame")
 statusFrame.Size = UDim2.new(1, -16, 0, 110)
 statusFrame.Position = UDim2.new(0, 8, 0, 35)
@@ -526,7 +526,7 @@ local isMinimized = false
 minimizeButton.MouseButton1Click:Connect(function()
 	isMinimized = not isMinimized
 	if isMinimized then
-		mainFrame.Size = UDim2.new(0, 240, 0, 150) -- Compact size (Title + Status visible)
+		mainFrame.Size = UDim2.new(0, 240, 0, 150)
 		toggleButton.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
@@ -611,7 +611,7 @@ loopWpBtn.MouseButton1Click:Connect(function()
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 		loopWpBtn.Text = "Run ON"
 		currentWaypointIndex = 1
-		roomClearedConfirmed = true
+		roomClearedConfirmed = true -- Instantly set true to allow immediate movement on Run ON
 		isLootingActive = false
 		gateTimer = tick()
 	else
@@ -777,7 +777,6 @@ RunService.Heartbeat:Connect(function(dt)
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
-		-- When monsters are detected, cancel/reset loot session immediately to prioritize combat
 		isLootingActive = false
 		
 		if isBossRoom and waypoints[CONFIG.BossRoomNumber] then
@@ -797,13 +796,11 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		gateTimer = tick()
 	elseif isLootPickupEnabled and myHrp and not nearestMonsterPart then
-		-- Handle Timed Loot Session with mid-route monster scanning
 		if not isLootingActive then
 			isLootingActive = true
 			lootStartTime = tick()
 		end
 		
-		-- Check if loot timeout has expired OR if a new monster has spawned
 		if (tick() - lootStartTime) < CONFIG.LootTimeout and not nearestMonsterPart then
 			local nearestLoot = getNearestLootPart(myHrp.Position)
 			if nearestLoot then
@@ -837,7 +834,6 @@ RunService.Heartbeat:Connect(function(dt)
 		if roomClearedConfirmed then
 			targetPos = currentWp + Vector3.new(0, 2, 0)
 			local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
-			targetName = (isBoss and "[BOSS] " or "") + "Room " + currentWaypointIndex + "/" + #waypoints + " (" + math.floor(wpDist) + "m)"
 			targetName = (isBoss and "[BOSS] " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
 			
 			if wpDist <= (CONFIG.StopDistance + 2) then
