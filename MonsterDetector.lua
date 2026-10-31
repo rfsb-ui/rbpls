@@ -7,9 +7,9 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 12,
-	DetectionRadius = 100,
-	StopDistance = 3,
+	FlightSpeed = 50,
+	DetectionRadius = 500,
+	StopDistance = 4,
 	GateTimeout = 15,
 	BossRoomNumber = 19 -- Manually set which room is the final boss
 }
@@ -123,7 +123,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.1"
+titleLabel.Text = "Auto Dungeon v2.8.2"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -263,7 +263,7 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 5)
 btnCorner.Parent = toggleButton
 
--- Dungeon Room Controls Row (Includes Save, Clear, Skip WP, Run)
+-- Dungeon Room Controls Row
 local saveWpBtn = Instance.new("TextButton")
 saveWpBtn.Size = UDim2.new(0, 52, 0, 26)
 saveWpBtn.Position = UDim2.new(0, 8, 0, 168)
@@ -378,7 +378,6 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
 	lbl.TextSize = 9
 	lbl.Font = Enum.Font.SourceSansBold
-	lbl.TextXAlignment = Enum.TextXAlignment.Left
 	lbl.Parent = mainFrame
 	table.insert(configurableElements, lbl)
 	
@@ -447,7 +446,6 @@ local function updateRoomListDisplay()
 		item.TextColor3 = Color3.fromRGB(220, 220, 220)
 		item.TextSize = 10
 		item.Font = Enum.Font.SourceSans
-		item.TextXAlignment = Enum.TextXAlignment.Left
 		item.Parent = roomListFrame
 		
 		local corner = Instance.new("UICorner")
@@ -513,7 +511,7 @@ clearWpBtn.MouseButton1Click:Connect(function()
 	isLoopingWaypoints = false
 	roomClearedConfirmed = true
 	loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-	loopWpBtn.Text = "Run OFF"
+	loopWpBtn.Text = "Run WP: OFF"
 	wpSavedLabel.Text = "Rooms Saved: 0"
 	wpImportedLabel.Text = "Imported WPs: 0"
 	targetLabel.Text = "Rooms Cleared"
@@ -544,13 +542,13 @@ loopWpBtn.MouseButton1Click:Connect(function()
 		toggleButton.Text = "Fly to All Mobs: OFF"
 		
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		loopWpBtn.Text = "Run ON"
+		loopWpBtn.Text = "Run WP: ON"
 		currentWaypointIndex = 1
 		roomClearedConfirmed = true
 		gateTimer = tick()
 	else
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		loopWpBtn.Text = "Run OFF"
+		loopWpBtn.Text = "Run WP: OFF"
 	end
 end)
 
@@ -570,7 +568,7 @@ toggleButton.MouseButton1Click:Connect(function()
 	if isTrackingAll then
 		isLoopingWaypoints = false
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		loopWpBtn.Text = "Run OFF"
+		loopWpBtn.Text = "Run WP: OFF"
 		
 		toggleButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 		toggleButton.Text = "Fly to All Mobs: ON"
@@ -628,46 +626,27 @@ RunService.Heartbeat:Connect(function(dt)
 	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 	
-	-- Robust fallback search for Aggressors across workspace if streaming shifts the folder
-	if not aggressorsFolder or not aggressorsFolder.Parent then
-		local live = workspace:FindFirstChild("Animal_Live")
-		if live then aggressorsFolder = live:FindFirstChild("Aggressors") end
-		if not aggressorsFolder then
-			for _, desc in ipairs(workspace:GetDescendants()) do
-				if desc.Name == "Aggressors" and desc:IsA("Folder") then
-					aggressorsFolder = desc
-					break
-				end
-			end
-		end
-	end
-	
 	local detectedCount = 0
 	local nearestMonsterPart = nil
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	
-	-- 1. Scan for nearby monsters (Top Priority) with recursive descendant backup check
-	local searchContainer = aggressorsFolder or workspace
-	for _, monster in ipairs(searchContainer:GetDescendants()) do
-		if monster:IsA("Model") then
-			local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
-			local hum = monster:FindFirstChildOfClass("Humanoid")
-			
-			if hrp and hum and hum.Health > 0 then
-				local dist = (myHrp and (myHrp.Position - hrp.Position).Magnitude) or 0
-				if myHrp and dist <= CONFIG.DetectionRadius then
-					detectedCount += 1
-					if dist < shortestDist then
-						shortestDist = dist
-						nearestMonsterPart = hrp
-						-- Pull animal property safely
-						local animalProp = monster:GetAttribute("Animal")
-						if not animalProp then
-							local val = monster:FindFirstChild("Animal")
-							if val and val:IsA("StringValue") then animalProp = val.Value end
+	-- Universal Workspace Monster Scanner (Scans all models with a Humanoid anywhere in workspace, excluding players)
+	if myHrp then
+		for _, obj in ipairs(workspace:GetDescendants()) do
+			if obj:IsA("Model") and obj ~= char and not Players:GetPlayerFromCharacter(obj) then
+				local hum = obj:FindFirstChildOfClass("Humanoid")
+				local hrp = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
+				
+				if hum and hrp and hum.Health > 0 then
+					local dist = (myHrp.Position - hrp.Position).Magnitude
+					if dist <= CONFIG.DetectionRadius then
+						detectedCount += 1
+						if dist < shortestDist then
+							shortestDist = dist
+							nearestMonsterPart = hrp
+							nearestMonsterName = obj.Name .. " (" .. math.floor(dist) .. "m)"
 						end
-						nearestMonsterName = (animalProp or monster.Name) .. " (" .. math.floor(dist) .. "m)"
 					end
 				end
 			end
@@ -679,7 +658,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local targetPos = nil
 	local targetName = "None"
 	
-	-- 2. Priority Logic: If monsters exist, attack them first before continuing room route
+	-- Priority Logic & Boss Room Centering
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
@@ -701,7 +680,7 @@ RunService.Heartbeat:Connect(function(dt)
 		gateTimer = tick()
 	elseif isLoopingWaypoints and #waypoints > 0 and myHrp then
 		local currentWp = waypoints[currentWaypointIndex]
-		local wpDist = (myHrp.Position - currentWp).Magnitude
+		local wpDist = (myHpr.Position - currentWp).Magnitude
 		
 		-- Room 1 proceeds right away. Room 2 onwards waits for gate clearance or timeout
 		if currentWaypointIndex == 1 then
@@ -736,7 +715,7 @@ RunService.Heartbeat:Connect(function(dt)
 	
 	targetLabel.Text = "Target: " .. targetName
 	
-	-- 3. Smooth Flight Execution
+	-- Smooth Flight Execution
 	if ((isTrackingAll or isLoopingWaypoints) and targetPos) and myHrp and humanoid then
 		humanoid.PlatformStand = true
 		local currentPos = myHrp.Position
