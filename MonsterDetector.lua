@@ -1,5 +1,5 @@
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -16,6 +16,14 @@ if not aggressorsFolder then
 	return
 end
 
+-- ================= CONFIGURABLE SETTINGS =================
+local CONFIG = {
+	FlightSpeed = 50,         -- Speed at which the player flies toward the target (higher = faster)
+	DetectionRadius = 100,    -- Maximum stud distance to scan and list monsters
+	StopDistance = 4          -- How close to get before stopping on the target
+}
+-- ========================================================
+
 -- Create the main ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MonsterTargeterGui"
@@ -24,7 +32,7 @@ screenGui.Parent = playerGui
 
 -- Main Panel
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 320)
+mainFrame.Size = UDim2.new(0, 260, 0, 360)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -34,12 +42,12 @@ local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 8)
 uiCorner.Parent = mainFrame
 
--- Title Label with Version Control (v1.2)
+-- Title Label with Version Control (v1.3)
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -75, 0, 40)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Aggressor Targeter v1.2"
+titleLabel.Text = "Aggressor Targeter v1.3"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 14
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -113,13 +121,24 @@ btnCorner.Parent = toggleButton
 -- Status Label
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 30)
-statusLabel.Position = UDim2.new(0, 10, 0, 265)
+statusLabel.Position = UDim2.new(0, 10, 0, 260)
 statusLabel.BackgroundTransparency = 1
 statusLabel.Text = "Selected: None"
 statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 statusLabel.TextSize = 12
 statusLabel.Font = Enum.Font.SourceSans
 statusLabel.Parent = mainFrame
+
+-- Settings indicator
+local settingsLabel = Instance.new("TextLabel")
+settingsLabel.Size = UDim2.new(1, -20, 0, 30)
+settingsLabel.Position = UDim2.new(0, 10, 0, 290)
+settingsLabel.BackgroundTransparency = 1
+settingsLabel.Text = "Radius: " .. CONFIG.DetectionRadius .. "m | Speed: " .. CONFIG.FlightSpeed
+settingsLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+settingsLabel.TextSize = 11
+settingsLabel.Font = Enum.Font.SourceSans
+settingsLabel.Parent = mainFrame
 
 -- State variables
 local selectedMonster = nil
@@ -130,21 +149,23 @@ local isMinimized = false
 minimizeButton.MouseButton1Click:Connect(function()
 	isMinimized = not isMinimized
 	if isMinimized then
-		mainFrame.Size = UDim2.new(0, 240, 0, 45)
+		mainFrame.Size = UDim2.new(0, 260, 0, 45)
 		scrollFrame.Visible = false
 		toggleButton.Visible = false
 		statusLabel.Visible = false
+		settingsLabel.Visible = false
 		minimizeButton.Text = "+"
 	else
-		mainFrame.Size = UDim2.new(0, 240, 0, 320)
+		mainFrame.Size = UDim2.new(0, 260, 0, 360)
 		scrollFrame.Visible = true
 		toggleButton.Visible = true
 		statusLabel.Visible = true
+		settingsLabel.Visible = true
 		minimizeButton.Text = "-"
 	end
 end)
 
--- Function to refresh the list of monsters from the folder
+-- Function to refresh the list of monsters within the configurable radius
 local function refreshMonsterList()
 	if isMinimized then return end
 	
@@ -155,48 +176,42 @@ local function refreshMonsterList()
 	end
 	
 	local count = 0
+	local char = player.Character
+	local myHrp = char and char:FindFirstChild("HumanoidRootPart")
+	
 	for _, monster in ipairs(aggressorsFolder:GetChildren()) do
 		if monster:IsA("Model") then
 			local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
-			local distanceStr = ""
 			
-			if hrp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-				local dist = math.floor((player.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
-				distanceStr = " (" .. dist .. "m)"
+			if hrp and myHrp then
+				local dist = math.floor((myHrp.Position - hrp.Position).Magnitude)
+				
+				-- Only display if within configured detection radius
+				if dist <= CONFIG.DetectionRadius then
+					count += 1
+					local btn = Instance.new("TextButton")
+					btn.Size = UDim2.new(1, -10, 0, 30)
+					btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+					btn.Text = monster.Name .. " (" .. dist .. "m)"
+					btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+					btn.TextSize = 13
+					btn.Font = Enum.Font.SourceSans
+					btn.Parent = scrollFrame
+					
+					local btnUiCorner = Instance.new("UICorner")
+					btnUiCorner.CornerRadius = UDim.new(0, 4)
+					btnUiCorner.Parent = btn
+					
+					btn.MouseButton1Click:Connect(function()
+						selectedMonster = monster
+						statusLabel.Text = "Selected: " .. monster.Name
+					end)
+				end
 			end
-			
-			count += 1
-			local btn = Instance.new("TextButton")
-			btn.Size = UDim2.new(1, -10, 0, 30)
-			btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-			btn.Text = monster.Name .. distanceStr
-			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-			btn.TextSize = 13
-			btn.Font = Enum.Font.SourceSans
-			btn.Parent = scrollFrame
-			
-			local btnUiCorner = Instance.new("UICorner")
-			btnUiCorner.CornerRadius = UDim.new(0, 4)
-			btnUiCorner.Parent = btn
-			
-			btn.MouseButton1Click:Connect(function()
-				selectedMonster = monster
-				statusLabel.Text = "Selected: " + monster.Name -- Fixed string concatenation below
-			end)
 		end
 	end
 	
 	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, count * 34)
-end
-
--- Fix string concatenation in click event
--- (Re-binding click event properly)
-local function updateButtonEvents()
-	for _, btn in ipairs(scrollFrame:GetChildren()) do
-		if btn:IsA("TextButton") then
-			-- Handled inside generation loop, but ensures safety
-		end
-	end
 end
 
 -- Toggle button click handler
@@ -211,34 +226,52 @@ toggleButton.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Main loop to refresh options and handle flying/moving to target
-task.spawn(function()
-	while true do
+-- Flight and list refresh loop running smoothly on Heartbeat / RenderStepped
+RunService.Heartbeat:Connect(function(dt)
+	-- Periodically refresh list items
+	local timeIndex = tick()
+	if math.floor(timeIndex * 2) % 2 == 0 then
 		refreshMonsterList()
-		
-		if isTracking and selectedMonster then
-			if selectedMonster.Parent then
-				local hrp = selectedMonster:FindFirstChild("HumanoidRootPart") or selectedMonster.PrimaryPart
-				local char = player.Character
-				local myHrp = char and char:FindFirstChild("HumanoidRootPart")
-				local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+	end
+	
+	-- Handle flight physics when active
+	if isTracking and selectedMonster then
+		if selectedMonster.Parent then
+			local hrp = selectedMonster:FindFirstChild("HumanoidRootPart") or selectedMonster.PrimaryPart
+			local char = player.Character
+			local myHrp = char and char:FindFirstChild("HumanoidRootPart")
+			local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+			
+			if hrp and myHrp and humanoid then
+				-- Disable platform standing / physics interruption
+				humanoid.PlatformStand = true
 				
-				if hrp and myHrp and humanoid then
-					-- Disable falling or gravity interference while moving to target position
-					local targetPosition = hrp.Position + Vector3.new(0, 3, 0) -- Hover slightly above or at the target
-					
-					-- Move character smoothly toward target position
-					humanoid:MoveTo(targetPosition)
-					
-					-- Optional: Look at target
-					myHrp.CFrame = CFrame.new(myHrp.Position, Vector3.new(hrp.Position.X, myHrp.Position.Y, hrp.Position.Z))
+				local targetPos = hrp.Position + Vector3.new(0, 2, 0)
+				local currentPos = myHrp.Position
+				local direction = (targetPos - currentPos)
+				local distance = direction.Magnitude
+				
+				if distance > CONFIG.StopDistance then
+					-- Move smoothly toward the target using speed configuration
+					local moveVector = direction.Unit * math.min(CONFIG.FlightSpeed * dt, distance)
+					myHrp.CFrame = CFrame.new(currentPos + moveVector, targetPos)
+					myHrp.AssemblyLinearVelocity = Vector3.zero
+				else
+					-- Hold position right next to target and face it
+					myHrp.CFrame = CFrame.new(currentPos, targetPos)
+					myHrp.AssemblyLinearVelocity = Vector3.zero
 				end
-			else
-				selectedMonster = nil
-				statusLabel.Text = "Selected: None (Target Lost)"
 			end
+		else
+			selectedMonster = nil
+			statusLabel.Text = "Selected: None (Target Lost)"
 		end
-		
-		task.wait(0.2)
+	else
+		-- Re-enable normal character physics when toggled off
+		local char = player.Character
+		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.PlatformStand then
+			humanoid.PlatformStand = false
+		end
 	end
 end)
