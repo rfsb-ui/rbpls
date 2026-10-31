@@ -2,7 +2,7 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Safely wait for the nested folder structure to prevent infinite yielding or nil errors
+-- Safely wait for the nested folder structure
 local animalLive = workspace:WaitForChild("Animal_Live", 10)
 if not animalLive then
 	warn("Animal_Live folder not found in workspace!")
@@ -33,15 +33,51 @@ local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 8)
 uiCorner.Parent = mainFrame
 
--- Title Label
+-- Title Label with Version Control (v1.1)
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, 0, 0, 40)
+titleLabel.Size = UDim2.new(1, -75, 0, 40)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Aggressor Targeter"
+titleLabel.Text = "Aggressor Targeter v1.1"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 16
+titleLabel.TextSize = 14
 titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = mainFrame
+
+-- Close (X) Button
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -35, 0, 5)
+closeButton.BackgroundColor3 = Color3.fromRGB(140, 40, 40)
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.TextSize = 14
+closeButton.Font = Enum.Font.SourceSansBold
+closeButton.Parent = mainFrame
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 6)
+closeCorner.Parent = closeButton
+
+closeButton.MouseButton1Click:Connect(function()
+	screenGui:Destroy()
+end)
+
+-- Minimize (-) Button
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Size = UDim2.new(0, 30, 0, 30)
+minimizeButton.Position = UDim2.new(1, -70, 0, 5)
+minimizeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+minimizeButton.Text = "-"
+minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeButton.TextSize = 16
+minimizeButton.Font = Enum.Font.SourceSansBold
+minimizeButton.Parent = mainFrame
+
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0, 6)
+minCorner.Parent = minimizeButton
 
 -- Scrolling Frame for Monster List
 local scrollFrame = Instance.new("ScrollingFrame")
@@ -87,10 +123,30 @@ statusLabel.Parent = mainFrame
 -- State variables
 local selectedMonster = nil
 local isTracking = false
+local isMinimized = false
+
+-- Minimize toggle logic
+minimizeButton.MouseButton1Click:Connect(function()
+	isMinimized = not isMinimized
+	if isMinimized then
+		mainFrame.Size = UDim2.new(0, 240, 0, 45)
+		scrollFrame.Visible = false
+		toggleButton.Visible = false
+		statusLabel.Visible = false
+		minimizeButton.Text = "+"
+	else
+		mainFrame.Size = UDim2.new(0, 240, 0, 320)
+		scrollFrame.Visible = true
+		toggleButton.Visible = true
+		statusLabel.Visible = true
+		minimizeButton.Text = "-"
+	end
+end)
 
 -- Function to refresh the list of monsters from the folder
 local function refreshMonsterList()
-	-- Clear old buttons safely
+	if isMinimized then return end
+	
 	for _, child in ipairs(scrollFrame:GetChildren()) do
 		if child:IsA("TextButton") then
 			child:Destroy()
@@ -99,7 +155,6 @@ local function refreshMonsterList()
 	
 	local count = 0
 	for _, monster in ipairs(aggressorsFolder:GetChildren()) do
-		-- Check if it's a model and has a primary root or position reference
 		if monster:IsA("Model") then
 			local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart
 			local distanceStr = ""
@@ -123,7 +178,6 @@ local function refreshMonsterList()
 			btnUiCorner.CornerRadius = UDim.new(0, 4)
 			btnUiCorner.Parent = btn
 			
-			-- Selection click event
 			btn.MouseButton1Click:Connect(function()
 				selectedMonster = monster
 				statusLabel.Text = "Selected: " .. monster.Name
@@ -131,7 +185,6 @@ local function refreshMonsterList()
 		end
 	end
 	
-	-- Explicitly update CanvasSize so scrolling works and items are fully visible
 	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, count * 34)
 end
 
@@ -153,15 +206,13 @@ task.spawn(function()
 		refreshMonsterList()
 		
 		if isTracking and selectedMonster then
-			-- Verify target still exists in workspace
 			if selectedMonster.Parent then
 				local hrp = selectedMonster:FindFirstChild("HumanoidRootPart") or selectedMonster.PrimaryPart
 				local char = player.Character
 				local myHrp = char and char:FindFirstChild("HumanoidRootPart")
 				
 				if hrp and myHrp then
-					-- Keeps the player character facing/locked onto the targeted monster
-					myHrp.CFrame = CFrame.new(myHrp.Position, Vector3.new(hrp.Position.X, myHrp.Position.Y, hrp.Position.Z))
+					myHrp.CFrame = CFrame.new(myHrp.Position, Vector3.new(hrp.Position.X, hrp.Position.Y, hrp.Position.Z))
 				end
 			else
 				selectedMonster = nil
