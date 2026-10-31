@@ -15,12 +15,12 @@ end
 
 -- ================= CONFIGURABLE SETTINGS (WITH PERSISTENCE) =================
 local CONFIG = {
-	FlightSpeed = 50,
-	DetectionRadius = 500,
-	StopDistance = 4,
-	GateTimeout = 15,
+	FlightSpeed = 14,
+	DetectionRadius = 100,
+	StopDistance = 3,
+	GateTimeout = 3,
 	BossRoomNumber = 19,
-	NoclipOffset = 8
+	NoclipOffset = 6
 }
 
 pcall(function()
