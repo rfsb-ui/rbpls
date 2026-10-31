@@ -48,8 +48,9 @@ local function getAnimalName(monster)
 	return animalProp or monster.Name
 end
 
--- Waypoint variables (Each waypoint represents a Dungeon Room)
+-- Waypoint tracking variables
 local waypoints = {}
+local importedWaypointsCount = 0
 local currentWaypointIndex = 1
 local isLoopingWaypoints = false
 local isTrackingAll = false
@@ -60,9 +61,9 @@ screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main Compact Panel (Height expanded to fit labels and import box)
+-- Main Compact Panel
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 390)
+mainFrame.Size = UDim2.new(0, 240, 0, 410)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -77,7 +78,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.2"
+titleLabel.Text = "Auto Dungeon v2.3"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -146,9 +147,9 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 5)
 minCorner.Parent = minimizeButton
 
--- Compact Status Dashboard (Includes Live Rooms/Waypoints Count)
+-- Compact Status Dashboard (Includes Live Rooms, Imported Count, and Target Info)
 local statusFrame = Instance.new("Frame")
-statusFrame.Size = UDim2.new(1, -16, 0, 72)
+statusFrame.Size = UDim2.new(1, -16, 0, 90)
 statusFrame.Position = UDim2.new(0, 8, 0, 35)
 statusFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 statusFrame.BorderSizePixel = 0
@@ -191,10 +192,21 @@ wpSavedLabel.Font = Enum.Font.SourceSansBold
 wpSavedLabel.TextXAlignment = Enum.TextXAlignment.Left
 wpSavedLabel.Parent = statusFrame
 
+local wpImportedLabel = Instance.new("TextLabel")
+wpImportedLabel.Size = UDim2.new(1, -8, 0, 18)
+wpImportedLabel.Position = UDim2.new(0, 4, 0, 64)
+wpImportedLabel.BackgroundTransparency = 1
+wpImportedLabel.Text = "Imported WPs: 0"
+wpImportedLabel.TextColor3 = Color3.fromRGB(220, 150, 255)
+wpImportedLabel.TextSize = 11
+wpImportedLabel.Font = Enum.Font.SourceSansBold
+wpImportedLabel.TextXAlignment = Enum.TextXAlignment.Left
+wpImportedLabel.Parent = statusFrame
+
 -- Main Fly to All Mobs Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(1, -16, 0, 28)
-toggleButton.Position = UDim2.new(0, 8, 0, 114)
+toggleButton.Position = UDim2.new(0, 8, 0, 132)
 toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 toggleButton.Text = "Fly to All Mobs: OFF"
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -206,10 +218,10 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 5)
 btnCorner.Parent = toggleButton
 
--- Dungeon Room Controls Row (Save Room, Clear Rooms, Loop Rooms)
+-- Dungeon Room Controls Row (Save Room, Clear Rooms, Run/Loop Dungeon Button)
 local saveWpBtn = Instance.new("TextButton")
 saveWpBtn.Size = UDim2.new(0, 72, 0, 26)
-saveWpBtn.Position = UDim2.new(0, 8, 0, 150)
+saveWpBtn.Position = UDim2.new(0, 8, 0, 168)
 saveWpBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 180)
 saveWpBtn.Text = "Save Room"
 saveWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -223,7 +235,7 @@ swpCorner.Parent = saveWpBtn
 
 local clearWpBtn = Instance.new("TextButton")
 clearWpBtn.Size = UDim2.new(0, 72, 0, 26)
-clearWpBtn.Position = UDim2.new(0, 84, 0, 150)
+clearWpBtn.Position = UDim2.new(0, 84, 0, 168)
 clearWpBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 60)
 clearWpBtn.Text = "Clear Rooms"
 clearWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -235,11 +247,12 @@ local cwpCorner = Instance.new("UICorner")
 cwpCorner.CornerRadius = UDim.new(0, 4)
 cwpCorner.Parent = clearWpBtn
 
+-- THIS IS THE RUN / LOOP WAYPOINT BUTTON
 local loopWpBtn = Instance.new("TextButton")
 loopWpBtn.Size = UDim2.new(0, 72, 0, 26)
-loopWpBtn.Position = UDim2.new(0, 160, 0, 150)
+loopWpBtn.Position = UDim2.new(0, 160, 0, 168)
 loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-loopWpBtn.Text = "Dungeon: OFF"
+loopWpBtn.Text = "Run WP: OFF"
 loopWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 loopWpBtn.TextSize = 10
 loopWpBtn.Font = Enum.Font.SourceSansBold
@@ -252,7 +265,7 @@ lwpCorner.Parent = loopWpBtn
 -- Waypoint Import Box
 local importBox = Instance.new("TextBox")
 importBox.Size = UDim2.new(1, -16, 0, 26)
-importBox.Position = UDim2.new(0, 8, 0, 184)
+importBox.Position = UDim2.new(0, 8, 0, 202)
 importBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 importBox.PlaceholderText = "Paste Waypoints/Coordinates to Import..."
 importBox.Text = ""
@@ -280,7 +293,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	
 	local box = Instance.new("TextBox")
 	box.Size = UDim2.new(0, width, 0, 24)
-	box.Position = UDim2.new(0, posX, 0, posY + 16)
+	box.Position = UDim2.new(0, posX, 0, posY + 15)
 	box.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 	box.Text = tostring(defaultVal)
 	box.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -305,9 +318,9 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
-createLabeledInput(8, 216, 72, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
-createLabeledInput(84, 216, 72, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
-createLabeledInput(160, 216, 72, "Stop Dist", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(8, 234, 72, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(84, 234, 72, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(160, 234, 72, "Stop Dist", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
 
 -- State variables
 local isMinimized = false
@@ -324,7 +337,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		importBox.Visible = false
 		minimizeButton.Text = "+"
 	else
-		mainFrame.Size = UDim2.new(0, 240, 0, 390)
+		mainFrame.Size = UDim2.new(0, 240, 0, 410)
 		statusFrame.Visible = true
 		toggleButton.Visible = true
 		saveWpBtn.Visible = true
@@ -347,17 +360,19 @@ end)
 
 clearWpBtn.MouseButton1Click:Connect(function()
 	waypoints = {}
+	importedWaypointsCount = 0
 	currentWaypointIndex = 1
 	isLoopingWaypoints = false
 	loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-	loopWpBtn.Text = "Dungeon: OFF"
+	loopWpBtn.Text = "Run WP: OFF"
 	wpSavedLabel.Text = "Rooms Saved: 0"
+	wpImportedLabel.Text = "Imported WPs: 0"
 	targetLabel.Text = "Rooms Cleared"
 end)
 
 loopWpBtn.MouseButton1Click:Connect(function()
 	if #waypoints == 0 then
-		targetLabel.Text = "No Dungeon Rooms Saved!"
+		targetLabel.Text = "No Waypoints Saved!"
 		return
 	end
 	isLoopingWaypoints = not isLoopingWaypoints
@@ -367,11 +382,11 @@ loopWpBtn.MouseButton1Click:Connect(function()
 		toggleButton.Text = "Fly to All Mobs: OFF"
 		
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		loopWpBtn.Text = "Dungeon: ON"
+		loopWpBtn.Text = "Run WP: ON"
 		currentWaypointIndex = 1
 	else
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		loopWpBtn.Text = "Dungeon: OFF"
+		loopWpBtn.Text = "Run WP: OFF"
 	end
 end)
 
@@ -380,7 +395,7 @@ toggleButton.MouseButton1Click:Connect(function()
 	if isTrackingAll then
 		isLoopingWaypoints = false
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		loopWpBtn.Text = "Dungeon: OFF"
+		loopWpBtn.Text = "Run WP: OFF"
 		
 		toggleButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 		toggleButton.Text = "Fly to All Mobs: ON"
@@ -390,22 +405,25 @@ toggleButton.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Waypoint Import handler (Parses pasted Vector3 coordinates or JSON-like arrays)
+-- Waypoint Import handler
 importBox.FocusLost:Connect(function()
 	local text = importBox.Text
 	if text == "" then return end
 	
-	-- Simple pattern matching for Vector3 coordinates e.g., Vector3.new(x, y, z) or x, y, z
+	local countAdded = 0
 	for x, y, z in string.gmatch(text, "([%-?%d%.]+)%s*,%s*([%-?%d%.]+)%s*,%s*([%-?%d%.]+)") do
 		local numX, numY, numZ = tonumber(x), tonumber(y), tonumber(z)
 		if numX and numY and numZ then
 			table.insert(waypoints, Vector3.new(numX, numY, numZ))
+			countAdded += 1
 		end
 	end
 	
+	importedWaypointsCount += countAdded
 	wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
+	wpImportedLabel.Text = "Imported WPs: " .. importedWaypointsCount
 	importBox.Text = ""
-	targetLabel.Text = "Imported Rooms Successfully!"
+	targetLabel.Text = "Imported " .. countAdded .. " Waypoints!"
 end)
 
 -- Main loop
@@ -457,12 +475,11 @@ RunService.Heartbeat:Connect(function(dt)
 		if wpDist <= (CONFIG.StopDistance + 2) then
 			currentWaypointIndex += 1
 			if currentWaypointIndex > #waypoints then
-				currentWaypointIndex = 1 -- Loop back to room 1
+				currentWaypointIndex = 1
 			end
 		end
 	end
 	
-	countLabel.Text = "Mobs Detected: " + detectedCount -- (Fixed string display below)
 	countLabel.Text = "Mobs Detected: " .. detectedCount
 	if (isTrackingAll or isLoopingWaypoints) and targetName ~= "None" then
 		targetLabel.Text = "Target: " .. targetName
