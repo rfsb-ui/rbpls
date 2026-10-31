@@ -17,11 +17,11 @@ end
 local CONFIG = {
 	FlightSpeed = 13,
 	DetectionRadius = 100,
-	StopDistance = 4, -- Slightly increased to prevent wall/camera clipping
+	StopDistance = 3,
 	GateTimeout = 30,
 	BossRoomNumber = 19,
 	LootRadius = 150,
-	LootTimeout = 3
+	LootTimeout = 2
 }
 
 pcall(function()
@@ -135,10 +135,11 @@ local function checkAndRestartDungeon()
 	end
 end
 
--- Create the main ScreenGui
+-- Create the main ScreenGui safely with explicit ZIndex
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
+screenGui.DisplayOrder = 999
 screenGui.Parent = playerGui
 
 -- Main Compact Panel
@@ -146,7 +147,9 @@ local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 240, 0, 595)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BackgroundTransparency = 0
 mainFrame.BorderSizePixel = 0
+mainFrame.ZIndex = 1
 mainFrame.Parent = screenGui
 
 local uiCorner = Instance.new("UICorner")
@@ -158,11 +161,12 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v3.8"
+titleLabel.Text = "Auto Dungeon v3.8.1"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.ZIndex = 2
 titleLabel.Parent = mainFrame
 
 -- Draggable Window Logic
@@ -202,6 +206,7 @@ closeButton.Text = "X"
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.TextSize = 12
 closeButton.Font = Enum.Font.SourceSansBold
+closeButton.ZIndex = 2
 closeButton.Parent = mainFrame
 
 local closeCorner = Instance.new("UICorner")
@@ -221,6 +226,7 @@ minimizeButton.Text = "-"
 minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 minimizeButton.TextSize = 14
 minimizeButton.Font = Enum.Font.SourceSansBold
+minimizeButton.ZIndex = 2
 minimizeButton.Parent = mainFrame
 
 local minCorner = Instance.new("UICorner")
@@ -233,6 +239,7 @@ statusFrame.Size = UDim2.new(1, -16, 0, 110)
 statusFrame.Position = UDim2.new(0, 8, 0, 35)
 statusFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 statusFrame.BorderSizePixel = 0
+statusFrame.ZIndex = 2
 statusFrame.Parent = mainFrame
 
 local statusCorner = Instance.new("UICorner")
@@ -248,6 +255,7 @@ targetLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
 targetLabel.TextSize = 11
 targetLabel.Font = Enum.Font.SourceSansBold
 targetLabel.TextXAlignment = Enum.TextXAlignment.Left
+targetLabel.ZIndex = 3
 targetLabel.Parent = statusFrame
 
 local currentWpLabel = Instance.new("TextLabel")
@@ -259,6 +267,7 @@ currentWpLabel.TextColor3 = Color3.fromRGB(255, 150, 220)
 currentWpLabel.TextSize = 11
 currentWpLabel.Font = Enum.Font.SourceSansBold
 currentWpLabel.TextXAlignment = Enum.TextXAlignment.Left
+currentWpLabel.ZIndex = 3
 currentWpLabel.Parent = statusFrame
 
 local countLabel = Instance.new("TextLabel")
@@ -270,6 +279,7 @@ countLabel.TextColor3 = Color3.fromRGB(100, 220, 100)
 countLabel.TextSize = 11
 countLabel.Font = Enum.Font.SourceSansBold
 countLabel.TextXAlignment = Enum.TextXAlignment.Left
+countLabel.ZIndex = 3
 countLabel.Parent = statusFrame
 
 local wpSavedLabel = Instance.new("TextLabel")
@@ -281,6 +291,7 @@ wpSavedLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
 wpSavedLabel.TextSize = 11
 wpSavedLabel.Font = Enum.Font.SourceSansBold
 wpSavedLabel.TextXAlignment = Enum.TextXAlignment.Left
+wpSavedLabel.ZIndex = 3
 wpSavedLabel.Parent = statusFrame
 
 local wpImportedLabel = Instance.new("TextLabel")
@@ -292,6 +303,7 @@ wpImportedLabel.TextColor3 = Color3.fromRGB(220, 150, 255)
 wpImportedLabel.TextSize = 11
 wpImportedLabel.Font = Enum.Font.SourceSansBold
 wpImportedLabel.TextXAlignment = Enum.TextXAlignment.Left
+wpImportedLabel.ZIndex = 3
 wpImportedLabel.Parent = statusFrame
 
 -- Main Fly to All Mobs Toggle Button
@@ -303,6 +315,7 @@ toggleButton.Text = "Fly to All Mobs: OFF"
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.TextSize = 12
 toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.ZIndex = 2
 toggleButton.Parent = mainFrame
 
 local btnCorner = Instance.new("UICorner")
@@ -318,6 +331,7 @@ saveWpBtn.Text = "Save"
 saveWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveWpBtn.TextSize = 11
 saveWpBtn.Font = Enum.Font.SourceSansBold
+saveWpBtn.ZIndex = 2
 saveWpBtn.Parent = mainFrame
 
 local swpCorner = Instance.new("UICorner")
@@ -332,6 +346,7 @@ clearWpBtn.Text = "Clear"
 clearWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 clearWpBtn.TextSize = 11
 clearWpBtn.Font = Enum.Font.SourceSansBold
+clearWpBtn.ZIndex = 2
 clearWpBtn.Parent = mainFrame
 
 local cwpCorner = Instance.new("UICorner")
@@ -346,6 +361,7 @@ skipWpBtn.Text = "Skip WP"
 skipWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 skipWpBtn.TextSize = 11
 skipWpBtn.Font = Enum.Font.SourceSansBold
+skipWpBtn.ZIndex = 2
 skipWpBtn.Parent = mainFrame
 
 local skpCorner = Instance.new("UICorner")
@@ -360,6 +376,7 @@ loopWpBtn.Text = "Run OFF"
 loopWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 loopWpBtn.TextSize = 10
 loopWpBtn.Font = Enum.Font.SourceSansBold
+loopWpBtn.ZIndex = 2
 loopWpBtn.Parent = mainFrame
 
 local lwpCorner = Instance.new("UICorner")
@@ -375,6 +392,7 @@ restartToggleBtn.Text = "Auto Restart: OFF"
 restartToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 restartToggleBtn.TextSize = 11
 restartToggleBtn.Font = Enum.Font.SourceSansBold
+restartToggleBtn.ZIndex = 2
 restartToggleBtn.Parent = mainFrame
 
 local rstCorner = Instance.new("UICorner")
@@ -390,6 +408,7 @@ lootToggleBtn.Text = "Loot Pickup: OFF"
 lootToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 lootToggleBtn.TextSize = 11
 lootToggleBtn.Font = Enum.Font.SourceSansBold
+lootToggleBtn.ZIndex = 2
 lootToggleBtn.Parent = mainFrame
 
 local ltCorner = Instance.new("UICorner")
@@ -406,6 +425,7 @@ importBox.Text = ""
 importBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 importBox.TextSize = 11
 importBox.Font = Enum.Font.SourceSans
+importBox.ZIndex = 2
 importBox.Parent = mainFrame
 
 local impCorner = Instance.new("UICorner")
@@ -421,6 +441,7 @@ exportWpBtn.Text = "Export Rooms"
 exportWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 exportWpBtn.TextSize = 11
 exportWpBtn.Font = Enum.Font.SourceSansBold
+exportWpBtn.ZIndex = 2
 exportWpBtn.Parent = mainFrame
 
 local expCorner = Instance.new("UICorner")
@@ -440,6 +461,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	lbl.TextSize = 8
 	lbl.Font = Enum.Font.SourceSansBold
 	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.ZIndex = 2
 	lbl.Parent = mainFrame
 	table.insert(configurableElements, lbl)
 	
@@ -451,6 +473,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	box.TextColor3 = Color3.fromRGB(255, 255, 255)
 	box.TextSize = 10
 	box.Font = Enum.Font.SourceSans
+	box.ZIndex = 2
 	box.Parent = mainFrame
 	table.insert(configurableElements, box)
 	
@@ -486,6 +509,7 @@ roomListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 roomListFrame.BorderSizePixel = 0
 roomListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 roomListFrame.ScrollBarThickness = 5
+roomListFrame.ZIndex = 2
 roomListFrame.Parent = mainFrame
 table.insert(configurableElements, roomListFrame)
 
@@ -510,6 +534,7 @@ local function updateRoomListDisplay()
 		item.TextSize = 10
 		item.Font = Enum.Font.SourceSans
 		item.TextXAlignment = Enum.TextXAlignment.Left
+		item.ZIndex = 3
 		item.Parent = roomListFrame
 		
 		local corner = Instance.new("UICorner")
@@ -830,7 +855,6 @@ RunService.Heartbeat:Connect(function(dt)
 		if currentWaypointIndex == 1 then
 			roomClearedConfirmed = true
 		else
-			-- Continues checking for gate message OR checks if gate timeout has passed, while actively scanning for newly spawned mobs
 			if checkGateUnsealed() or (tick() - gateTimer >= CONFIG.GateTimeout) then
 				roomClearedConfirmed = true
 			else
