@@ -21,9 +21,9 @@ local CONFIG = {
 
 pcall(function()
 	if _G.DungeonSettings then
-		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or CONFIG.DungeonSettings.FlightSpeed
-		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or CONFIG.DungeonSettings.DetectionRadius
-		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or CONFIG.StopDistance
+		CONFIG.FlightSpeed = _G.DungeonSettings.FlightSpeed or _G.DungeonSettings.FlightSpeed
+		CONFIG.DetectionRadius = _G.DungeonSettings.DetectionRadius or _G.DungeonSettings.DetectionRadius
+		CONFIG.StopDistance = _G.DungeonSettings.StopDistance or _G.StopDistance
 	end
 end)
 
@@ -54,7 +54,7 @@ local importedWaypointsCount = 0
 local currentWaypointIndex = 1
 local isLoopingWaypoints = false
 local isTrackingAll = false
-local roomClearedConfirmed = true -- Room 1 starts unlocked
+local roomClearedConfirmed = true
 
 -- Function to check if the gate unseal message is active on screen
 local function checkGateUnsealed()
@@ -75,9 +75,9 @@ screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main Compact Panel
+-- Main Compact Panel (Height expanded slightly to fit export button)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 410)
+mainFrame.Size = UDim2.new(0, 240, 0, 445)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -92,7 +92,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.4"
+titleLabel.Text = "Auto Dungeon v2.5"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -291,6 +291,21 @@ local impCorner = Instance.new("UICorner")
 impCorner.CornerRadius = UDim.new(0, 4)
 impCorner.Parent = importBox
 
+-- Export Rooms Button
+local exportWpBtn = Instance.new("TextButton")
+exportWpBtn.Size = UDim2.new(1, -16, 0, 26)
+exportWpBtn.Position = UDim2.new(0, 8, 0, 234)
+exportWpBtn.BackgroundColor3 = Color3.fromRGB(50, 140, 100)
+exportWpBtn.Text = "Export Rooms to Clipboard"
+exportWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+exportWpBtn.TextSize = 11
+exportWpBtn.Font = Enum.Font.SourceSansBold
+exportWpBtn.Parent = mainFrame
+
+local expCorner = Instance.new("UICorner")
+expCorner.CornerRadius = UDim.new(0, 4)
+expCorner.Parent = exportWpBtn
+
 -- Configurable Inputs
 local function createLabeledInput(posX, posY, width, labelText, defaultVal, callback)
 	local lbl = Instance.new("TextLabel")
@@ -331,9 +346,9 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
-createLabeledInput(8, 234, 72, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
-createLabeledInput(84, 234, 72, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
-createLabeledInput(160, 234, 72, "Stop Dist", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(8, 268, 72, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(84, 268, 72, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(160, 268, 72, "Stop Dist", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
 
 -- State variables
 local isMinimized = false
@@ -348,15 +363,17 @@ minimizeButton.MouseButton1Click:Connect(function()
 		clearWpBtn.Visible = false
 		loopWpBtn.Visible = false
 		importBox.Visible = false
+		exportWpBtn.Visible = false
 		minimizeButton.Text = "+"
 	else
-		mainFrame.Size = UDim2.new(0, 240, 0, 410)
+		mainFrame.Size = UDim2.new(0, 240, 0, 445)
 		statusFrame.Visible = true
 		toggleButton.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
 		loopWpBtn.Visible = true
 		importBox.Visible = true
+		exportWpBtn.Visible = true
 		minimizeButton.Text = "-"
 	end
 end)
@@ -397,7 +414,7 @@ loopWpBtn.MouseButton1Click:Connect(function()
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 		loopWpBtn.Text = "Run WP: ON"
 		currentWaypointIndex = 1
-		roomClearedConfirmed = true -- Room 1 starts unlocked
+		roomClearedConfirmed = true
 	else
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 		loopWpBtn.Text = "Run WP: OFF"
@@ -437,6 +454,25 @@ importBox.FocusLost:Connect(function()
 	wpImportedLabel.Text = "Imported WPs: " .. importedWaypointsCount
 	importBox.Text = ""
 	targetLabel.Text = "Imported " .. countAdded .. " Rooms!"
+end)
+
+exportWpBtn.MouseButton1Click:Connect(function()
+	if #waypoints == 0 then
+		targetLabel.Text = "No Rooms to Export!"
+		return
+	end
+	
+	local exportStr = ""
+	for i, pos in ipairs(waypoints) do
+		exportStr = exportStr .. string.format("%.2f, %.2f, %.2f\n", pos.X, pos.Y, pos.Z)
+	end
+	
+	pcall(function()
+		setclipboard(exportStr)
+	end)
+	print("--- EXPORTED DUNGEON ROOMS ---")
+	print(exportStr)
+	targetLabel.Text = "Rooms Exported to Output/Clipboard!"
 end)
 
 -- Main execution loop
@@ -485,14 +521,12 @@ RunService.Heartbeat:Connect(function(dt)
 	-- 2. Priority Logic: If monsters exist, attack them first before continuing room route
 	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
 		targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
-		targetName = "Killing Mob: " + nearestMonsterName
 		targetName = "Killing Mob: " .. nearestMonsterName
 	elseif isLoopingWaypoints and #waypoints > 0 and myHrp then
-		-- No monsters nearby: Proceed with dungeon rooms
 		local currentWp = waypoints[currentWaypointIndex]
 		local wpDist = (myHrp.Position - currentWp).Magnitude
 		
-		-- Room 1 (Index 1) can proceed right away. Room 2 onwards requires gate clearance message.
+		-- Room 1 proceeds right away; Room 2 onwards waits for gate clearance trigger
 		if currentWaypointIndex == 1 then
 			roomClearedConfirmed = true
 		else
@@ -504,7 +538,6 @@ RunService.Heartbeat:Connect(function(dt)
 			targetName = "Room " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
 			
 			if wpDist <= (CONFIG.StopDistance + 2) then
-				-- Reached room waypoint, advance to next room and reset gate check for subsequent rooms
 				currentWaypointIndex += 1
 				if currentWaypointIndex > #waypoints then
 					currentWaypointIndex = 1
@@ -512,7 +545,7 @@ RunService.Heartbeat:Connect(function(dt)
 				roomClearedConfirmed = false
 			end
 		else
-			targetName = "Waiting for Room Clearance..."
+			targetName = "Waiting for Gate Unseal..."
 		end
 	elseif isTrackingAll and nearestMonsterPart then
 		targetPos = nearestMonsterPart.Position + Vector3.new(0, 2, 0)
