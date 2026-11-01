@@ -137,34 +137,33 @@ screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- ================= DRAGGABLE CLICK TARGET BOX =================
+-- ================= COMPACT DRAGGABLE CLICK TARGET BOX (70% SMALLER) =================
 local clickTargetFrame = Instance.new("Frame")
-clickTargetFrame.Size = UDim2.new(0, 160, 0, 50)
+clickTargetFrame.Size = UDim2.new(0, 48, 0, 15)
 
 if CONFIG.UseDefaultPos then
-	-- Spawn dead center of the screen so it's always visible on first load
-	clickTargetFrame.Position = UDim2.new(0.5, -80, 0.5, -25)
+	clickTargetFrame.Position = UDim2.new(0.5, -24, 0.5, -7)
 else
 	clickTargetFrame.Position = UDim2.new(0, CONFIG.TargetPosX, 0, CONFIG.TargetPosY)
 end
 
 clickTargetFrame.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
 clickTargetFrame.BackgroundTransparency = 0.4
-clickTargetFrame.BorderSizePixel = 2
+clickTargetFrame.BorderSizePixel = 1
 clickTargetFrame.BorderColor3 = Color3.fromRGB(255, 255, 255)
 clickTargetFrame.Active = true
 clickTargetFrame.Parent = screenGui
 
 local targetCorner = Instance.new("UICorner")
-targetCorner.CornerRadius = UDim.new(0, 6)
+targetCorner.CornerRadius = UDim.new(0, 4)
 targetCorner.Parent = clickTargetFrame
 
 local targetText = Instance.new("TextLabel")
 targetText.Size = UDim2.new(1, 0, 1, 0)
 targetText.BackgroundTransparency = 1
-targetText.Text = "[DRAG TO RUN AGAIN]"
+targetText.Text = "Run again"
 targetText.TextColor3 = Color3.fromRGB(255, 255, 255)
-targetText.TextSize = 10
+targetText.TextSize = 8
 targetText.Font = Enum.Font.SourceSansBold
 targetText.Parent = clickTargetFrame
 
@@ -199,7 +198,7 @@ UserInputService.InputChanged:Connect(function(input)
 		clickTargetFrame.Position = UDim2.new(targetStartPos.X.Scale, targetStartPos.X.Offset + delta.X, targetStartPos.Y.Scale, targetStartPos.Y.Offset + delta.Y)
 	end
 end)
--- ============================================================
+-- ====================================================================================
 
 -- Precision Clicker using the Draggable Target Box coordinates
 local function triggerRunAgainButton()
@@ -238,7 +237,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.28"
+titleLabel.Text = "Auto Dungeon v2.8.29"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -825,7 +824,6 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		
 		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
-			-- Trigger click on the target box coordinates
 			if tick() - lastRestartAttempt >= 10 then
 				lastRestartAttempt = tick()
 				resetToRoomOne()
