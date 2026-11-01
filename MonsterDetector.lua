@@ -255,7 +255,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.33"
+titleLabel.Text = "Auto Dungeon v2.8.34"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -812,7 +812,6 @@ RunService.Heartbeat:Connect(function(dt)
 	
 	-- No-Clip execution loop
 	if isNoClipEnabled and char then
-		print("DEBUG No-Clip: Walking parts...")
 		for _, part in ipairs(char:GetDescendants()) do
 			if part:IsA("BasePart") then
 				part.CanCollide = false
@@ -927,7 +926,6 @@ RunService.Heartbeat:Connect(function(dt)
 		local currentWp = waypoints[currentWaypointIndex]
 		local wpDist = (myHrp.Position - currentWp).Magnitude
 		
-		-- Room 1 proceeds right away. Room 2 onwards uses the throttled gate check
 		if currentWaypointIndex == 1 then
 			roomClearedConfirmed = true
 		else
@@ -971,7 +969,7 @@ RunService.Heartbeat:Connect(function(dt)
 	targetLabel.Text = "Target: " .. targetName
 	statusSubLabel.Text = "Status: " .. statusMsg
 	
-	-- Smooth Flight Execution
+	-- Smooth Flight Execution with Level Posture Correction (Locking Pitch/Roll)
 	if ((isTrackingAll or isLoopingWaypoints) and targetPos) and myHrp and humanoid then
 		humanoid.PlatformStand = true
 		local currentPos = myHrp.Position
@@ -980,7 +978,13 @@ RunService.Heartbeat:Connect(function(dt)
 		
 		if distance > CONFIG.StopDistance then
 			local moveVector = direction.Unit * math.min(CONFIG.FlightSpeed * dt, distance)
-			myHrp.CFrame = CFrame.new(currentPos + moveVector, targetPos)
+			-- Force flat level orientation (ignoring vertical pitch tilt to prevent hip/knee sagging)
+			local flatTarget = Vector3.new(targetPos.X, currentPos.Y, targetPos.Z)
+			if (flatTarget - currentPos).Magnitude > 1 then
+				myHrp.CFrame = CFrame.new(currentPos + moveVector, flatTarget + Vector3.new(0, (targetPos.Y - currentPos.Y), 0))
+			else
+				myHrp.CFrame = CFrame.new(currentPos + moveVector, targetPos)
+			end
 			myHrp.AssemblyLinearVelocity = Vector3.zero
 		else
 			myHrp.CFrame = CFrame.new(currentPos, targetPos)
