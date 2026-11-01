@@ -31,6 +31,7 @@ local CONFIG = {
 }
 
 local waypoints = {}
+local runCounter = 0
 
 local function saveToDevice()
 	pcall(function()
@@ -115,7 +116,8 @@ local function resetToRoomOne()
 	bossWasPresent = false
 	bossDefeatedTimer = 0
 	postRestartCooldown = tick()
-	print("Dungeon state fully reset to Room 1.")
+	runCounter += 1
+	print("Dungeon state fully reset to Room 1. Total Runs:", runCounter)
 end
 
 -- Function to check if the gate unseal message is active on screen
@@ -240,7 +242,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.30"
+titleLabel.Text = "Auto Dungeon v2.8.31"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -311,7 +313,7 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 5)
 minCorner.Parent = minimizeButton
 
--- Compact Status Dashboard (70% Opacity)
+-- Compact Status Dashboard (2 Columns layout, 70% Opacity)
 local statusFrame = Instance.new("Frame")
 statusFrame.Size = UDim2.new(1, -16, 0, 70)
 statusFrame.Position = UDim2.new(0, 8, 0, 35)
@@ -324,38 +326,63 @@ local statusCorner = Instance.new("UICorner")
 statusCorner.CornerRadius = UDim.new(0, 5)
 statusCorner.Parent = statusFrame
 
+-- Column 1 Labels (Left side)
 local targetLabel = Instance.new("TextLabel")
-targetLabel.Size = UDim2.new(1, -8, 0, 18)
+targetLabel.Size = UDim2.new(0.5, -4, 0, 20)
 targetLabel.Position = UDim2.new(0, 4, 0, 4)
 targetLabel.BackgroundTransparency = 1
 targetLabel.Text = "Target: None"
 targetLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-targetLabel.TextSize = 11
+targetLabel.TextSize = 10
 targetLabel.Font = Enum.Font.SourceSansBold
 targetLabel.TextXAlignment = Enum.TextXAlignment.Left
 targetLabel.Parent = statusFrame
 
 local countLabel = Instance.new("TextLabel")
-countLabel.Size = UDim2.new(1, -8, 0, 18)
-countLabel.Position = UDim2.new(0, 4, 0, 24)
+countLabel.Size = UDim2.new(0.5, -4, 0, 20)
+countLabel.Position = UDim2.new(0, 4, 0, 25)
 countLabel.BackgroundTransparency = 1
-countLabel.Text = "Mobs Detected: 0"
+countLabel.Text = "Mobs: 0"
 countLabel.TextColor3 = Color3.fromRGB(100, 220, 100)
-countLabel.TextSize = 11
+countLabel.TextSize = 10
 countLabel.Font = Enum.Font.SourceSansBold
 countLabel.TextXAlignment = Enum.TextXAlignment.Left
 countLabel.Parent = statusFrame
 
+-- Column 2 Labels (Right side)
+local runsLabel = Instance.new("TextLabel")
+runsLabel.Size = UDim2.new(0.5, -4, 0, 20)
+runsLabel.Position = UDim2.new(0.5, 2, 0, 4)
+runsLabel.BackgroundTransparency = 1
+runsLabel.Text = "Runs: 0"
+runsLabel.TextColor3 = Color3.fromRGB(255, 100, 255)
+runsLabel.TextSize = 10
+runsLabel.Font = Enum.Font.SourceSansBold
+runsLabel.TextXAlignment = Enum.TextXAlignment.Left
+runsLabel.Parent = statusFrame
+
 local wpSavedLabel = Instance.new("TextLabel")
-wpSavedLabel.Size = UDim2.new(1, -8, 0, 18)
-wpSavedLabel.Position = UDim2.new(0, 4, 0, 44)
+wpSavedLabel.Size = UDim2.new(0.5, -4, 0, 20)
+wpSavedLabel.Position = UDim2.new(0.5, 2, 0, 25)
 wpSavedLabel.BackgroundTransparency = 1
-wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
+wpSavedLabel.Text = "Rooms: 0"
 wpSavedLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
-wpSavedLabel.TextSize = 11
+wpSavedLabel.TextSize = 10
 wpSavedLabel.Font = Enum.Font.SourceSansBold
 wpSavedLabel.TextXAlignment = Enum.TextXAlignment.Left
 wpSavedLabel.Parent = statusFrame
+
+-- Status Bottom Sub-label (spanning full width at bottom of status box)
+local statusSubLabel = Instance.new("TextLabel")
+statusSubLabel.Size = UDim2.new(1, -8, 0, 18)
+statusSubLabel.Position = UDim2.new(0, 4, 0, 48)
+statusSubLabel.BackgroundTransparency = 1
+statusSubLabel.Text = "Status: Ready"
+statusSubLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusSubLabel.TextSize = 9
+statusSubLabel.Font = Enum.Font.SourceSans
+statusSubLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusSubLabel.Parent = statusFrame
 
 -- Main Fly to All Mobs Toggle Button
 local toggleButton = Instance.new("TextButton")
@@ -591,7 +618,7 @@ local function updateRoomListDisplay()
 	end
 	
 	roomListFrame.CanvasSize = UDim2.new(0, 0, 0, #waypoints * 25)
-	wpSavedLabel.Text = "Rooms Saved: " .. #waypoints
+	wpSavedLabel.Text = "Rooms: " .. #waypoints
 end
 
 updateRoomListDisplay()
@@ -651,7 +678,8 @@ clearWpBtn.MouseButton1Click:Connect(function()
 	loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 	loopWpBtn.Text = "Run OFF"
 	updateRoomListDisplay()
-	targetLabel.Text = "Rooms Cleared"
+	targetLabel.Text = "Target: None"
+	statusSubLabel.Text = "Status: Cleared"
 	saveToDevice()
 end)
 
@@ -663,13 +691,14 @@ skipWpBtn.MouseButton1Click:Connect(function()
 		end
 		roomClearedConfirmed = true
 		gateTimer = tick()
-		targetLabel.Text = "Skipped to Room " .. currentWaypointIndex
+		targetLabel.Text = "Target: Room " .. currentWaypointIndex
 	end
 end)
 
 loopWpBtn.MouseButton1Click:Connect(function()
 	if #waypoints == 0 then
-		targetLabel.Text = "No Rooms Saved!"
+		targetLabel.Text = "Target: None"
+		statusSubLabel.Text = "Status: No Rooms!"
 		return
 	end
 	isLoopingWaypoints = not isLoopingWaypoints
@@ -739,14 +768,14 @@ importBox.FocusLost:Connect(function()
 	end
 	
 	importBox.Text = ""
-	targetLabel.Text = "Imported " .. countAdded .. " Rooms!"
+	statusSubLabel.Text = "Status: Imported " .. countAdded
 	updateRoomListDisplay()
 	saveToDevice()
 end)
 
 exportWpBtn.MouseButton1Click:Connect(function()
 	if #waypoints == 0 then
-		targetLabel.Text = "No Rooms to Export!"
+		statusSubLabel.Text = "Status: No Rooms!"
 		return
 	end
 	
@@ -760,7 +789,7 @@ exportWpBtn.MouseButton1Click:Connect(function()
 	end)
 	print("--- EXPORTED DUNGEON ROOMS ---")
 	print(exportStr)
-	targetLabel.Text = "Rooms Exported!"
+	statusSubLabel.Text = "Status: Exported"
 end)
 
 -- Main execution loop
@@ -778,10 +807,14 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
+	-- Update live Run counter on UI dashboard
+	runsLabel.Text = "Runs: " .. runCounter
+	
 	-- If post-restart cooldown is active, pause navigation and show status
 	if tick() - postRestartCooldown < 10 then
-		targetLabel.Text = "Status: Restarting Room 1..."
-		countLabel.Text = "Mobs Detected: 0"
+		targetLabel.Text = "Target: Restarting"
+		countLabel.Text = "Mobs: 0"
+		statusSubLabel.Text = "Status: Cooldown"
 		return
 	end
 	
@@ -827,14 +860,31 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		
 		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
-			triggerRunAgainButton()
+			if tick() - lastRestartAttempt >= 10 then
+				lastRestartAttempt = tick()
+				resetToRoomOne()
+				
+				local absPos = clickTargetFrame.AbsolutePosition
+				local absSize = clickTargetFrame.AbsoluteSize
+				local centerX = absPos.X + absSize.X / 2
+				local centerY = absPos.Y + absSize.Y / 2
+				
+				for i = 1, 3 do
+					VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+					task.wait(0.03)
+					VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+					task.wait(0.03)
+				end
+				print("Auto Dungeon Restarted via Target Box Coordinates!")
+			end
 		end
 	end
 	
-	countLabel.Text = "Mobs Detected: " .. detectedCount
+	countLabel.Text = "Mobs: " .. detectedCount
 	
 	local targetPos = nil
 	local targetName = "None"
+	local statusMsg = "Active"
 	
 	-- Priority Logic & Waypoint Room Navigation
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
@@ -847,14 +897,17 @@ RunService.Heartbeat:Connect(function(dt)
 			
 			if centerDist > 15 then
 				targetPos = bossCenterPos + heightOffset
-				targetName = "Returning to Boss Center"
+				targetName = "Boss Center"
+				statusMsg = "Centering"
 			else
 				targetPos = nearestMonsterPart.Position + heightOffset
-				targetName = "Fighting Boss: " .. nearestMonsterName
+				targetName = "Boss Mob"
+				statusMsg = "Fighting"
 			end
 		else
 			targetPos = nearestMonsterPart.Position + heightOffset
-			targetName = "Killing Mob: " .. nearestMonsterName
+			targetName = "Mob Target"
+			statusMsg = "Attacking"
 		end
 		gateTimer = tick()
 	elseif isLoopingWaypoints and #waypoints > 0 and myHrp then
@@ -875,7 +928,8 @@ RunService.Heartbeat:Connect(function(dt)
 		if roomClearedConfirmed then
 			targetPos = currentWp + heightOffset
 			local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
-			targetName = (isBoss and "[BOSS] " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints .. " (" .. math.floor(wpDist) .. "m)"
+			targetName = (isBoss and "Boss " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints
+			statusMsg = "Moving (" .. math.floor(wpDist) .. "m)"
 			
 			if wpDist <= (CONFIG.StopDistance + 2) then
 				if currentWaypointIndex < CONFIG.BossRoomNumber then
@@ -885,18 +939,24 @@ RunService.Heartbeat:Connect(function(dt)
 				gateTimer = tick()
 			end
 		else
-			targetName = "Waiting for Room Cleared..."
+			targetName = "Room " .. currentWaypointIndex
+			statusMsg = "Waiting Gate"
 		end
 	elseif isTrackingAll and nearestMonsterPart then
 		targetPos = nearestMonsterPart.Position + heightOffset
-		targetName = nearestMonsterName
+		targetName = "All Mobs"
+		statusMsg = "Tracking"
 	else
 		if isLoopingWaypoints and #waypoints == 0 then
-			targetLabel.Text = "Error: No Rooms Saved!"
+			targetName = "None"
+			statusMsg = "No Rooms!"
+		else
+			statusMsg = "Idle"
 		end
 	end
 	
 	targetLabel.Text = "Target: " .. targetName
+	statusSubLabel.Text = "Status: " .. statusMsg
 	
 	-- Smooth Flight Execution
 	if ((isTrackingAll or isLoopingWaypoints) and targetPos) and myHrp and humanoid then
