@@ -109,6 +109,10 @@ local bossWasPresent = false
 local bossDefeatedTimer = 0
 local postRestartCooldown = 0
 
+-- Throttle variables for heavy UI scanning
+local lastGuiThrottle = 0
+local cachedGateUnsealed = false
+
 -- Function to completely reset state back to Room 1
 local function resetToRoomOne()
 	currentWaypointIndex = 1
@@ -120,17 +124,26 @@ local function resetToRoomOne()
 	print("Dungeon state fully reset to Room 1. Total Runs:", runCounter)
 end
 
--- Function to check if the gate unseal message is active on screen
-local function checkGateUnsealed()
+-- Throttled function to check if the gate unseal message is active on screen
+local function checkGateUnsealedThrottled()
+	if tick() - lastGuiThrottle < 0.5 then
+		return cachedGateUnsealed
+	end
+	
+	lastGuiThrottle = tick()
+	cachedGateUnsealed = false
+	
 	for _, gui in ipairs(playerGui:GetDescendants()) do
 		if gui:IsA("TextLabel") or gui:IsA("TextButton") then
 			local text = gui.Text:lower()
 			if string.find(text, "room cleared") or string.find(text, "gate unseals") then
-				return true
+				cachedGateUnsealed = true
+				break
 			end
 		end
 	end
-	return false
+	
+	return cachedGateUnsealed
 end
 
 -- Create the main ScreenGui
@@ -242,7 +255,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.32"
+titleLabel.Text = "Auto Dungeon v2.8.33"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -799,6 +812,7 @@ RunService.Heartbeat:Connect(function(dt)
 	
 	-- No-Clip execution loop
 	if isNoClipEnabled and char then
+		print("DEBUG No-Clip: Walking parts...")
 		for _, part in ipairs(char:GetDescendants()) do
 			if part:IsA("BasePart") then
 				part.CanCollide = false
@@ -913,11 +927,11 @@ RunService.Heartbeat:Connect(function(dt)
 		local currentWp = waypoints[currentWaypointIndex]
 		local wpDist = (myHrp.Position - currentWp).Magnitude
 		
-		-- Room 1 proceeds right away. Room 2 onwards waits for gate clearance or timeout
+		-- Room 1 proceeds right away. Room 2 onwards uses the throttled gate check
 		if currentWaypointIndex == 1 then
 			roomClearedConfirmed = true
 		else
-			if checkGateUnsealed() or (tick() - gateTimer >= CONFIG.GateTimeout) then
+			if checkGateUnsealedThrottled() or (tick() - gateTimer >= CONFIG.GateTimeout) then
 				roomClearedConfirmed = true
 			else
 				roomClearedConfirmed = false
