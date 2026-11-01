@@ -14,17 +14,19 @@ if not aggressorsFolder then
 	warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
 end
 
--- ================= FILE-BASED CONFIG & WAYPOINT SYSTEM =================
+-- ================= FILE-BASED CONFIG & TARGET SYSTEM =================
 local CONFIG_FOLDER = "AutoDungeonConfigs"
 local CONFIG_FILE = CONFIG_FOLDER .. "/dungeon_config.json"
 
 local CONFIG = {
-	FlightSpeed = 12,
-	DetectionRadius = 100,
+	FlightSpeed = 50,
+	DetectionRadius = 500,
 	StopDistance = 4,
-	GateTimeout = 4,
+	GateTimeout = 15,
 	BossRoomNumber = 19,
-	NoclipOffset = 6
+	NoclipOffset = 8,
+	TargetPosX = 600, -- Default screen fallback position
+	TargetPosY = 680
 }
 
 local waypoints = {}
@@ -61,6 +63,8 @@ local function loadFromDevice()
 				CONFIG.GateTimeout = decoded.Settings.GateTimeout or CONFIG.GateTimeout
 				CONFIG.BossRoomNumber = decoded.Settings.BossRoomNumber or CONFIG.BossRoomNumber
 				CONFIG.NoclipOffset = decoded.Settings.NoclipOffset or CONFIG.NoclipOffset
+				CONFIG.TargetPosX = decoded.Settings.TargetPosX or CONFIG.TargetPosX
+				CONFIG.TargetPosY = decoded.Settings.TargetPosY or CONFIG.TargetPosY
 			end
 			
 			if decoded and decoded.Waypoints then
@@ -125,45 +129,86 @@ local function checkGateUnsealed()
 	return false
 end
 
--- Robust function to trigger "Run again" button
-local function triggerRunAgainButton()
-	if tick() - lastRestartAttempt < 10 then return false end
-	
-	for _, gui in ipairs(playerGui:GetDescendants()) do
-		if gui:IsA("TextButton") then
-			local text = gui.Text:lower()
-			if string.find(text, "run again") or string.find(text, "restart") then
-				lastRestartAttempt = tick()
-				resetToRoomOne()
-				
-				pcall(function()
-					for _, connection in ipairs(getconnections(gui.MouseButton1Click)) do
-						connection:Fire()
-					end
-				end)
-				
-				local absPos = gui.AbsolutePosition
-				local absSize = gui.AbsoluteSize
-				local centerX = absPos.X + absSize.X / 2
-				local centerY = absPos.Y + absSize.Y / 2
-				
-				VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
-				task.wait(0.05)
-				VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
-				
-				print("Successfully clicked 'Run again' button at coordinates:", centerX, centerY)
-				return true
-			end
-		end
-	end
-	return false
-end
-
--- Create the main ScreenGui (70% opacity applied via BackgroundTransparency = 0.3)
+-- Create the main ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
+
+-- ================= DRAGGABLE CLICK TARGET BOX =================
+local clickTargetFrame = Instance.new("Frame")
+clickTargetFrame.Size = UDim2.new(0, 160, 0, 50)
+clickTargetFrame.Position = UDim2.new(0, CONFIG.TargetPosX, 0, CONFIG.TargetPosY)
+clickTargetFrame.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+clickTargetFrame.BackgroundTransparency = 0.4
+clickTargetFrame.BorderSizePixel = 2
+clickTargetFrame.BorderColor3 = Color3.fromRGB(255, 255, 255)
+clickTargetFrame.Active = true
+clickTargetFrame.Parent = screenGui
+
+local targetCorner = Instance.new("UICorner")
+targetCorner.CornerRadius = UDim.new(0, 6)
+targetCorner.Parent = clickTargetFrame
+
+local targetText = Instance.new("TextLabel")
+targetText.Size = UDim2.new(1, 0, 1, 0)
+targetText.BackgroundTransparency = 1
+targetText.Text = "[DRAG TO RUN AGAIN]"
+targetText.TextColor3 = Color3.fromRGB(255, 255, 255)
+targetText.TextSize = 10
+targetText.Font = Enum.Font.SourceSansBold
+targetText.Parent = clickTargetFrame
+
+-- Drag logic for the click target box
+local targetDragging, targetDragInput, targetDragStart, targetStartPos
+clickTargetFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		targetDragging = true
+		targetDragStart = input.Position
+		targetStartPos = clickTargetFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				targetDragging = false
+				CONFIG.TargetPosX = clickTargetFrame.AbsolutePosition.X
+				CONFIG.TargetPosY = clickTargetFrame.AbsolutePosition.Y
+				saveToDevice()
+			end
+		end)
+	end
+end)
+
+clickTargetFrame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		targetDragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == targetDragInput and targetDragging then
+		local delta = input.Position - targetDragStart
+		clickTargetFrame.Position = UDim2.new(targetStartPos.X.Scale, targetStartPos.X.Offset + delta.X, targetStartPos.Y.Scale, targetStartPos.Y.Offset + delta.Y)
+	end
+end)
+-- ============================================================
+
+-- Precision Clicker using the Draggable Target Box coordinates
+local function triggerRunAgainButton()
+	if tick() - lastRestartAttempt < 10 then return false end
+	lastRestartAttempt = tick()
+	resetToRoomOne()
+	
+	local absPos = clickTargetFrame.AbsolutePosition
+	local absSize = clickTargetFrame.AbsoluteSize
+	local centerX = absPos.X + absSize.X / 2
+	local centerY = absPos.Y + absSize.Y / 2
+	
+	VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+	task.wait(0.05)
+	VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+	
+	print("Clicked 'Run again' via Target Box at coordinates:", centerX, centerY)
+	return true
+end
 
 -- Main Compact Panel (70% Opacity)
 local mainFrame = Instance.new("Frame")
@@ -183,7 +228,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.26"
+titleLabel.Text = "Auto Dungeon v2.8.27"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -721,23 +766,6 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Continuous check for manual or automatic "Run again" button clicks to force Room 1 reset
-	for _, gui in ipairs(playerGui:GetDescendants()) do
-		if gui:IsA("TextButton") then
-			local text = gui.Text:lower()
-			if string.find(text, "run again") then
-				-- Check if user clicked it manually or if auto-restart is scanning
-				local absoluteSize = gui.AbsoluteSize
-				-- Detect if mouse is interacting or if auto restart triggered
-				if isAutoRestartEnabled and (tick() - lastRestartAttempt >= 10) then
-					if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
-						triggerRunAgainButton()
-					end
-				end
-			end
-		end
-	end
-	
 	-- If post-restart cooldown is active, pause navigation and show status
 	if tick() - postRestartCooldown < 10 then
 		targetLabel.Text = "Status: Restarting Room 1..."
@@ -777,7 +805,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Floor 19 Boss Defeat Auto-Restart Trigger
+	-- Floor 19 Boss Defeat Auto-Restart Trigger using Target Box
 	if isAutoRestartEnabled and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
 			bossDefeatedTimer = tick()
