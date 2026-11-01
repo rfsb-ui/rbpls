@@ -25,8 +25,9 @@ local CONFIG = {
 	GateTimeout = 15,
 	BossRoomNumber = 19,
 	NoclipOffset = 8,
-	TargetPosX = 600, -- Default screen fallback position
-	TargetPosY = 680
+	TargetPosX = 0,
+	TargetPosY = 0,
+	UseDefaultPos = true
 }
 
 local waypoints = {}
@@ -65,6 +66,7 @@ local function loadFromDevice()
 				CONFIG.NoclipOffset = decoded.Settings.NoclipOffset or CONFIG.NoclipOffset
 				CONFIG.TargetPosX = decoded.Settings.TargetPosX or CONFIG.TargetPosX
 				CONFIG.TargetPosY = decoded.Settings.TargetPosY or CONFIG.TargetPosY
+				CONFIG.UseDefaultPos = decoded.Settings.UseDefaultPos ~= nil and decoded.Settings.UseDefaultPos or false
 			end
 			
 			if decoded and decoded.Waypoints then
@@ -138,7 +140,14 @@ screenGui.Parent = playerGui
 -- ================= DRAGGABLE CLICK TARGET BOX =================
 local clickTargetFrame = Instance.new("Frame")
 clickTargetFrame.Size = UDim2.new(0, 160, 0, 50)
-clickTargetFrame.Position = UDim2.new(0, CONFIG.TargetPosX, 0, CONFIG.TargetPosY)
+
+if CONFIG.UseDefaultPos then
+	-- Spawn dead center of the screen so it's always visible on first load
+	clickTargetFrame.Position = UDim2.new(0.5, -80, 0.5, -25)
+else
+	clickTargetFrame.Position = UDim2.new(0, CONFIG.TargetPosX, 0, CONFIG.TargetPosY)
+end
+
 clickTargetFrame.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
 clickTargetFrame.BackgroundTransparency = 0.4
 clickTargetFrame.BorderSizePixel = 2
@@ -171,6 +180,7 @@ clickTargetFrame.InputBegan:Connect(function(input)
 				targetDragging = false
 				CONFIG.TargetPosX = clickTargetFrame.AbsolutePosition.X
 				CONFIG.TargetPosY = clickTargetFrame.AbsolutePosition.Y
+				CONFIG.UseDefaultPos = false
 				saveToDevice()
 			end
 		end)
@@ -228,7 +238,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.27"
+titleLabel.Text = "Auto Dungeon v2.8.28"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -805,7 +815,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Floor 19 Boss Defeat Auto-Restart Trigger using Target Box
+	-- Floor 19 Boss Defeat Auto-Restart Trigger
 	if isAutoRestartEnabled and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
 			bossDefeatedTimer = tick()
@@ -815,7 +825,21 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		
 		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
-			triggerRunAgainButton()
+			-- Trigger click on the target box coordinates
+			if tick() - lastRestartAttempt >= 10 then
+				lastRestartAttempt = tick()
+				resetToRoomOne()
+				
+				local absPos = clickTargetFrame.AbsolutePosition
+				local absSize = clickTargetFrame.AbsoluteSize
+				local centerX = absPos.X + absSize.X / 2
+				local centerY = absPos.Y + absSize.Y / 2
+				
+				VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+				task.wait(0.05)
+				VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+				print("Auto Dungeon Restarted via Target Box Coordinates!")
+			end
 		end
 	end
 	
