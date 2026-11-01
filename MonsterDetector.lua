@@ -200,7 +200,7 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 -- ====================================================================================
 
--- Precision Clicker using the Draggable Target Box coordinates
+-- Precision Multi-Clicker (Fires 3 clicks in quick succession)
 local function triggerRunAgainButton()
 	if tick() - lastRestartAttempt < 10 then return false end
 	lastRestartAttempt = tick()
@@ -211,11 +211,14 @@ local function triggerRunAgainButton()
 	local centerX = absPos.X + absSize.X / 2
 	local centerY = absPos.Y + absSize.Y / 2
 	
-	VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
-	task.wait(0.05)
-	VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+	for i = 1, 3 do
+		VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+		task.wait(0.03)
+		VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+		task.wait(0.03)
+	end
 	
-	print("Clicked 'Run again' via Target Box at coordinates:", centerX, centerY)
+	print("Fired 3 rapid clicks on 'Run again' via Target Box at coordinates:", centerX, centerY)
 	return true
 end
 
@@ -237,7 +240,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.29"
+titleLabel.Text = "Auto Dungeon v2.8.30"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -824,20 +827,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		
 		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
-			if tick() - lastRestartAttempt >= 10 then
-				lastRestartAttempt = tick()
-				resetToRoomOne()
-				
-				local absPos = clickTargetFrame.AbsolutePosition
-				local absSize = clickTargetFrame.AbsoluteSize
-				local centerX = absPos.X + absSize.X / 2
-				local centerY = absPos.Y + absSize.Y / 2
-				
-				VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
-				task.wait(0.05)
-				VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
-				print("Auto Dungeon Restarted via Target Box Coordinates!")
-			end
+			triggerRunAgainButton()
 		end
 	end
 	
