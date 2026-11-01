@@ -25,6 +25,7 @@ local CONFIG = {
 	GateTimeout = 15,
 	BossRoomNumber = 19,
 	NoclipOffset = 8,
+	MobArrivalDelay = 2, -- 2 second delay to wait for drops upon reaching a mob
 	TargetPosX = 0,
 	TargetPosY = 0,
 	UseDefaultPos = true
@@ -65,6 +66,7 @@ local function loadFromDevice()
 				CONFIG.GateTimeout = decoded.Settings.GateTimeout or CONFIG.GateTimeout
 				CONFIG.BossRoomNumber = decoded.Settings.BossRoomNumber or CONFIG.BossRoomNumber
 				CONFIG.NoclipOffset = decoded.Settings.NoclipOffset or CONFIG.NoclipOffset
+				CONFIG.MobArrivalDelay = decoded.Settings.MobArrivalDelay or CONFIG.MobArrivalDelay
 				CONFIG.TargetPosX = decoded.Settings.TargetPosX or CONFIG.TargetPosX
 				CONFIG.TargetPosY = decoded.Settings.TargetPosY or CONFIG.TargetPosY
 				CONFIG.UseDefaultPos = decoded.Settings.UseDefaultPos ~= nil and decoded.Settings.UseDefaultPos or false
@@ -108,6 +110,8 @@ local lastRestartAttempt = 0
 local bossWasPresent = false
 local bossDefeatedTimer = 0
 local postRestartCooldown = 0
+local mobArrivalTimer = 0
+local lastTargetMonsterId = nil
 
 -- Throttle variables for heavy UI scanning
 local lastGuiThrottle = 0
@@ -255,7 +259,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.34"
+titleLabel.Text = "Auto Dungeon v2.8.35"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -837,6 +841,7 @@ RunService.Heartbeat:Connect(function(dt)
 	
 	local detectedCount = 0
 	local nearestMonsterPart = nil
+	local nearestMonsterModel = nil
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	local hasBossPresent = false
@@ -853,6 +858,7 @@ RunService.Heartbeat:Connect(function(dt)
 						if dist < shortestDist then
 							shortestDist = dist
 							nearestMonsterPart = hrp
+							nearestMonsterModel = monster
 							local animalName = getAnimalName(monster)
 							nearestMonsterName = animalName .. " (" .. math.floor(dist) .. "m)"
 						end
@@ -898,11 +904,28 @@ RunService.Heartbeat:Connect(function(dt)
 	local targetName = "None"
 	local statusMsg = "Active"
 	
+	-- Check if we are currently delayed at a mob arrival spot
+	if mobArrivalTimer > 0 then
+		if tick() - mobArrivalTimer < CONFIG.MobArrivalDelay then
+			statusMsg = "Waiting Drop"
+			targetName = "Looting..."
+			targetPos = nil -- Hold position
+		else
+			mobArrivalTimer = 0 -- Timer expired, resume hunting
+		end
+	end
+	
 	-- Priority Logic & Waypoint Room Navigation
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	local heightOffset = isNoClipEnabled and Vector3.new(0, CONFIG.NoclipOffset, 0) or Vector3.new(0, 2, 0)
 	
-	if (isTrackingAll or isLoopingWaypoints) and nearestMonsterPart then
+	if mobArrivalTimer == 0 and ((isTrackingAll or isLoopingWaypoints) and nearestMonsterPart) then
+		-- Track if we just arrived at a new target mob
+		if lastTargetMonsterId ~= nearestMonsterModel and shortestDist <= (CONFIG.StopDistance + 2) then
+			lastTargetMonsterId = nearestMonsterModel
+			mobArrivalTimer = tick()
+		end
+		
 		if isBossRoom and waypoints[CONFIG.BossRoomNumber] then
 			local bossCenterPos = waypoints[CONFIG.BossRoomNumber]
 			local centerDist = (myHrp.Position - bossCenterPos).Magnitude
@@ -922,7 +945,7 @@ RunService.Heartbeat:Connect(function(dt)
 			statusMsg = "Attacking"
 		end
 		gateTimer = tick()
-	elseif isLoopingWaypoints and #waypoints > 0 and myHrp then
+	elseif mobArrivalTimer == 0 and (isLoopingWaypoints and #waypoints > 0 and myHrp) then
 		local currentWp = waypoints[currentWaypointIndex]
 		local wpDist = (myHrp.Position - currentWp).Magnitude
 		
@@ -953,15 +976,15 @@ RunService.Heartbeat:Connect(function(dt)
 			targetName = "Room " .. currentWaypointIndex
 			statusMsg = "Waiting Gate"
 		end
-	elseif isTrackingAll and nearestMonsterPart then
+	elseif mobArrivalTimer == 0 and (isTrackingAll and nearestMonsterPart) then
 		targetPos = nearestMonsterPart.Position + heightOffset
 		targetName = "All Mobs"
 		statusMsg = "Tracking"
 	else
-		if isLoopingWaypoints and #waypoints == 0 then
+		if isLoopingWaypoints and #waypoints == 0 and mobArrivalTimer == 0 then
 			targetName = "None"
 			statusMsg = "No Rooms!"
-		else
+		elseif mobArrivalTimer == 0 then
 			statusMsg = "Idle"
 		end
 	end
@@ -978,7 +1001,6 @@ RunService.Heartbeat:Connect(function(dt)
 		
 		if distance > CONFIG.StopDistance then
 			local moveVector = direction.Unit * math.min(CONFIG.FlightSpeed * dt, distance)
-			-- Force flat level orientation (ignoring vertical pitch tilt to prevent hip/knee sagging)
 			local flatTarget = Vector3.new(targetPos.X, currentPos.Y, targetPos.Z)
 			if (flatTarget - currentPos).Magnitude > 1 then
 				myHrp.CFrame = CFrame.new(currentPos + moveVector, flatTarget + Vector3.new(0, (targetPos.Y - currentPos.Y), 0))
