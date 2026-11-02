@@ -336,7 +336,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.43"
+titleLabel.Text = "Auto Dungeon v2.8.45"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -1016,6 +1016,10 @@ RunService.Heartbeat:Connect(function(dt)
 	local shortestDist = math.huge
 	local hasBossPresent = false
 	
+	local isBossRoomScan = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
+	local bossWp = isBossRoomScan and waypoints[CONFIG.BossRoomNumber] or nil
+	local shortestBossDist = math.huge
+	
 	if aggressorsFolder and myHrp then
 		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
 			if monster:IsA("Model") then
@@ -1025,12 +1029,25 @@ RunService.Heartbeat:Connect(function(dt)
 					if dist <= CONFIG.DetectionRadius then
 						detectedCount += 1
 						hasBossPresent = true
-						if dist < shortestDist then
-							shortestDist = dist
-							nearestMonsterPart = hrp
-							nearestMonsterModel = monster
-							local animalName = getAnimalName(monster)
-							nearestMonsterName = animalName .. " (" .. math.floor(dist) .. "m)"
+						
+						if bossWp then
+							local wpDist = (hrp.Position - bossWp).Magnitude
+							if wpDist < shortestBossDist then
+								shortestBossDist = wpDist
+								shortestDist = dist
+								nearestMonsterPart = hrp
+								nearestMonsterModel = monster
+								local animalName = getAnimalName(monster)
+								nearestMonsterName = animalName .. " (Boss)"
+							end
+						else
+							if dist < shortestDist then
+								shortestDist = dist
+								nearestMonsterPart = hrp
+								nearestMonsterModel = monster
+								local animalName = getAnimalName(monster)
+								nearestMonsterName = animalName .. " (" .. math.floor(dist) .. "m)"
+							end
 						end
 					end
 				end
@@ -1038,11 +1055,11 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Floor 19 Boss Defeat Auto-Restart Trigger (Using configurable BossDelay)
+	-- Floor/Boss Room Defeat Auto-Restart Trigger (Using configurable BossDelay)
 	if isAutoRestartEnabled and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
 			bossDefeatedTimer = tick()
-			print("Boss defeated on Floor 19! Starting " .. CONFIG.BossDelay .. "-second auto-restart timeout...")
+			print("Boss defeated in final room! Starting " .. CONFIG.BossDelay .. "-second auto-restart timeout...")
 		elseif hasBossPresent then
 			bossWasPresent = true
 		end
@@ -1051,7 +1068,7 @@ RunService.Heartbeat:Connect(function(dt)
 			if tick() - lastRestartAttempt >= 10 then
 				lastRestartAttempt = tick()
 				triggerRunAgainButton()
-				bossDefeatedTimer = 0 -- Reset timer so it doesn't loop indefinitely
+				bossDefeatedTimer = 0
 			end
 		end
 	end
@@ -1106,7 +1123,8 @@ RunService.Heartbeat:Connect(function(dt)
 		local currentWp = waypoints[currentWaypointIndex]
 		local wpDist = (myHrp.Position - currentWp).Magnitude
 		
-		if currentWaypointIndex == 1 then
+		-- FIXED: If this is the final/boss room, bypass gate waiting entirely so it moves straight to fighting/boss tracking
+		if currentWaypointIndex == 1 or currentWaypointIndex >= CONFIG.BossRoomNumber then
 			roomClearedConfirmed = true
 		else
 			if checkGateUnsealedThrottled() or (tick() - gateTimer >= CONFIG.GateTimeout) then
@@ -1166,7 +1184,7 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 			myHrp.AssemblyLinearVelocity = Vector3.zero
 		else
-			myHrp.CFrame = CFrame.new(currentPos, targetPos)
+			myHrp.CFrame = MyHrp and CFrame.new(currentPos, targetPos) or myHrp.CFrame
 			myHrp.AssemblyLinearVelocity = Vector3.zero
 		end
 	else
