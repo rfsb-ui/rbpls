@@ -25,9 +25,9 @@ local CONFIG = {
 	GateTimeout = 15,
 	BossRoomNumber = 19,
 	NoclipOffset = 8,
-	MobArrivalDelay = 1,
+	MobArrivalDelay = 2,
 	PotThreshold = 40,
-	BossDelay = 10, -- Default 10 seconds delay after boss is defeated before clicking Run again
+	BossDelay = 10,
 	TargetPosX = 0,
 	TargetPosY = 0,
 	UseDefaultPos = true,
@@ -336,7 +336,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.42"
+titleLabel.Text = "Auto Dungeon v2.8.43"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -697,7 +697,6 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
--- 8 Configurable inputs adjusted to fit across the 240px width bar
 createLabeledInput(6, 264, 25, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
 createLabeledInput(33, 264, 25, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
 createLabeledInput(60, 264, 25, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
@@ -1051,20 +1050,8 @@ RunService.Heartbeat:Connect(function(dt)
 		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= CONFIG.BossDelay) then
 			if tick() - lastRestartAttempt >= 10 then
 				lastRestartAttempt = tick()
-				resetToRoomOne()
-				
-				local absPos = clickTargetFrame.AbsolutePosition
-				local absSize = clickTargetFrame.AbsoluteSize
-				local centerX = absPos.X + absSize.X / 2
-				local centerY = absPos.Y + absSize.Y / 2
-				
-				for i = 1, 3 do
-					VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
-					task.wait(0.03)
-					VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
-					task.wait(0.03)
-				end
-				print("Auto Dungeon Restarted via Target Box Coordinates!")
+				triggerRunAgainButton()
+				bossDefeatedTimer = 0 -- Reset timer so it doesn't loop indefinitely
 			end
 		end
 	end
@@ -1159,7 +1146,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	targetLabel.Text = "Target: " + targetName
+	targetLabel.Text = "Target: " .. targetName
 	statusSubLabel.Text = "Status: " .. statusMsg
 	
 	-- Smooth Flight Execution with Level Posture Correction (Locking Pitch/Roll)
