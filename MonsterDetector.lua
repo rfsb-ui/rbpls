@@ -318,7 +318,7 @@ local function triggerRunAgainButton()
 	return true
 end
 
--- Main Compact Panel (Boots up maximized, smart minimize keeps status visible)
+-- Main Compact Panel (Boots up Maximized)
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 240, 0, 510)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
@@ -770,7 +770,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 	isMinimized = not isMinimized
 	if isMinimized then
 		mainFrame.Size = UDim2.new(0, 240, 0, 95)
-		statusFrame.Visible = true -- Keep status dashboard visible when minimized
+		statusFrame.Visible = true
 		noclipToggleBtn.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
@@ -969,8 +969,8 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- AAT Target Box Click Simulation Loop
-	if isAatEnabled then
+	-- AAT Target Box Click Simulation Loop (Automatically paused during boss cooldown and post-restart)
+	if isAatEnabled and bossDefeatedTimer == 0 and (tick() - postRestartCooldown >= 10) then
 		if tick() - lastAtkClickTime >= 0.15 then
 			lastAtkClickTime = tick()
 			local absPos = atkTargetFrame.AbsolutePosition
@@ -1069,7 +1069,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Boss Room Defeat Auto-Restart Trigger with Live Countdown Display & Visible Status
+	-- Boss Room Defeat Auto-Restart Trigger with Live Countdown & Status Lock
 	local statusMsg = "Active"
 	if isAutoRestartEnabled and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
@@ -1116,7 +1116,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Priority Logic & Waypoint Room Navigation (Using unified NoclipOffset for flight clearance)
+	-- Priority Logic & Waypoint Room Navigation
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	local heightOffset = Vector3.new(0, CONFIG.NoclipOffset, 0)
 	
