@@ -263,7 +263,7 @@ atkText.TextSize = 8
 atkText.Font = Enum.Font.SourceSansBold
 atkText.Parent = atkTargetFrame
 
--- Drag logic for ATK target box
+-- Drag logic for ATK target box with auto-save persistence
 local atkDragging, atkDragInput, atkDragStart, atkStartPos
 atkTargetFrame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -318,9 +318,9 @@ local function triggerRunAgainButton()
 	return true
 end
 
--- Main Compact Panel (70% Opacity)
+-- Main Compact Panel (Boots up initially Minimized)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 510)
+mainFrame.Size = UDim2.new(0, 240, 0, 95) -- Initial minimized height
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BackgroundTransparency = 0.3
@@ -336,7 +336,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.47"
+titleLabel.Text = "Auto Dungeon v2.8.48"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -391,13 +391,13 @@ closeButton.MouseButton1Click:Connect(function()
 	screenGui:Destroy()
 end)
 
--- Minimize (-) Button
+-- Minimize (+) Button (Initialized to '+' since UI starts minimized)
 local minimizeButton = Instance.new("TextButton")
 minimizeButton.Size = UDim2.new(0, 26, 0, 26)
 minimizeButton.Position = UDim2.new(1, -60, 0, 3)
 minimizeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 minimizeButton.BackgroundTransparency = 0.3
-minimizeButton.Text = "-"
+minimizeButton.Text = "+"
 minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 minimizeButton.TextSize = 14
 minimizeButton.Font = Enum.Font.SourceSansBold
@@ -414,6 +414,7 @@ statusFrame.Position = UDim2.new(0, 8, 0, 35)
 statusFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 statusFrame.BackgroundTransparency = 0.3
 statusFrame.BorderSizePixel = 0
+statusFrame.Visible = false -- Initially hidden when minimized
 statusFrame.Parent = mainFrame
 
 local statusCorner = Instance.new("UICorner")
@@ -536,6 +537,7 @@ noclipToggleBtn.Text = "No-Clip: OFF"
 noclipToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 noclipToggleBtn.TextSize = 11
 noclipToggleBtn.Font = Enum.Font.SourceSansBold
+noclipToggleBtn.Visible = false
 noclipToggleBtn.Parent = mainFrame
 
 local nclCorner = Instance.new("UICorner")
@@ -552,6 +554,7 @@ saveWpBtn.Text = "Save"
 saveWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 saveWpBtn.TextSize = 10
 saveWpBtn.Font = Enum.Font.SourceSansBold
+saveWpBtn.Visible = false
 saveWpBtn.Parent = mainFrame
 
 local swpCorner = Instance.new("UICorner")
@@ -567,6 +570,7 @@ clearWpBtn.Text = "Clear"
 clearWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 clearWpBtn.TextSize = 10
 clearWpBtn.Font = Enum.Font.SourceSansBold
+clearWpBtn.Visible = false
 clearWpBtn.Parent = mainFrame
 
 local cwpCorner = Instance.new("UICorner")
@@ -582,6 +586,7 @@ skipWpBtn.Text = "Skip WP"
 skipWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 skipWpBtn.TextSize = 9
 skipWpBtn.Font = Enum.Font.SourceSansBold
+skipWpBtn.Visible = false
 skipWpBtn.Parent = mainFrame
 
 local skpCorner = Instance.new("UICorner")
@@ -598,6 +603,7 @@ autoPotBtn.Text = "Auto Pot"
 autoPotBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 autoPotBtn.TextSize = 9
 autoPotBtn.Font = Enum.Font.SourceSansBold
+autoPotBtn.Visible = false
 autoPotBtn.Parent = mainFrame
 
 local aptCorner = Instance.new("UICorner")
@@ -614,6 +620,7 @@ restartToggleBtn.Text = "Auto Restart: OFF"
 restartToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 restartToggleBtn.TextSize = 11
 restartToggleBtn.Font = Enum.Font.SourceSansBold
+restartToggleBtn.Visible = false
 restartToggleBtn.Parent = mainFrame
 
 local rstCorner = Instance.new("UICorner")
@@ -631,6 +638,7 @@ importBox.Text = ""
 importBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 importBox.TextSize = 11
 importBox.Font = Enum.Font.SourceSans
+importBox.Visible = false
 importBox.Parent = mainFrame
 
 local impCorner = Instance.new("UICorner")
@@ -647,6 +655,7 @@ exportWpBtn.Text = "Export Rooms"
 exportWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 exportWpBtn.TextSize = 11
 exportWpBtn.Font = Enum.Font.SourceSansBold
+exportWpBtn.Visible = false
 exportWpBtn.Parent = mainFrame
 
 local expCorner = Instance.new("UICorner")
@@ -665,6 +674,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
 	lbl.TextSize = 8
 	lbl.Font = Enum.Font.SourceSansBold
+	lbl.Visible = false
 	lbl.Parent = mainFrame
 	table.insert(configurableElements, lbl)
 	
@@ -677,6 +687,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	box.TextColor3 = Color3.fromRGB(255, 255, 255)
 	box.TextSize = 9
 	box.Font = Enum.Font.SourceSans
+	box.Visible = false
 	box.Parent = mainFrame
 	table.insert(configurableElements, box)
 	
@@ -715,6 +726,7 @@ roomListFrame.BackgroundTransparency = 0.3
 roomListFrame.BorderSizePixel = 0
 roomListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 roomListFrame.ScrollBarThickness = 5
+roomListFrame.Visible = false
 roomListFrame.Parent = mainFrame
 table.insert(configurableElements, roomListFrame)
 
@@ -751,13 +763,14 @@ end
 
 updateRoomListDisplay()
 
--- State variables
-local isMinimized = false
+-- State variables (Starts minimized by default)
+local isMinimized = true
 
 minimizeButton.MouseButton1Click:Connect(function()
 	isMinimized = not isMinimized
 	if isMinimized then
 		mainFrame.Size = UDim2.new(0, 240, 0, 95)
+		statusFrame.Visible = false
 		noclipToggleBtn.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
@@ -772,6 +785,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		minimizeButton.Text = "+"
 	else
 		mainFrame.Size = UDim2.new(0, 240, 0, 510)
+		statusFrame.Visible = true
 		noclipToggleBtn.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
