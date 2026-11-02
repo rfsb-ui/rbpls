@@ -336,7 +336,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.50"
+titleLabel.Text = "Auto Dungeon v2.8.51"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -785,7 +785,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		minimizeButton.Text = "+"
 	else
 		mainFrame.Size = UDim2.new(0, 240, 0, 510)
-		statusFrame.Visible = true
+		statusFrame.Visible = true -- FIXED: Explicitly show status dashboard when expanded
 		noclipToggleBtn.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
@@ -1094,7 +1094,7 @@ RunService.Heartbeat:Connect(function(dt)
 					lastRestartAttempt = tick()
 					triggerRunAgainButton()
 					bossDefeatedTimer = 0
-					bossWasPresent = false -- Fully clear so it doesn't loop
+					bossWasPresent = false
 				end
 			end
 		end
