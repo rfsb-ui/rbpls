@@ -336,7 +336,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.45"
+titleLabel.Text = "Auto Dungeon v2.8.47"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -1055,20 +1055,27 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Floor/Boss Room Defeat Auto-Restart Trigger (Using configurable BossDelay)
+	-- Boss Room Defeat Auto-Restart Trigger with Live Countdown Display
+	local statusMsg = "Active"
 	if isAutoRestartEnabled and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
 			bossDefeatedTimer = tick()
-			print("Boss defeated in final room! Starting " .. CONFIG.BossDelay .. "-second auto-restart timeout...")
+			print("Boss defeated! Starting " .. CONFIG.BossDelay .. "-second auto-restart countdown...")
 		elseif hasBossPresent then
 			bossWasPresent = true
 		end
 		
-		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= CONFIG.BossDelay) then
-			if tick() - lastRestartAttempt >= 10 then
-				lastRestartAttempt = tick()
-				triggerRunAgainButton()
-				bossDefeatedTimer = 0
+		if bossDefeatedTimer > 0 then
+			local elapsed = tick() - bossDefeatedTimer
+			local remaining = math.max(0, math.ceil(CONFIG.BossDelay - elapsed))
+			statusMsg = "Boss Down (" .. remaining .. "s)"
+			
+			if elapsed >= CONFIG.BossDelay then
+				if tick() - lastRestartAttempt >= 10 then
+					lastRestartAttempt = tick()
+					triggerRunAgainButton()
+					bossDefeatedTimer = 0
+				end
 			end
 		end
 	end
@@ -1077,10 +1084,9 @@ RunService.Heartbeat:Connect(function(dt)
 	
 	local targetPos = nil
 	local targetName = "None"
-	local statusMsg = "Active"
 	
 	-- Check if we are currently delayed at a mob arrival spot
-	if mobArrivalTimer > 0 then
+	if mobArrivalTimer > 0 and bossDefeatedTimer == 0 then
 		if tick() - mobArrivalTimer < CONFIG.MobArrivalDelay then
 			statusMsg = "Waiting Drop"
 			targetName = "Looting..."
@@ -1090,77 +1096,78 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Priority Logic & Waypoint Room Navigation
+	-- Priority Logic & Waypoint Room Navigation (Using unified NoclipOffset for flight clearance)
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
-	local heightOffset = isNoClipEnabled and Vector3.new(0, CONFIG.NoclipOffset, 0) or Vector3.new(0, 2, 0)
+	local heightOffset = Vector3.new(0, CONFIG.NoclipOffset, 0)
 	
-	if mobArrivalTimer == 0 and ((isTrackingAll or isLoopingWaypoints) and nearestMonsterPart) then
-		if lastTargetMonsterId ~= nearestMonsterModel and shortestDist <= (CONFIG.StopDistance + 2) then
-			lastTargetMonsterId = nearestMonsterModel
-			mobArrivalTimer = tick()
-		end
-		
-		if isBossRoom and waypoints[CONFIG.BossRoomNumber] then
-			local bossCenterPos = waypoints[CONFIG.BossRoomNumber]
-			local centerDist = (myHrp.Position - bossCenterPos).Magnitude
+	if bossDefeatedTimer == 0 then
+		if mobArrivalTimer == 0 and ((isTrackingAll or isLoopingWaypoints) and nearestMonsterPart) then
+			if lastTargetMonsterId ~= nearestMonsterModel and shortestDist <= (CONFIG.StopDistance + 2) then
+				lastTargetMonsterId = nearestMonsterModel
+				mobArrivalTimer = tick()
+			end
 			
-			if centerDist > 15 then
-				targetPos = bossCenterPos + heightOffset
-				targetName = "Boss Center"
-				statusMsg = "Centering"
+			if isBossRoom and waypoints[CONFIG.BossRoomNumber] then
+				local bossCenterPos = waypoints[CONFIG.BossRoomNumber]
+				local centerDist = (myHrp.Position - bossCenterPos).Magnitude
+				
+				if centerDist > 15 then
+					targetPos = bossCenterPos + heightOffset
+					targetName = "Boss Center"
+					statusMsg = "Centering"
+				else
+					targetPos = nearestMonsterPart.Position + heightOffset
+					targetName = "Boss Mob"
+					statusMsg = "Fighting"
+				end
 			else
 				targetPos = nearestMonsterPart.Position + heightOffset
-				targetName = "Boss Mob"
-				statusMsg = "Fighting"
+				targetName = "Mob Target"
+				statusMsg = "Attacking"
 			end
-		else
-			targetPos = nearestMonsterPart.Position + heightOffset
-			targetName = "Mob Target"
-			statusMsg = "Attacking"
-		end
-		gateTimer = tick()
-	elseif mobArrivalTimer == 0 and (isLoopingWaypoints and #waypoints > 0 and myHrp) then
-		local currentWp = waypoints[currentWaypointIndex]
-		local wpDist = (myHrp.Position - currentWp).Magnitude
-		
-		-- FIXED: If this is the final/boss room, bypass gate waiting entirely so it moves straight to fighting/boss tracking
-		if currentWaypointIndex == 1 or currentWaypointIndex >= CONFIG.BossRoomNumber then
-			roomClearedConfirmed = true
-		else
-			if checkGateUnsealedThrottled() or (tick() - gateTimer >= CONFIG.GateTimeout) then
+			gateTimer = tick()
+		elseif mobArrivalTimer == 0 and (isLoopingWaypoints and #waypoints > 0 and myHrp) then
+			local currentWp = waypoints[currentWaypointIndex]
+			local wpDist = (myHrp.Position - currentWp).Magnitude
+			
+			if currentWaypointIndex == 1 or currentWaypointIndex >= CONFIG.BossRoomNumber then
 				roomClearedConfirmed = true
 			else
-				roomClearedConfirmed = false
-			end
-		end
-		
-		if roomClearedConfirmed then
-			targetPos = currentWp + heightOffset
-			local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
-			targetName = (isBoss and "Boss " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints
-			statusMsg = "Moving (" .. math.floor(wpDist) .. "m)"
-			
-			if wpDist <= (CONFIG.StopDistance + 2) then
-				if currentWaypointIndex < CONFIG.BossRoomNumber then
-					currentWaypointIndex += 1
+				if checkGateUnsealedThrottled() or (tick() - gateTimer >= CONFIG.GateTimeout) then
+					roomClearedConfirmed = true
+				else
+					roomClearedConfirmed = false
 				end
-				roomClearedConfirmed = false
-				gateTimer = tick()
 			end
+			
+			if roomClearedConfirmed then
+				targetPos = currentWp + heightOffset
+				local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
+				targetName = (isBoss and "Boss " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints
+				statusMsg = "Moving (" .. math.floor(wpDist) .. "m)"
+				
+				if wpDist <= (CONFIG.StopDistance + 2) then
+					if currentWaypointIndex < CONFIG.BossRoomNumber then
+						currentWaypointIndex += 1
+					end
+					roomClearedConfirmed = false
+					gateTimer = tick()
+				end
+			else
+				targetName = "Room " .. currentWaypointIndex
+				statusMsg = "Waiting Gate"
+			end
+		elseif mobArrivalTimer == 0 and (isTrackingAll and nearestMonsterPart) then
+			targetPos = nearestMonsterPart.Position + heightOffset
+			targetName = "All Mobs"
+			statusMsg = "Tracking"
 		else
-			targetName = "Room " .. currentWaypointIndex
-			statusMsg = "Waiting Gate"
-		end
-	elseif mobArrivalTimer == 0 and (isTrackingAll and nearestMonsterPart) then
-		targetPos = nearestMonsterPart.Position + heightOffset
-		targetName = "All Mobs"
-		statusMsg = "Tracking"
-	else
-		if isLoopingWaypoints and #waypoints == 0 and mobArrivalTimer == 0 then
-			targetName = "None"
-			statusMsg = "No Rooms!"
-		elseif mobArrivalTimer == 0 then
-			statusMsg = "Idle"
+			if isLoopingWaypoints and #waypoints == 0 and mobArrivalTimer == 0 then
+				targetName = "None"
+				statusMsg = "No Rooms!"
+			elseif mobArrivalTimer == 0 then
+				statusMsg = "Idle"
+			end
 		end
 	end
 	
@@ -1184,7 +1191,7 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 			myHrp.AssemblyLinearVelocity = Vector3.zero
 		else
-			myHrp.CFrame = MyHrp and CFrame.new(currentPos, targetPos) or myHrp.CFrame
+			myHrp.CFrame = CFrame.new(currentPos, targetPos)
 			myHrp.AssemblyLinearVelocity = Vector3.zero
 		end
 	else
