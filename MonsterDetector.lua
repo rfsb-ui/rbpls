@@ -26,6 +26,7 @@ local CONFIG = {
 	BossRoomNumber = 19,
 	NoclipOffset = 8,
 	MobArrivalDelay = 1,
+	PotThreshold = 40, -- Default 40% HP threshold for Auto Pot
 	TargetPosX = 0,
 	TargetPosY = 0,
 	UseDefaultPos = true
@@ -67,6 +68,7 @@ local function loadFromDevice()
 				CONFIG.BossRoomNumber = decoded.Settings.BossRoomNumber or CONFIG.BossRoomNumber
 				CONFIG.NoclipOffset = decoded.Settings.NoclipOffset or CONFIG.NoclipOffset
 				CONFIG.MobArrivalDelay = decoded.Settings.MobArrivalDelay or CONFIG.MobArrivalDelay
+				CONFIG.PotThreshold = decoded.Settings.PotThreshold or CONFIG.PotThreshold
 				CONFIG.TargetPosX = decoded.Settings.TargetPosX or CONFIG.TargetPosX
 				CONFIG.TargetPosY = decoded.Settings.TargetPosY or CONFIG.TargetPosY
 				CONFIG.UseDefaultPos = decoded.Settings.UseDefaultPos ~= nil and decoded.Settings.UseDefaultPos or false
@@ -104,9 +106,11 @@ local isTrackingAll = false
 local isAutoRestartEnabled = false
 local isNoClipEnabled = false
 local isRmbHoldEnabled = false
+local isAutoPotEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastRestartAttempt = 0
+local lastPotionTime = 0
 
 local bossWasPresent = false
 local bossDefeatedTimer = 0
@@ -260,7 +264,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.38"
+titleLabel.Text = "Auto Dungeon v2.8.39"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -466,15 +470,15 @@ local nclCorner = Instance.new("UICorner")
 nclCorner.CornerRadius = UDim.new(0, 4)
 nclCorner.Parent = noclipToggleBtn
 
--- Dungeon Room Controls Row (Save, Clear, Skip WP)
+-- Dungeon Room Controls Row (Save, Clear, Skip WP, Auto Pot)
 local saveWpBtn = Instance.new("TextButton")
-saveWpBtn.Size = UDim2.new(0, 72, 0, 26)
+saveWpBtn.Size = UDim2.new(0, 54, 0, 26)
 saveWpBtn.Position = UDim2.new(0, 8, 0, 130)
 saveWpBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 180)
 saveWpBtn.BackgroundTransparency = 0.3
 saveWpBtn.Text = "Save"
 saveWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-saveWpBtn.TextSize = 11
+saveWpBtn.TextSize = 10
 saveWpBtn.Font = Enum.Font.SourceSansBold
 saveWpBtn.Parent = mainFrame
 
@@ -483,13 +487,13 @@ swpCorner.CornerRadius = UDim.new(0, 4)
 swpCorner.Parent = saveWpBtn
 
 local clearWpBtn = Instance.new("TextButton")
-clearWpBtn.Size = UDim2.new(0, 72, 0, 26)
-clearWpBtn.Position = UDim2.new(0, 84, 0, 130)
+clearWpBtn.Size = UDim2.new(0, 54, 0, 26)
+clearWpBtn.Position = UDim2.new(0, 66, 0, 130)
 clearWpBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 60)
 clearWpBtn.BackgroundTransparency = 0.3
 clearWpBtn.Text = "Clear"
 clearWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-clearWpBtn.TextSize = 11
+clearWpBtn.TextSize = 10
 clearWpBtn.Font = Enum.Font.SourceSansBold
 clearWpBtn.Parent = mainFrame
 
@@ -498,19 +502,35 @@ cwpCorner.CornerRadius = UDim.new(0, 4)
 cwpCorner.Parent = clearWpBtn
 
 local skipWpBtn = Instance.new("TextButton")
-skipWpBtn.Size = UDim2.new(0, 64, 0, 26)
-skipWpBtn.Position = UDim2.new(0, 160, 0, 130)
+skipWpBtn.Size = UDim2.new(0, 50, 0, 26)
+skipWpBtn.Position = UDim2.new(0, 124, 0, 130)
 skipWpBtn.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
 skipWpBtn.BackgroundTransparency = 0.3
 skipWpBtn.Text = "Skip WP"
 skipWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-skipWpBtn.TextSize = 11
+skipWpBtn.TextSize = 9
 skipWpBtn.Font = Enum.Font.SourceSansBold
 skipWpBtn.Parent = mainFrame
 
 local skpCorner = Instance.new("UICorner")
 skpCorner.CornerRadius = UDim.new(0, 4)
 skpCorner.Parent = skipWpBtn
+
+-- Auto Pot Toggle Button (Placed right next to Skip WP)
+local autoPotBtn = Instance.new("TextButton")
+autoPotBtn.Size = UDim2.new(0, 48, 0, 26)
+autoPotBtn.Position = UDim2.new(0, 178, 0, 130)
+autoPotBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+autoPotBtn.BackgroundTransparency = 0.3
+autoPotBtn.Text = "Auto Pot"
+autoPotBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoPotBtn.TextSize = 9
+autoPotBtn.Font = Enum.Font.SourceSansBold
+autoPotBtn.Parent = mainFrame
+
+local aptCorner = Instance.new("UICorner")
+aptCorner.CornerRadius = UDim.new(0, 4)
+aptCorner.Parent = autoPotBtn
 
 -- Auto Restart Toggle Button
 local restartToggleBtn = Instance.new("TextButton")
@@ -605,12 +625,14 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
-createLabeledInput(8, 264, 33, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
-createLabeledInput(45, 264, 33, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
-createLabeledInput(82, 264, 33, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
-createLabeledInput(119, 264, 33, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
-createLabeledInput(156, 264, 33, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
-createLabeledInput(193, 264, 39, "Offset", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
+-- 6 Configurable inputs (Speed, Radius, Stop, GateSec, Boss#, Offset, PotHP%) -> Adjusted widths to fit 7 items across 240px
+createLabeledInput(8, 264, 28, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(39, 264, 28, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(70, 264, 28, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(101, 264, 28, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
+createLabeledInput(132, 264, 28, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
+createLabeledInput(163, 264, 30, "Offset", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
+createLabeledInput(196, 264, 36, "PotHP%", CONFIG.PotThreshold, function(v) CONFIG.PotThreshold = v end)
 
 -- Scrollable Room List Viewer below UI (70% Opacity)
 local roomListFrame = Instance.new("ScrollingFrame")
@@ -668,6 +690,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
 		skipWpBtn.Visible = false
+		autoPotBtn.Visible = false
 		restartToggleBtn.Visible = false
 		importBox.Visible = false
 		exportWpBtn.Visible = false
@@ -681,6 +704,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
 		skipWpBtn.Visible = true
+		autoPotBtn.Visible = true
 		restartToggleBtn.Visible = true
 		importBox.Visible = true
 		exportWpBtn.Visible = true
@@ -792,6 +816,17 @@ aatToggleBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
+autoPotBtn.MouseButton1Click:Connect(function()
+	isAutoPotEnabled = not isAutoPotEnabled
+	if isAutoPotEnabled then
+		autoPotBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		autoPotBtn.Text = "Pot ON"
+	else
+		autoPotBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		autoPotBtn.Text = "Auto Pot"
+	end
+end)
+
 noclipToggleBtn.MouseButton1Click:Connect(function()
 	isNoClipEnabled = not isNoClipEnabled
 	if isNoClipEnabled then
@@ -852,6 +887,29 @@ RunService.Heartbeat:Connect(function(dt)
 		for _, part in ipairs(char:GetDescendants()) do
 			if part:IsA("BasePart") then
 				part.CanCollide = false
+			end
+		end
+	end
+	
+	-- Auto Potion / HP Monitor Logic
+	if isAutoPotEnabled and humanoid and humanoid.Health > 0 then
+		local hpPercent = (humanoid.Health / humanoid.MaxHealth) * 100
+		if hpPercent <= CONFIG.PotThreshold then
+			if tick() - lastPotionTime >= 3 then -- 3 second cooldown between pot uses
+				lastPotionTime = tick()
+				print("HP dropped below " .. CONFIG.PotThreshold .. "%. Using potion (Key 2 -> Key 1)...")
+				
+				task.spawn(function()
+					VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Two, false, game)
+					task.wait(0.05)
+					VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Two, false, game)
+					
+					task.wait(1.0)
+					
+					VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+					task.wait(0.05)
+					VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+				end)
 			end
 		end
 	end
