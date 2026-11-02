@@ -26,14 +26,17 @@ local CONFIG = {
 	BossRoomNumber = 19,
 	NoclipOffset = 8,
 	MobArrivalDelay = 1,
-	PotThreshold = 40, -- Default 40% HP threshold for Auto Pot
+	PotThreshold = 40,
 	TargetPosX = 0,
 	TargetPosY = 0,
-	UseDefaultPos = true
+	UseDefaultPos = true,
+	AtkPosX = 0,
+	AtkPosY = 0,
+	AtkUseDefaultPos = true
 }
 
 local waypoints = {}
-local runCounter = 0
+local runsCounter = 0
 
 local function saveToDevice()
 	pcall(function()
@@ -72,6 +75,9 @@ local function loadFromDevice()
 				CONFIG.TargetPosX = decoded.Settings.TargetPosX or CONFIG.TargetPosX
 				CONFIG.TargetPosY = decoded.Settings.TargetPosY or CONFIG.TargetPosY
 				CONFIG.UseDefaultPos = decoded.Settings.UseDefaultPos ~= nil and decoded.Settings.UseDefaultPos or false
+				CONFIG.AtkPosX = decoded.Settings.AtkPosX or CONFIG.AtkPosX
+				CONFIG.AtkPosY = decoded.Settings.AtkPosY or CONFIG.AtkPosY
+				CONFIG.AtkUseDefaultPos = decoded.Settings.AtkUseDefaultPos ~= nil and decoded.Settings.AtkUseDefaultPos or true
 			end
 			
 			if decoded and decoded.Waypoints then
@@ -105,12 +111,13 @@ local isLoopingWaypoints = false
 local isTrackingAll = false
 local isAutoRestartEnabled = false
 local isNoClipEnabled = false
-local isRmbHoldEnabled = false
+local isAatEnabled = false
 local isAutoPotEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastRestartAttempt = 0
 local lastPotionTime = 0
+local lastAtkClickTime = 0
 
 local bossWasPresent = false
 local bossDefeatedTimer = 0
@@ -129,8 +136,8 @@ local function resetToRoomOne()
 	bossWasPresent = false
 	bossDefeatedTimer = 0
 	postRestartCooldown = tick()
-	runCounter += 1
-	print("Dungeon state fully reset to Room 1. Total Runs:", runCounter)
+	runsCounter += 1
+	print("Dungeon state fully reset to Room 1. Total Runs:", runsCounter)
 end
 
 -- Throttled function to check if the gate unseal message is active on screen
@@ -161,7 +168,7 @@ screenGui.Name = "AutoDungeonGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- ================= COMPACT DRAGGABLE CLICK TARGET BOX (70% SMALLER) =================
+-- ================= COMPACT DRAGGABLE CLICK TARGET BOX ("Run again") =================
 local clickTargetFrame = Instance.new("Frame")
 clickTargetFrame.Size = UDim2.new(0, 48, 0, 15)
 
@@ -191,7 +198,7 @@ targetText.TextSize = 8
 targetText.Font = Enum.Font.SourceSansBold
 targetText.Parent = clickTargetFrame
 
--- Drag logic for the click target box
+-- Drag logic for Run again target box
 local targetDragging, targetDragInput, targetDragStart, targetStartPos
 clickTargetFrame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -222,7 +229,70 @@ UserInputService.InputChanged:Connect(function(input)
 		clickTargetFrame.Position = UDim2.new(targetStartPos.X.Scale, targetStartPos.X.Offset + delta.X, targetStartPos.Y.Scale, targetStartPos.Y.Offset + delta.Y)
 	end
 end)
--- ====================================================================================
+
+
+-- ================= COMPACT DRAGGABLE ATK TARGET BOX ("ATK") =================
+local atkTargetFrame = Instance.new("Frame")
+atkTargetFrame.Size = UDim2.new(0, 48, 0, 15)
+
+if CONFIG.AtkUseDefaultPos then
+	atkTargetFrame.Position = UDim2.new(0.5, -24, 0.5, 15)
+else
+	atkTargetFrame.Position = UDim2.new(0, CONFIG.AtkPosX, 0, CONFIG.AtkPosY)
+end
+
+atkTargetFrame.BackgroundColor3 = Color3.fromRGB(50, 150, 220)
+atkTargetFrame.BackgroundTransparency = 0.4
+atkTargetFrame.BorderSizePixel = 1
+atkTargetFrame.BorderColor3 = Color3.fromRGB(255, 255, 255)
+atkTargetFrame.Active = true
+atkTargetFrame.Parent = screenGui
+
+local atkCorner = Instance.new("UICorner")
+atkCorner.CornerRadius = UDim.new(0, 4)
+atkCorner.Parent = atkTargetFrame
+
+local atkText = Instance.new("TextLabel")
+atkText.Size = UDim2.new(1, 0, 1, 0)
+atkText.BackgroundTransparency = 1
+atkText.Text = "ATK"
+atkText.TextColor3 = Color3.fromRGB(255, 255, 255)
+atkText.TextSize = 8
+atkText.Font = Enum.Font.SourceSansBold
+atkText.Parent = atkTargetFrame
+
+-- Drag logic for ATK target box
+local atkDragging, atkDragInput, atkDragStart, atkStartPos
+atkTargetFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		atkDragging = true
+		atkDragStart = input.Position
+		atkStartPos = atkTargetFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				atkDragging = false
+				CONFIG.AtkPosX = atkTargetFrame.AbsolutePosition.X
+				CONFIG.AtkPosY = atkTargetFrame.AbsolutePosition.Y
+				CONFIG.AtkUseDefaultPos = false
+				saveToDevice()
+			end
+		end)
+	end
+end)
+
+atkTargetFrame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		atkDragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == atkDragInput and atkDragging then
+		local delta = input.Position - atkDragStart
+		atkTargetFrame.Position = UDim2.new(atkStartPos.X.Scale, atkStartPos.X.Offset + delta.X, atkStartPos.Y.Scale, atkStartPos.Y.Offset + delta.Y)
+	end
+end)
+-- ============================================================================
 
 -- Precision Multi-Clicker (Fires 3 clicks in quick succession)
 local function triggerRunAgainButton()
@@ -264,7 +334,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.39"
+titleLabel.Text = "Auto Dungeon v2.8.40"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -426,7 +496,7 @@ local lwpCorner = Instance.new("UICorner")
 lwpCorner.CornerRadius = UDim.new(0, 3)
 lwpCorner.Parent = loopWpBtn
 
--- Column 3 Bottom: AAT (Right Mouse Button Hold) Toggle Button
+-- Column 3 Bottom: AAT (ATK Target Box Clicker) Toggle Button
 local aatToggleBtn = Instance.new("TextButton")
 aatToggleBtn.Size = UDim2.new(0.33, -4, 0, 13)
 aatToggleBtn.Position = UDim2.new(0.66, 1, 0, 30)
@@ -516,7 +586,7 @@ local skpCorner = Instance.new("UICorner")
 skpCorner.CornerRadius = UDim.new(0, 4)
 skpCorner.Parent = skipWpBtn
 
--- Auto Pot Toggle Button (Placed right next to Skip WP)
+-- Auto Pot Toggle Button
 local autoPotBtn = Instance.new("TextButton")
 autoPotBtn.Size = UDim2.new(0, 48, 0, 26)
 autoPotBtn.Position = UDim2.new(0, 178, 0, 130)
@@ -625,7 +695,6 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
--- 6 Configurable inputs (Speed, Radius, Stop, GateSec, Boss#, Offset, PotHP%) -> Adjusted widths to fit 7 items across 240px
 createLabeledInput(8, 264, 28, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
 createLabeledInput(39, 264, 28, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
 createLabeledInput(70, 264, 28, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
@@ -798,21 +867,13 @@ toggleButton.MouseButton1Click:Connect(function()
 end)
 
 aatToggleBtn.MouseButton1Click:Connect(function()
-	isRmbHoldEnabled = not isRmbHoldEnabled
-	if isRmbHoldEnabled then
+	isAatEnabled = not isAatEnabled
+	if isAatEnabled then
 		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 		aatToggleBtn.Text = "AAT ⏸ [ON]"
-		pcall(function()
-			local vpSize = workspace.CurrentCamera.ViewportSize
-			VirtualInputManager:SendMouseButtonEvent(vpSize.X / 2, vpSize.Y / 2, 1, true, game, 1)
-		end)
 	else
 		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 		aatToggleBtn.Text = "AAT ▶ [OFF]"
-		pcall(function()
-			local vpSize = workspace.CurrentCamera.ViewportSize
-			VirtualInputManager:SendMouseButtonEvent(vpSize.X / 2, vpSize.Y / 2, 1, false, game, 1)
-		end)
 	end
 end)
 
@@ -891,11 +952,26 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
+	-- AAT Target Box Click Simulation Loop
+	if isAatEnabled then
+		if tick() - lastAtkClickTime >= 0.15 then
+			lastAtkClickTime = tick()
+			local absPos = atkTargetFrame.AbsolutePosition
+			local absSize = atkTargetFrame.AbsoluteSize
+			local centerX = absPos.X + absSize.X / 2
+			local centerY = absPos.Y + absSize.Y / 2
+			
+			VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+			task.wait(0.02)
+			VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+		end
+	end
+	
 	-- Auto Potion / HP Monitor Logic
 	if isAutoPotEnabled and humanoid and humanoid.Health > 0 then
 		local hpPercent = (humanoid.Health / humanoid.MaxHealth) * 100
 		if hpPercent <= CONFIG.PotThreshold then
-			if tick() - lastPotionTime >= 3 then -- 3 second cooldown between pot uses
+			if tick() - lastPotionTime >= 3 then
 				lastPotionTime = tick()
 				print("HP dropped below " .. CONFIG.PotThreshold .. "%. Using potion (Key 2 -> Key 1)...")
 				
@@ -915,7 +991,7 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 	
 	-- Update live Run counter on UI dashboard
-	runsLabel.Text = "Runs: " .. runCounter
+	runsLabel.Text = "Runs: " .. runsCounter
 	
 	-- If post-restart cooldown is active, pause navigation and show status
 	if tick() - postRestartCooldown < 10 then
