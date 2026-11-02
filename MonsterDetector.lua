@@ -320,7 +320,7 @@ end
 
 -- Main Compact Panel (Boots up initially Minimized)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 95) -- Initial minimized height
+mainFrame.Size = UDim2.new(0, 240, 0, 95)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BackgroundTransparency = 0.3
@@ -336,7 +336,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.48"
+titleLabel.Text = "Auto Dungeon v2.8.50"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -414,7 +414,7 @@ statusFrame.Position = UDim2.new(0, 8, 0, 35)
 statusFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 statusFrame.BackgroundTransparency = 0.3
 statusFrame.BorderSizePixel = 0
-statusFrame.Visible = false -- Initially hidden when minimized
+statusFrame.Visible = false -- Starts hidden when minimized
 statusFrame.Parent = mainFrame
 
 local statusCorner = Instance.new("UICorner")
@@ -1069,7 +1069,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Boss Room Defeat Auto-Restart Trigger with Live Countdown Display
+	-- Boss Room Defeat Auto-Restart Trigger with Live Countdown Display & Visible Status
 	local statusMsg = "Active"
 	if isAutoRestartEnabled and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
@@ -1082,13 +1082,19 @@ RunService.Heartbeat:Connect(function(dt)
 		if bossDefeatedTimer > 0 then
 			local elapsed = tick() - bossDefeatedTimer
 			local remaining = math.max(0, math.ceil(CONFIG.BossDelay - elapsed))
-			statusMsg = "Boss Down (" .. remaining .. "s)"
+			
+			if remaining > 0 then
+				statusMsg = "Boss Down (" .. remaining .. "s)"
+			else
+				statusMsg = "Now clicking Run again"
+			end
 			
 			if elapsed >= CONFIG.BossDelay then
 				if tick() - lastRestartAttempt >= 10 then
 					lastRestartAttempt = tick()
 					triggerRunAgainButton()
 					bossDefeatedTimer = 0
+					bossWasPresent = false -- Fully clear so it doesn't loop
 				end
 			end
 		end
