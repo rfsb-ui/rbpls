@@ -25,8 +25,8 @@ local CONFIG = {
 	GateTimeout = 15,
 	BossRoomNumber = 19,
 	NoclipOffset = 8,
-	MobArrivalDelay = 1,
-	PotThreshold = 40,
+	MobArrivalDelay = 2,
+	PotThreshold = 50,
 	TargetPosX = 0,
 	TargetPosY = 0,
 	UseDefaultPos = true,
@@ -75,6 +75,8 @@ local function loadFromDevice()
 				CONFIG.TargetPosX = decoded.Settings.TargetPosX or CONFIG.TargetPosX
 				CONFIG.TargetPosY = decoded.Settings.TargetPosY or CONFIG.TargetPosY
 				CONFIG.UseDefaultPos = decoded.Settings.UseDefaultPos ~= nil and decoded.Settings.UseDefaultPos or false
+				
+				-- FIXED: Properly load saved ATK box position and default status from device
 				CONFIG.AtkPosX = decoded.Settings.AtkPosX or CONFIG.AtkPosX
 				CONFIG.AtkPosY = decoded.Settings.AtkPosY or CONFIG.AtkPosY
 				CONFIG.AtkUseDefaultPos = decoded.Settings.AtkUseDefaultPos ~= nil and decoded.Settings.AtkUseDefaultPos or true
@@ -334,7 +336,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.40"
+titleLabel.Text = "Auto Dungeon v2.8.41"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
