@@ -25,7 +25,7 @@ local CONFIG = {
 	GateTimeout = 15,
 	BossRoomNumber = 19,
 	NoclipOffset = 8,
-	MobArrivalDelay = 1, -- 2 second delay to wait for drops upon reaching a mob
+	MobArrivalDelay = 1,
 	TargetPosX = 0,
 	TargetPosY = 0,
 	UseDefaultPos = true
@@ -243,7 +243,7 @@ end
 
 -- Main Compact Panel (70% Opacity)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 570)
+mainFrame.Size = UDim2.new(0, 240, 0, 540)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BackgroundTransparency = 0.3
@@ -259,7 +259,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.35"
+titleLabel.Text = "Auto Dungeon v2.8.36"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -330,7 +330,7 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 5)
 minCorner.Parent = minimizeButton
 
--- Compact Status Dashboard (2 Columns, Tight Spacing, 70% Opacity)
+-- Compact Status Dashboard (3 Columns Layout, 70% Opacity)
 local statusFrame = Instance.new("Frame")
 statusFrame.Size = UDim2.new(1, -16, 0, 50)
 statusFrame.Position = UDim2.new(0, 8, 0, 35)
@@ -343,56 +343,72 @@ local statusCorner = Instance.new("UICorner")
 statusCorner.CornerRadius = UDim.new(0, 5)
 statusCorner.Parent = statusFrame
 
--- Column 1 Labels (Left side, tighter gaps)
+-- Column 1 Labels (Left side)
 local targetLabel = Instance.new("TextLabel")
-targetLabel.Size = UDim2.new(0.5, -4, 0, 14)
-targetLabel.Position = UDim2.new(0, 4, 0, 3)
+targetLabel.Size = UDim2.new(0.33, -2, 0, 14)
+targetLabel.Position = UDim2.new(0, 3, 0, 3)
 targetLabel.BackgroundTransparency = 1
 targetLabel.Text = "Target: None"
 targetLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-targetLabel.TextSize = 10
+targetLabel.TextSize = 9
 targetLabel.Font = Enum.Font.SourceSansBold
 targetLabel.TextXAlignment = Enum.TextXAlignment.Left
 targetLabel.Parent = statusFrame
 
 local countLabel = Instance.new("TextLabel")
-countLabel.Size = UDim2.new(0.5, -4, 0, 14)
-countLabel.Position = UDim2.new(0, 4, 0, 18)
+countLabel.Size = UDim2.new(0.33, -2, 0, 14)
+countLabel.Position = UDim2.new(0, 3, 0, 18)
 countLabel.BackgroundTransparency = 1
 countLabel.Text = "Mobs: 0"
 countLabel.TextColor3 = Color3.fromRGB(100, 220, 100)
-countLabel.TextSize = 10
+countLabel.TextSize = 9
 countLabel.Font = Enum.Font.SourceSansBold
 countLabel.TextXAlignment = Enum.TextXAlignment.Left
 countLabel.Parent = statusFrame
 
--- Column 2 Labels (Right side, tighter gaps)
+-- Column 2 Labels (Middle)
 local runsLabel = Instance.new("TextLabel")
-runsLabel.Size = UDim2.new(0.5, -4, 0, 14)
-runsLabel.Position = UDim2.new(0.5, 2, 0, 3)
+runsLabel.Size = UDim2.new(0.33, -2, 0, 14)
+runsLabel.Position = UDim2.new(0.33, 1, 0, 3)
 runsLabel.BackgroundTransparency = 1
 runsLabel.Text = "Runs: 0"
 runsLabel.TextColor3 = Color3.fromRGB(255, 100, 255)
-runsLabel.TextSize = 10
+runsLabel.TextSize = 9
 runsLabel.Font = Enum.Font.SourceSansBold
 runsLabel.TextXAlignment = Enum.TextXAlignment.Left
 runsLabel.Parent = statusFrame
 
 local wpSavedLabel = Instance.new("TextLabel")
-wpSavedLabel.Size = UDim2.new(0.5, -4, 0, 14)
-wpSavedLabel.Position = UDim2.new(0.5, 2, 0, 18)
+wpSavedLabel.Size = UDim2.new(0.33, -2, 0, 14)
+wpSavedLabel.Position = UDim2.new(0.33, 1, 0, 18)
 wpSavedLabel.BackgroundTransparency = 1
 wpSavedLabel.Text = "Rooms: 0"
 wpSavedLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
-wpSavedLabel.TextSize = 10
+wpSavedLabel.TextSize = 9
 wpSavedLabel.Font = Enum.Font.SourceSansBold
 wpSavedLabel.TextXAlignment = Enum.TextXAlignment.Left
 wpSavedLabel.Parent = statusFrame
 
--- Status Bottom Sub-label (tighter spacing at bottom of status box)
+-- Column 3 Play Button Toggle (Right side)
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0.33, -4, 0, 29)
+toggleButton.Position = UDim2.new(0.66, 1, 0, 3)
+toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+toggleButton.BackgroundTransparency = 0.3
+toggleButton.Text = "▶ [OFF]"
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.TextSize = 10
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.Parent = statusFrame
+
+local tBtnCorner = Instance.new("UICorner")
+tBtnCorner.CornerRadius = UDim.new(0, 4)
+tBtnCorner.Parent = toggleButton
+
+-- Status Bottom Sub-label (spanning full width at bottom of status box)
 local statusSubLabel = Instance.new("TextLabel")
-statusSubLabel.Size = UDim2.new(1, -8, 0, 14)
-statusSubLabel.Position = UDim2.new(0, 4, 0, 33)
+statusSubLabel.Size = UDim2.new(1, -6, 0, 14)
+statusSubLabel.Position = UDim2.new(0, 3, 0, 33)
 statusSubLabel.BackgroundTransparency = 1
 statusSubLabel.Text = "Status: Ready"
 statusSubLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -401,26 +417,10 @@ statusSubLabel.Font = Enum.Font.SourceSans
 statusSubLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusSubLabel.Parent = statusFrame
 
--- Main Fly to All Mobs Toggle Button
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(1, -16, 0, 28)
-toggleButton.Position = UDim2.new(0, 8, 0, 92)
-toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-toggleButton.BackgroundTransparency = 0.3
-toggleButton.Text = "Fly to All Mobs: OFF"
-toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleButton.TextSize = 12
-toggleButton.Font = Enum.Font.SourceSansBold
-toggleButton.Parent = mainFrame
-
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 5)
-btnCorner.Parent = toggleButton
-
 -- No-Clip Toggle Button
 local noclipToggleBtn = Instance.new("TextButton")
 noclipToggleBtn.Size = UDim2.new(1, -16, 0, 26)
-noclipToggleBtn.Position = UDim2.new(0, 8, 0, 126)
+noclipToggleBtn.Position = UDim2.new(0, 8, 0, 92)
 noclipToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 noclipToggleBtn.BackgroundTransparency = 0.3
 noclipToggleBtn.Text = "No-Clip: OFF"
@@ -436,7 +436,7 @@ nclCorner.Parent = noclipToggleBtn
 -- Dungeon Room Controls Row
 local saveWpBtn = Instance.new("TextButton")
 saveWpBtn.Size = UDim2.new(0, 52, 0, 26)
-saveWpBtn.Position = UDim2.new(0, 8, 0, 158)
+saveWpBtn.Position = UDim2.new(0, 8, 0, 124)
 saveWpBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 180)
 saveWpBtn.BackgroundTransparency = 0.3
 saveWpBtn.Text = "Save"
@@ -451,7 +451,7 @@ swpCorner.Parent = saveWpBtn
 
 local clearWpBtn = Instance.new("TextButton")
 clearWpBtn.Size = UDim2.new(0, 52, 0, 26)
-clearWpBtn.Position = UDim2.new(0, 64, 0, 158)
+clearWpBtn.Position = UDim2.new(0, 64, 0, 124)
 clearWpBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 60)
 clearWpBtn.BackgroundTransparency = 0.3
 clearWpBtn.Text = "Clear"
@@ -466,7 +466,7 @@ cwpCorner.Parent = clearWpBtn
 
 local skipWpBtn = Instance.new("TextButton")
 skipWpBtn.Size = UDim2.new(0, 52, 0, 26)
-skipWpBtn.Position = UDim2.new(0, 120, 0, 158)
+skipWpBtn.Position = UDim2.new(0, 120, 0, 124)
 skipWpBtn.BackgroundColor3 = Color3.fromRGB(180, 120, 40)
 skipWpBtn.BackgroundTransparency = 0.3
 skipWpBtn.Text = "Skip WP"
@@ -481,7 +481,7 @@ skpCorner.Parent = skipWpBtn
 
 local loopWpBtn = Instance.new("TextButton")
 loopWpBtn.Size = UDim2.new(0, 52, 0, 26)
-loopWpBtn.Position = UDim2.new(0, 176, 0, 158)
+loopWpBtn.Position = UDim2.new(0, 176, 0, 124)
 loopWpBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 loopWpBtn.BackgroundTransparency = 0.3
 loopWpBtn.Text = "Run OFF"
@@ -497,7 +497,7 @@ lwpCorner.Parent = loopWpBtn
 -- Auto Restart Toggle Button
 local restartToggleBtn = Instance.new("TextButton")
 restartToggleBtn.Size = UDim2.new(1, -16, 0, 26)
-restartToggleBtn.Position = UDim2.new(0, 8, 0, 192)
+restartToggleBtn.Position = UDim2.new(0, 8, 0, 158)
 restartToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 restartToggleBtn.BackgroundTransparency = 0.3
 restartToggleBtn.Text = "Auto Restart: OFF"
@@ -513,7 +513,7 @@ rstCorner.Parent = restartToggleBtn
 -- Waypoint Import Box
 local importBox = Instance.new("TextBox")
 importBox.Size = UDim2.new(1, -16, 0, 26)
-importBox.Position = UDim2.new(0, 8, 0, 226)
+importBox.Position = UDim2.new(0, 8, 0, 192)
 importBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 importBox.BackgroundTransparency = 0.3
 importBox.PlaceholderText = "Paste Waypoints/Coordinates..."
@@ -530,7 +530,7 @@ impCorner.Parent = importBox
 -- Export Rooms Button
 local exportWpBtn = Instance.new("TextButton")
 exportWpBtn.Size = UDim2.new(1, -16, 0, 26)
-exportWpBtn.Position = UDim2.new(0, 8, 0, 258)
+exportWpBtn.Position = UDim2.new(0, 8, 0, 224)
 exportWpBtn.BackgroundColor3 = Color3.fromRGB(50, 140, 100)
 exportWpBtn.BackgroundTransparency = 0.3
 exportWpBtn.Text = "Export Rooms"
@@ -587,17 +587,17 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
-createLabeledInput(8, 292, 33, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
-createLabeledInput(45, 292, 33, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
-createLabeledInput(82, 292, 33, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
-createLabeledInput(119, 292, 33, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
-createLabeledInput(156, 292, 33, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
-createLabeledInput(193, 292, 39, "Offset", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
+createLabeledInput(8, 258, 33, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(45, 258, 33, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(82, 258, 33, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(119, 258, 33, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
+createLabeledInput(156, 258, 33, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
+createLabeledInput(193, 258, 39, "Offset", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
 
 -- Scrollable Room List Viewer below UI (70% Opacity)
 local roomListFrame = Instance.new("ScrollingFrame")
 roomListFrame.Size = UDim2.new(1, -16, 0, 225)
-roomListFrame.Position = UDim2.new(0, 8, 0, 334)
+roomListFrame.Position = UDim2.new(0, 8, 0, 300)
 roomListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 roomListFrame.BackgroundTransparency = 0.3
 roomListFrame.BorderSizePixel = 0
@@ -646,7 +646,6 @@ minimizeButton.MouseButton1Click:Connect(function()
 	isMinimized = not isMinimized
 	if isMinimized then
 		mainFrame.Size = UDim2.new(0, 240, 0, 95)
-		toggleButton.Visible = false
 		noclipToggleBtn.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
@@ -660,8 +659,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		end
 		minimizeButton.Text = "+"
 	else
-		mainFrame.Size = UDim2.new(0, 240, 0, 570)
-		toggleButton.Visible = true
+		mainFrame.Size = UDim2.new(0, 240, 0, 540)
 		noclipToggleBtn.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
@@ -721,7 +719,7 @@ loopWpBtn.MouseButton1Click:Connect(function()
 	if isLoopingWaypoints then
 		isTrackingAll = false
 		toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		toggleButton.Text = "Fly to All Mobs: OFF"
+		toggleButton.Text = "▶ [OFF]"
 		
 		loopWpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 		loopWpBtn.Text = "Run ON"
@@ -752,10 +750,10 @@ toggleButton.MouseButton1Click:Connect(function()
 		loopWpBtn.Text = "Run OFF"
 		
 		toggleButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		toggleButton.Text = "Fly to All Mobs: ON"
+		toggleButton.Text = "⏸ [ON]"
 	else
 		toggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		toggleButton.Text = "Fly to All Mobs: OFF"
+		toggleButton.Text = "▶ [OFF]"
 	end
 end)
 
@@ -909,9 +907,9 @@ RunService.Heartbeat:Connect(function(dt)
 		if tick() - mobArrivalTimer < CONFIG.MobArrivalDelay then
 			statusMsg = "Waiting Drop"
 			targetName = "Looting..."
-			targetPos = nil -- Hold position
+			targetPos = nil
 		else
-			mobArrivalTimer = 0 -- Timer expired, resume hunting
+			mobArrivalTimer = 0
 		end
 	end
 	
@@ -920,7 +918,6 @@ RunService.Heartbeat:Connect(function(dt)
 	local heightOffset = isNoClipEnabled and Vector3.new(0, CONFIG.NoclipOffset, 0) or Vector3.new(0, 2, 0)
 	
 	if mobArrivalTimer == 0 and ((isTrackingAll or isLoopingWaypoints) and nearestMonsterPart) then
-		-- Track if we just arrived at a new target mob
 		if lastTargetMonsterId ~= nearestMonsterModel and shortestDist <= (CONFIG.StopDistance + 2) then
 			lastTargetMonsterId = nearestMonsterModel
 			mobArrivalTimer = tick()
