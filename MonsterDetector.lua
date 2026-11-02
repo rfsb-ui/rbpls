@@ -25,8 +25,9 @@ local CONFIG = {
 	GateTimeout = 15,
 	BossRoomNumber = 19,
 	NoclipOffset = 8,
-	MobArrivalDelay = 2,
-	PotThreshold = 50,
+	MobArrivalDelay = 1,
+	PotThreshold = 40,
+	BossDelay = 10, -- Default 10 seconds delay after boss is defeated before clicking Run again
 	TargetPosX = 0,
 	TargetPosY = 0,
 	UseDefaultPos = true,
@@ -72,11 +73,10 @@ local function loadFromDevice()
 				CONFIG.NoclipOffset = decoded.Settings.NoclipOffset or CONFIG.NoclipOffset
 				CONFIG.MobArrivalDelay = decoded.Settings.MobArrivalDelay or CONFIG.MobArrivalDelay
 				CONFIG.PotThreshold = decoded.Settings.PotThreshold or CONFIG.PotThreshold
+				CONFIG.BossDelay = decoded.Settings.BossDelay or CONFIG.BossDelay
 				CONFIG.TargetPosX = decoded.Settings.TargetPosX or CONFIG.TargetPosX
 				CONFIG.TargetPosY = decoded.Settings.TargetPosY or CONFIG.TargetPosY
 				CONFIG.UseDefaultPos = decoded.Settings.UseDefaultPos ~= nil and decoded.Settings.UseDefaultPos or false
-				
-				-- FIXED: Properly load saved ATK box position and default status from device
 				CONFIG.AtkPosX = decoded.Settings.AtkPosX or CONFIG.AtkPosX
 				CONFIG.AtkPosY = decoded.Settings.AtkPosY or CONFIG.AtkPosY
 				CONFIG.AtkUseDefaultPos = decoded.Settings.AtkUseDefaultPos ~= nil and decoded.Settings.AtkUseDefaultPos or true
@@ -336,7 +336,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.41"
+titleLabel.Text = "Auto Dungeon v2.8.42"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -663,7 +663,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	lbl.BackgroundTransparency = 1
 	lbl.Text = labelText
 	lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-	lbl.TextSize = 9
+	lbl.TextSize = 8
 	lbl.Font = Enum.Font.SourceSansBold
 	lbl.Parent = mainFrame
 	table.insert(configurableElements, lbl)
@@ -675,7 +675,7 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	box.BackgroundTransparency = 0.3
 	box.Text = tostring(defaultVal)
 	box.TextColor3 = Color3.fromRGB(255, 255, 255)
-	box.TextSize = 10
+	box.TextSize = 9
 	box.Font = Enum.Font.SourceSans
 	box.Parent = mainFrame
 	table.insert(configurableElements, box)
@@ -697,13 +697,15 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
-createLabeledInput(8, 264, 28, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
-createLabeledInput(39, 264, 28, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
-createLabeledInput(70, 264, 28, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
-createLabeledInput(101, 264, 28, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
-createLabeledInput(132, 264, 28, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
-createLabeledInput(163, 264, 30, "Offset", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
-createLabeledInput(196, 264, 36, "PotHP%", CONFIG.PotThreshold, function(v) CONFIG.PotThreshold = v end)
+-- 8 Configurable inputs adjusted to fit across the 240px width bar
+createLabeledInput(6, 264, 25, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(33, 264, 25, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(60, 264, 25, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(87, 264, 25, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
+createLabeledInput(114, 264, 25, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
+createLabeledInput(141, 264, 27, "Offset", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
+createLabeledInput(170, 264, 30, "PotHP%", CONFIG.PotThreshold, function(v) CONFIG.PotThreshold = v end)
+createLabeledInput(202, 264, 32, "BossSec", CONFIG.BossDelay, function(v) CONFIG.BossDelay = v end)
 
 -- Scrollable Room List Viewer below UI (70% Opacity)
 local roomListFrame = Instance.new("ScrollingFrame")
@@ -1037,16 +1039,16 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Floor 19 Boss Defeat Auto-Restart Trigger
+	-- Floor 19 Boss Defeat Auto-Restart Trigger (Using configurable BossDelay)
 	if isAutoRestartEnabled and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
 			bossDefeatedTimer = tick()
-			print("Boss defeated on Floor 19! Starting 10-second auto-restart timeout...")
+			print("Boss defeated on Floor 19! Starting " .. CONFIG.BossDelay .. "-second auto-restart timeout...")
 		elseif hasBossPresent then
 			bossWasPresent = true
 		end
 		
-		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= 10) then
+		if bossDefeatedTimer > 0 and (tick() - bossDefeatedTimer >= CONFIG.BossDelay) then
 			if tick() - lastRestartAttempt >= 10 then
 				lastRestartAttempt = tick()
 				resetToRoomOne()
@@ -1157,7 +1159,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	targetLabel.Text = "Target: " .. targetName
+	targetLabel.Text = "Target: " + targetName
 	statusSubLabel.Text = "Status: " .. statusMsg
 	
 	-- Smooth Flight Execution with Level Posture Correction (Locking Pitch/Roll)
