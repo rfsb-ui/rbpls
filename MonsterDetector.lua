@@ -65,21 +65,11 @@ local function loadFromDevice()
 			local decoded = HttpService:JSONDecode(content)
 			
 			if decoded and decoded.Settings then
-				CONFIG.FlightSpeed = decoded.Settings.FlightSpeed or CONFIG.FlightSpeed
-				CONFIG.DetectionRadius = decoded.Settings.DetectionRadius or CONFIG.DetectionRadius
-				CONFIG.StopDistance = decoded.Settings.StopDistance or CONFIG.StopDistance
-				CONFIG.GateTimeout = decoded.Settings.GateTimeout or CONFIG.GateTimeout
-				CONFIG.BossRoomNumber = decoded.Settings.BossRoomNumber or CONFIG.BossRoomNumber
-				CONFIG.NoclipOffset = decoded.Settings.NoclipOffset or CONFIG.NoclipOffset
-				CONFIG.MobArrivalDelay = decoded.Settings.MobArrivalDelay or CONFIG.MobArrivalDelay
-				CONFIG.PotThreshold = decoded.Settings.PotThreshold or CONFIG.PotThreshold
-				CONFIG.BossDelay = decoded.Settings.BossDelay or CONFIG.BossDelay
-				CONFIG.TargetPosX = decoded.Settings.TargetPosX or CONFIG.TargetPosX
-				CONFIG.TargetPosY = decoded.Settings.TargetPosY or CONFIG.TargetPosY
-				CONFIG.UseDefaultPos = decoded.Settings.UseDefaultPos ~= nil and decoded.Settings.UseDefaultPos or false
-				CONFIG.AtkPosX = decoded.Settings.AtkPosX or CONFIG.AtkPosX
-				CONFIG.AtkPosY = decoded.Settings.AtkPosY or CONFIG.AtkPosY
-				CONFIG.AtkUseDefaultPos = decoded.Settings.AtkUseDefaultPos ~= nil and decoded.Settings.AtkUseDefaultPos or true
+				for k, v in pairs(decoded.Settings) do
+					if CONFIG[k] ~= nil then
+						CONFIG[k] = v
+					end
+				end
 			end
 			
 			if decoded and decoded.Waypoints then
@@ -335,7 +325,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.55"
+titleLabel.Text = "Auto Dungeon v2.8.56"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -968,9 +958,9 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- AAT Target Box Click Simulation Loop (Paused during pre-click countdown and post-restart cooldown)
+	-- AAT Target Box Click Simulation Loop (Paused during boss delay, pre-click countdown, and post-restart cooldown)
 	local isPreClickActive = (preClickCountdownTimer > 0)
-	if isAatEnabled and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
+	if isAatEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
 		if tick() - lastAtkClickTime >= 0.15 then
 			lastAtkClickTime = tick()
 			local absPos = atkTargetFrame.AbsolutePosition
@@ -1084,12 +1074,12 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Boss Room Defeat Auto-Restart Trigger with Pre-Click 5s Countdown
+	-- Boss Room Defeat Auto-Restart Trigger with BossDelay, then Pre-Click 5s Countdown
 	local statusMsg = "Active"
 	if isAutoRestartEnabled and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
 			bossDefeatedTimer = tick()
-			print("Boss defeated! Starting " .. CONFIG.BossDelay .. "-second auto-restart countdown...")
+			print("Boss defeated! Starting " .. CONFIG.BossDelay .. "-second boss delay countdown...")
 		elseif hasBossPresent then
 			bossWasPresent = true
 		end
@@ -1102,7 +1092,7 @@ RunService.Heartbeat:Connect(function(dt)
 				statusMsg = "Boss Down (" .. remaining .. "s)"
 			else
 				bossDefeatedTimer = 0
-				preClickCountdownTimer = tick() -- Trigger the pre-click 5s status countdown
+				preClickCountdownTimer = tick() -- Start the pre-click 5s status countdown
 			end
 		end
 	end
@@ -1113,7 +1103,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local targetName = "None"
 	
 	-- Check if we are currently delayed at a mob arrival spot
-	if mobArrivalTimer > 0 and bossDefeatedTimer == 0 then
+	if mobArrivalTimer > 0 and bossDefeatedTimer == 0 and preClickCountdownTimer == 0 then
 		if tick() - mobArrivalTimer < CONFIG.MobArrivalDelay then
 			statusMsg = "Waiting Drop"
 			targetName = "Looting..."
@@ -1127,7 +1117,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	local heightOffset = Vector3.new(0, CONFIG.NoclipOffset, 0)
 	
-	if bossDefeatedTimer == 0 then
+	if bossDefeatedTimer == 0 and preClickCountdownTimer == 0 then
 		if mobArrivalTimer == 0 and ((isTrackingAll or isLoopingWaypoints) and nearestMonsterPart) then
 			if lastTargetMonsterId ~= nearestMonsterModel and shortestDist <= (CONFIG.StopDistance + 2) then
 				lastTargetMonsterId = nearestMonsterModel
