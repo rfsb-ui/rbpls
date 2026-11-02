@@ -117,13 +117,13 @@ local isAatEnabled = false
 local isAutoPotEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
-local lastRestartAttempt = 0
 local lastPotionTime = 0
 local lastAtkClickTime = 0
 
 local bossWasPresent = false
 local bossDefeatedTimer = 0
 local postRestartCooldown = 0
+local preClickCountdownTimer = 0
 local mobArrivalTimer = 0
 local lastTargetMonsterId = nil
 
@@ -137,6 +137,7 @@ local function resetToRoomOne()
 	roomClearedConfirmed = true
 	bossWasPresent = false
 	bossDefeatedTimer = 0
+	preClickCountdownTimer = 0
 	postRestartCooldown = tick()
 	runsCounter += 1
 	print("Dungeon state fully reset to Room 1. Total Runs:", runsCounter)
@@ -298,24 +299,22 @@ end)
 
 -- Precision Multi-Clicker (Fires 3 clicks in quick succession)
 local function triggerRunAgainButton()
-	if tick() - lastRestartAttempt < 10 then return false end
-	lastRestartAttempt = tick()
-	resetToRoomOne()
-	
 	local absPos = clickTargetFrame.AbsolutePosition
 	local absSize = clickTargetFrame.AbsoluteSize
 	local centerX = absPos.X + absSize.X / 2
 	local centerY = absPos.Y + absSize.Y / 2
 	
-	for i = 1, 3 do
-		VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
-		task.wait(0.03)
-		VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
-		task.wait(0.03)
-	end
+	task.spawn(function()
+		for i = 1, 3 do
+			VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+			task.wait(0.03)
+			VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+			task.wait(0.03)
+		end
+		print("Fired 3 rapid clicks on 'Run again' via Target Box at coordinates:", centerX, centerY)
+	end)
 	
-	print("Fired 3 rapid clicks on 'Run again' via Target Box at coordinates:", centerX, centerY)
-	return true
+	resetToRoomOne()
 end
 
 -- Main Compact Panel (Boots up Maximized)
@@ -336,7 +335,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.53"
+titleLabel.Text = "Auto Dungeon v2.8.55"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -969,8 +968,9 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- AAT Target Box Click Simulation Loop (Automatically paused during boss cooldown and post-restart)
-	if isAatEnabled and bossDefeatedTimer == 0 and (tick() - postRestartCooldown >= 10) then
+	-- AAT Target Box Click Simulation Loop (Paused during pre-click countdown and post-restart cooldown)
+	local isPreClickActive = (preClickCountdownTimer > 0)
+	if isAatEnabled and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
 		if tick() - lastAtkClickTime >= 0.15 then
 			lastAtkClickTime = tick()
 			local absPos = atkTargetFrame.AbsolutePosition
@@ -1009,6 +1009,21 @@ RunService.Heartbeat:Connect(function(dt)
 	
 	-- Update live Run counter on UI dashboard
 	runsLabel.Text = "Runs: " .. runsCounter
+	
+	-- If pre-click 5-second status countdown is active before clicking Run again
+	if preClickCountdownTimer > 0 then
+		local elapsedPreClick = tick() - preClickCountdownTimer
+		local preClickRemaining = math.max(0, math.ceil(5 - elapsedPreClick))
+		
+		targetLabel.Text = "Target: Restarting"
+		countLabel.Text = "Mobs: 0"
+		statusSubLabel.Text = "Status: Clicking Run again (" .. preClickRemaining .. "s)"
+		
+		if elapsedPreClick >= 5 then
+			triggerRunAgainButton()
+		end
+		return
+	end
 	
 	-- If post-restart cooldown is active, pause navigation and show status
 	if tick() - postRestartCooldown < 10 then
@@ -1069,7 +1084,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Boss Room Defeat Auto-Restart Trigger with Live Countdown & Status Lock
+	-- Boss Room Defeat Auto-Restart Trigger with Pre-Click 5s Countdown
 	local statusMsg = "Active"
 	if isAutoRestartEnabled and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber then
 		if bossWasPresent and not hasBossPresent and bossDefeatedTimer == 0 then
@@ -1086,16 +1101,8 @@ RunService.Heartbeat:Connect(function(dt)
 			if remaining > 0 then
 				statusMsg = "Boss Down (" .. remaining .. "s)"
 			else
-				statusMsg = "Now clicking Run again"
-			end
-			
-			if elapsed >= CONFIG.BossDelay then
-				if tick() - lastRestartAttempt >= 10 then
-					lastRestartAttempt = tick()
-					triggerRunAgainButton()
-					bossDefeatedTimer = 0
-					bossWasPresent = false
-				end
+				bossDefeatedTimer = 0
+				preClickCountdownTimer = tick() -- Trigger the pre-click 5s status countdown
 			end
 		end
 	end
