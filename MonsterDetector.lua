@@ -25,7 +25,7 @@ local CONFIG = {
 	GateTimeout = 15,
 	BossRoomNumber = 19,
 	NoclipOffset = 8,
-	MobArrivalDelay = 1,
+	MobArrivalDelay = 2,
 	PotThreshold = 40,
 	BossDelay = 10,
 	TargetPosX = 0,
@@ -105,6 +105,7 @@ local isAutoRestartEnabled = false
 local isNoClipEnabled = false
 local isAatEnabled = false
 local isAutoPotEnabled = false
+local isAlwaysFlyEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastPotionTime = 0
@@ -309,7 +310,7 @@ end
 
 -- Main Compact Panel (Boots up Maximized)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 510)
+mainFrame.Size = UDim2.new(0, 240, 0, 540)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BackgroundTransparency = 0.3
@@ -325,7 +326,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "RF Auto-all v2.8.56"
+titleLabel.Text = "Auto Dungeon v2.8.59"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -518,13 +519,13 @@ statusSubLabel.Parent = statusFrame
 
 -- No-Clip Toggle Button
 local noclipToggleBtn = Instance.new("TextButton")
-noclipToggleBtn.Size = UDim2.new(1, -16, 0, 26)
+noclipToggleBtn.Size = UDim2.new(0.48, 0, 0, 26)
 noclipToggleBtn.Position = UDim2.new(0, 8, 0, 98)
 noclipToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 noclipToggleBtn.BackgroundTransparency = 0.3
 noclipToggleBtn.Text = "No-Clip: OFF"
 noclipToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-noclipToggleBtn.TextSize = 11
+noclipToggleBtn.TextSize = 10
 noclipToggleBtn.Font = Enum.Font.SourceSansBold
 noclipToggleBtn.Visible = true
 noclipToggleBtn.Parent = mainFrame
@@ -532,6 +533,23 @@ noclipToggleBtn.Parent = mainFrame
 local nclCorner = Instance.new("UICorner")
 nclCorner.CornerRadius = UDim.new(0, 4)
 nclCorner.Parent = noclipToggleBtn
+
+-- Always Fly Toggle Button
+local alwaysFlyBtn = Instance.new("TextButton")
+alwaysFlyBtn.Size = UDim2.new(0.48, 0, 0, 26)
+alwaysFlyBtn.Position = UDim2.new(0.52, 0, 0, 98)
+alwaysFlyBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+alwaysFlyBtn.BackgroundTransparency = 0.3
+alwaysFlyBtn.Text = "Always Fly: OFF"
+alwaysFlyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+alwaysFlyBtn.TextSize = 10
+alwaysFlyBtn.Font = Enum.Font.SourceSansBold
+alwaysFlyBtn.Visible = true
+alwaysFlyBtn.Parent = mainFrame
+
+local afCorner = Instance.new("UICorner")
+afCorner.CornerRadius = UDim.new(0, 4)
+afCorner.Parent = alwaysFlyBtn
 
 -- Dungeon Room Controls Row
 local saveWpBtn = Instance.new("TextButton")
@@ -702,14 +720,14 @@ createLabeledInput(33, 264, 25, "Radius", CONFIG.DetectionRadius, function(v) CO
 createLabeledInput(60, 264, 25, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
 createLabeledInput(87, 264, 25, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
 createLabeledInput(114, 264, 25, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
-createLabeledInput(141, 264, 27, "Offset", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
+createLabeledInput(141, 264, 27, "Height", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
 createLabeledInput(170, 264, 30, "PotHP%", CONFIG.PotThreshold, function(v) CONFIG.PotThreshold = v end)
 createLabeledInput(202, 264, 32, "BossSec", CONFIG.BossDelay, function(v) CONFIG.BossDelay = v end)
 
 -- Scrollable Room List Viewer below UI (70% Opacity)
 local roomListFrame = Instance.new("ScrollingFrame")
-roomListFrame.Size = UDim2.new(1, -16, 0, 195)
-roomListFrame.Position = UDim2.new(0, 8, 0, 306)
+roomListFrame.Size = UDim2.new(1, -16, 0, 165)
+roomListFrame.Position = UDim2.new(0, 8, 0, 336)
 roomListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 roomListFrame.BackgroundTransparency = 0.3
 roomListFrame.BorderSizePixel = 0
@@ -725,7 +743,8 @@ roomListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 roomListLayout.Padding = UDim.new(0, 3)
 
 local function updateRoomListDisplay()
-	for _, child in ipairs(roomListFrame:GetChildren()) do
+	local children = roomListFrame:GetChildren()
+	for _, child in ipairs(children) do
 		if child:IsA("TextLabel") then
 			child:Destroy()
 		end
@@ -761,6 +780,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		mainFrame.Size = UDim2.new(0, 240, 0, 95)
 		statusFrame.Visible = true
 		noclipToggleBtn.Visible = false
+		alwaysFlyBtn.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
 		skipWpBtn.Visible = false
@@ -773,9 +793,10 @@ minimizeButton.MouseButton1Click:Connect(function()
 		end
 		minimizeButton.Text = "+"
 	else
-		mainFrame.Size = UDim2.new(0, 240, 0, 510)
+		mainFrame.Size = UDim2.new(0, 240, 0, 540)
 		statusFrame.Visible = true
 		noclipToggleBtn.Visible = true
+		alwaysFlyBtn.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
 		skipWpBtn.Visible = true
@@ -902,6 +923,17 @@ noclipToggleBtn.MouseButton1Click:Connect(function()
 	else
 		noclipToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 		noclipToggleBtn.Text = "No-Clip: OFF"
+	end
+end)
+
+alwaysFlyBtn.MouseButton1Click:Connect(function()
+	isAlwaysFlyEnabled = not isAlwaysFlyEnabled
+	if isAlwaysFlyEnabled then
+		alwaysFlyBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		alwaysFlyBtn.Text = "Always Fly: ON"
+	else
+		alwaysFlyBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		alwaysFlyBtn.Text = "Always Fly: OFF"
 	end
 end)
 
@@ -1092,7 +1124,7 @@ RunService.Heartbeat:Connect(function(dt)
 				statusMsg = "Boss Down (" .. remaining .. "s)"
 			else
 				bossDefeatedTimer = 0
-				preClickCountdownTimer = tick() -- Start the pre-click 5s status countdown
+				preClickCountdownTimer = tick()
 			end
 		end
 	end
@@ -1191,24 +1223,32 @@ RunService.Heartbeat:Connect(function(dt)
 	targetLabel.Text = "Target: " .. targetName
 	statusSubLabel.Text = "Status: " .. statusMsg
 	
-	-- Smooth Flight Execution with Level Posture Correction (Locking Pitch/Roll)
-	if ((isTrackingAll or isLoopingWaypoints) and targetPos) and myHrp and humanoid then
+	-- Flight Execution (Active via Waypoint/Mob target OR Always Fly toggle)
+	local shouldFly = ((isTrackingAll or isLoopingWaypoints) and targetPos) or isAlwaysFlyEnabled
+	
+	if shouldFly and myHrp and humanoid then
 		humanoid.PlatformStand = true
 		local currentPos = myHrp.Position
-		local direction = (targetPos - currentPos)
-		local distance = direction.Magnitude
 		
-		if distance > CONFIG.StopDistance then
-			local moveVector = direction.Unit * math.min(CONFIG.FlightSpeed * dt, distance)
-			local flatTarget = Vector3.new(targetPos.X, currentPos.Y, targetPos.Z)
-			if (flatTarget - currentPos).Magnitude > 1 then
-				myHrp.CFrame = CFrame.new(currentPos + moveVector, flatTarget + Vector3.new(0, (targetPos.Y - currentPos.Y), 0))
+		if targetPos then
+			local direction = (targetPos - currentPos)
+			local distance = direction.Magnitude
+			
+			if distance > CONFIG.StopDistance then
+				local moveVector = direction.Unit * math.min(CONFIG.FlightSpeed * dt, distance)
+				local flatTarget = Vector3.new(targetPos.X, currentPos.Y, targetPos.Z)
+				if (flatTarget - currentPos).Magnitude > 0.1 then
+					myHrp.CFrame = CFrame.new(currentPos + moveVector, flatTarget)
+				else
+					myHrp.CFrame = CFrame.new(currentPos + moveVector, targetPos)
+				end
+				myHrp.AssemblyLinearVelocity = Vector3.zero
 			else
-				myHrp.CFrame = CFrame.new(currentPos + moveVector, targetPos)
+				myHrp.CFrame = CFrame.new(currentPos, targetPos)
+				myHrp.AssemblyLinearVelocity = Vector3.zero
 			end
-			myHrp.AssemblyLinearVelocity = Vector3.zero
 		else
-			myHrp.CFrame = CFrame.new(currentPos, targetPos)
+			-- Always Fly mode active without an explicit target: maintain current hover level and lock velocity
 			myHrp.AssemblyLinearVelocity = Vector3.zero
 		end
 	else
