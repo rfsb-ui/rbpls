@@ -14,6 +14,13 @@ if not aggressorsFolder then
 	warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
 end
 
+-- Direct path verification to workspace.Worldbits for drop items
+local worldbitsFolder = workspace:WaitForChild("Worldbits", 30)
+
+if not worldbitsFolder then
+	warn("NOTICE: workspace.Worldbits folder not found yet. It will be tracked when available.")
+end
+
 -- ================= FILE-BASED CONFIG & TARGET SYSTEM =================
 local CONFIG_FOLDER = "AutoDungeonConfigs"
 local CONFIG_FILE = CONFIG_FOLDER .. "/dungeon_config.json"
@@ -106,6 +113,7 @@ local isNoClipEnabled = false
 local isAatEnabled = false
 local isAutoPotEnabled = false
 local isAlwaysFlyEnabled = false
+local isAutoLootEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastPotionTime = 0
@@ -326,7 +334,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.63"
+titleLabel.Text = "Auto Dungeon v2.8.66"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -519,13 +527,13 @@ statusSubLabel.Parent = statusFrame
 
 -- No-Clip Toggle Button
 local noclipToggleBtn = Instance.new("TextButton")
-noclipToggleBtn.Size = UDim2.new(0.48, 0, 0, 26)
+noclipToggleBtn.Size = UDim2.new(0.32, 0, 0, 26)
 noclipToggleBtn.Position = UDim2.new(0, 8, 0, 98)
 noclipToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 noclipToggleBtn.BackgroundTransparency = 0.3
 noclipToggleBtn.Text = "No-Clip: OFF"
 noclipToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-noclipToggleBtn.TextSize = 10
+noclipToggleBtn.TextSize = 9
 noclipToggleBtn.Font = Enum.Font.SourceSansBold
 noclipToggleBtn.Visible = true
 noclipToggleBtn.Parent = mainFrame
@@ -536,13 +544,13 @@ nclCorner.Parent = noclipToggleBtn
 
 -- Always Fly Toggle Button
 local alwaysFlyBtn = Instance.new("TextButton")
-alwaysFlyBtn.Size = UDim2.new(0.48, 0, 0, 26)
-alwaysFlyBtn.Position = UDim2.new(0.52, 0, 0, 98)
+alwaysFlyBtn.Size = UDim2.new(0.32, 0, 0, 26)
+alwaysFlyBtn.Position = UDim2.new(0.34, 0, 0, 98)
 alwaysFlyBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 alwaysFlyBtn.BackgroundTransparency = 0.3
-alwaysFlyBtn.Text = "Always Fly: OFF"
+alwaysFlyBtn.Text = "Fly: OFF"
 alwaysFlyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-alwaysFlyBtn.TextSize = 10
+alwaysFlyBtn.TextSize = 9
 alwaysFlyBtn.Font = Enum.Font.SourceSansBold
 alwaysFlyBtn.Visible = true
 alwaysFlyBtn.Parent = mainFrame
@@ -550,6 +558,23 @@ alwaysFlyBtn.Parent = mainFrame
 local afCorner = Instance.new("UICorner")
 afCorner.CornerRadius = UDim.new(0, 4)
 afCorner.Parent = alwaysFlyBtn
+
+-- Auto Loot Toggle Button
+local autoLootBtn = Instance.new("TextButton")
+autoLootBtn.Size = UDim2.new(0.32, 0, 0, 26)
+autoLootBtn.Position = UDim2.new(0.68, 0, 0, 98)
+autoLootBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+autoLootBtn.BackgroundTransparency = 0.3
+autoLootBtn.Text = "Drops: OFF"
+autoLootBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoLootBtn.TextSize = 9
+autoLootBtn.Font = Enum.Font.SourceSansBold
+autoLootBtn.Visible = true
+autoLootBtn.Parent = mainFrame
+
+local altCorner = Instance.new("UICorner")
+altCorner.CornerRadius = UDim.new(0, 4)
+altCorner.Parent = autoLootBtn
 
 -- Dungeon Room Controls Row
 local saveWpBtn = Instance.new("TextButton")
@@ -781,6 +806,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		statusFrame.Visible = true
 		noclipToggleBtn.Visible = false
 		alwaysFlyBtn.Visible = false
+		autoLootBtn.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
 		skipWpBtn.Visible = false
@@ -797,6 +823,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		statusFrame.Visible = true
 		noclipToggleBtn.Visible = true
 		alwaysFlyBtn.Visible = true
+		autoLootBtn.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
 		skipWpBtn.Visible = true
@@ -930,10 +957,21 @@ alwaysFlyBtn.MouseButton1Click:Connect(function()
 	isAlwaysFlyEnabled = not isAlwaysFlyEnabled
 	if isAlwaysFlyEnabled then
 		alwaysFlyBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		alwaysFlyBtn.Text = "Always Fly: ON"
+		alwaysFlyBtn.Text = "Fly: ON"
 	else
 		alwaysFlyBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		alwaysFlyBtn.Text = "Always Fly: OFF"
+		alwaysFlyBtn.Text = "Fly: OFF"
+	end
+end)
+
+autoLootBtn.MouseButton1Click:Connect(function()
+	isAutoLootEnabled = not isAutoLootEnabled
+	if isAutoLootEnabled then
+		autoLootBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		autoLootBtn.Text = "Drops: ON"
+	else
+		autoLootBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		autoLootBtn.Text = "Drops: OFF"
 	end
 end)
 
@@ -951,7 +989,7 @@ importBox.FocusLost:Connect(function()
 	end
 	
 	importBox.Text = ""
-	statusSubLabel.Text = "Status: Imported " .. countAdded
+	statusSubLabel.Text = "Status: Imported " + countAdded
 	updateRoomListDisplay()
 	saveToDevice()
 end)
@@ -1060,12 +1098,36 @@ RunService.Heartbeat:Connect(function(dt)
 		if live then aggressorsFolder = live:FindFirstChild("Aggressors") end
 	end
 	
+	if not worldbitsFolder or not worldbitsFolder.Parent then
+		local wb = workspace:FindFirstChild("Worldbits")
+		if wb then worldbitsFolder = wb end
+	end
+	
 	local detectedCount = 0
 	local nearestMonsterPart = nil
 	local nearestMonsterModel = nil
 	local nearestMonsterName = "None"
 	local shortestDist = math.huge
 	local hasBossPresent = false
+	
+	-- Worldbits drop items detection (Tied to configured DetectionRadius)
+	local nearestDropPart = nil
+	local shortestDropDist = math.huge
+	
+	if isAutoLootEnabled and worldbitsFolder and myHrp then
+		for _, drop in ipairs(worldbitsFolder:GetChildren()) do
+			if drop:IsA("Model") then
+				local dropPart = drop.PrimaryPart or drop:FindFirstChild("HumanoidRootPart") or drop:FindFirstChildWhichIsA("BasePart")
+				if dropPart then
+					local dropDist = (myHrp.Position - dropPart.Position).Magnitude
+					if dropDist <= CONFIG.DetectionRadius and dropDist < shortestDropDist then
+						shortestDropDist = dropDist
+						nearestDropPart = dropPart
+					end
+				end
+			end
+		end
+	end
 	
 	local isBossRoomScan = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	local bossWp = isBossRoomScan and waypoints[CONFIG.BossRoomNumber] or nil
@@ -1145,12 +1207,17 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Priority Logic & Waypoint Room Navigation
+	-- Priority Logic & Waypoint Room Navigation (Worldbits drop items take priority when toggle is ON and within DetectionRadius)
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	local heightOffset = Vector3.new(0, CONFIG.NoclipOffset, 0)
 	
 	if bossDefeatedTimer == 0 and preClickCountdownTimer == 0 then
-		if mobArrivalTimer == 0 and ((isTrackingAll or isLoopingWaypoints) and nearestMonsterPart) then
+		if mobArrivalTimer == 0 and isAutoLootEnabled and nearestDropPart then
+			targetPos = nearestDropPart.Position + Vector3.new(0, 2, 0)
+			targetName = "Worldbit Drop"
+			statusMsg = "Looting Drop"
+			gateTimer = tick()
+		elseif mobArrivalTimer == 0 and ((isTrackingAll or isLoopingWaypoints) and nearestMonsterPart) then
 			if lastTargetMonsterId ~= nearestMonsterModel and shortestDist <= (CONFIG.StopDistance + 2) then
 				lastTargetMonsterId = nearestMonsterModel
 				mobArrivalTimer = tick()
@@ -1223,8 +1290,8 @@ RunService.Heartbeat:Connect(function(dt)
 	targetLabel.Text = "Target: " .. targetName
 	statusSubLabel.Text = "Status: " .. statusMsg
 	
-	-- Flight Execution (Active via Waypoint/Mob target OR Always Fly toggle)
-	local shouldFly = ((isTrackingAll or isLoopingWaypoints) and targetPos) or isAlwaysFlyEnabled
+	-- Flight Execution (Active via Waypoint/Mob/Drop target OR Always Fly toggle)
+	local shouldFly = ((isTrackingAll or isLoopingWaypoints) and targetPos) or (targetPos ~= nil) or isAlwaysFlyEnabled
 	
 	if shouldFly and myHrp and humanoid then
 		humanoid.PlatformStand = true
