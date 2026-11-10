@@ -14,11 +14,21 @@ if not aggressorsFolder then
 	warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
 end
 
--- Direct path verification to workspace.Worldbits for drop items
-local worldbitsFolder = workspace:WaitForChild("Worldbits", 30)
+-- Direct path verification to workspace.WorldBits for drop items (Case-corrected)
+local worldbitsFolder = workspace:WaitForChild("WorldBits", 30)
 
 if not worldbitsFolder then
-	warn("NOTICE: workspace.Worldbits folder not found yet. It will be tracked when available.")
+	-- Fallback: search workspace case-insensitively
+	for _, child in ipairs(workspace:GetChildren()) do
+		if child.Name:lower() == "worldbits" then
+			worldbitsFolder = child
+			break
+		end
+	end
+end
+
+if not worldbitsFolder then
+	warn("NOTICE: workspace.WorldBits folder not found yet. It will be tracked when available.")
 end
 
 -- ================= FILE-BASED CONFIG & TARGET SYSTEM =================
@@ -334,7 +344,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.68"
+titleLabel.Text = "Auto Dungeon v2.8.69"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -1113,8 +1123,12 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 	
 	if not worldbitsFolder or not worldbitsFolder.Parent then
-		local wb = workspace:FindFirstChild("Worldbits")
-		if wb then worldbitsFolder = wb end
+		for _, child in ipairs(workspace:GetChildren()) do
+			if child.Name:lower() == "worldbits" then
+				worldbitsFolder = child
+				break
+			end
+		end
 	end
 	
 	local detectedCount = 0
@@ -1124,13 +1138,15 @@ RunService.Heartbeat:Connect(function(dt)
 	local shortestDist = math.huge
 	local hasBossPresent = false
 	
-	-- Worldbits drop items detection targeting ItemAura / DropAura parts
+	-- WorldBits drop items detection targeting ItemAura / DropAura parts
 	local detectedDropsCount = 0
 	local nearestDropPart = nil
 	local shortestDropDist = math.huge
 	
 	if worldbitsFolder and myHrp then
-		for _, drop in ipairs(worldbitsFolder:GetChildren()) do
+		local worldbitsChildren = worldbitsFolder:GetChildren()
+		for i = 1, #worldbitsChildren do
+			local drop = worldbitsChildren[i]
 			if drop:IsA("Model") then
 				local dropPart = nil
 				-- Specifically search for ItemAura or DropAura part
@@ -1260,7 +1276,7 @@ RunService.Heartbeat:Connect(function(dt)
 	if bossDefeatedTimer == 0 and preClickCountdownTimer == 0 then
 		if mobArrivalTimer == 0 and isAutoLootEnabled and nearestDropPart then
 			targetPos = nearestDropPart.Position + Vector3.new(0, 2, 0)
-			targetName = "Worldbit Drop"
+			targetName = "WorldBits Drop"
 			statusMsg = "Looting Drop"
 			gateTimer = tick()
 		elseif mobArrivalTimer == 0 and ((isTrackingAll or isLoopingWaypoints) and nearestMonsterPart) then
