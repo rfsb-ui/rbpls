@@ -334,7 +334,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.66"
+titleLabel.Text = "Auto Dungeon v2.8.68"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -513,9 +513,9 @@ local aatCorner = Instance.new("UICorner")
 aatCorner.CornerRadius = UDim.new(0, 3)
 aatCorner.Parent = aatToggleBtn
 
--- Status Bottom Sub-label
+-- Status Bottom Sub-label (Left side of bottom row)
 local statusSubLabel = Instance.new("TextLabel")
-statusSubLabel.Size = UDim2.new(1, -6, 0, 12)
+statusSubLabel.Size = UDim2.new(0.6, 0, 0, 12)
 statusSubLabel.Position = UDim2.new(0, 3, 0, 44)
 statusSubLabel.BackgroundTransparency = 1
 statusSubLabel.Text = "Status: Ready"
@@ -524,6 +524,18 @@ statusSubLabel.TextSize = 8
 statusSubLabel.Font = Enum.Font.SourceSans
 statusSubLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusSubLabel.Parent = statusFrame
+
+-- #Drops: Live Counter Label (Lower right side of Status)
+local dropsCountLabel = Instance.new("TextLabel")
+dropsCountLabel.Size = UDim2.new(0.4, -4, 0, 12)
+dropsCountLabel.Position = UDim2.new(0.6, 0, 0, 44)
+dropsCountLabel.BackgroundTransparency = 1
+dropsCountLabel.Text = "#Drops: 0"
+dropsCountLabel.TextColor3 = Color3.fromRGB(255, 220, 100)
+dropsCountLabel.TextSize = 8
+dropsCountLabel.Font = Enum.Font.SourceSansBold
+dropsCountLabel.TextXAlignment = Enum.TextXAlignment.Right
+dropsCountLabel.Parent = statusFrame
 
 -- No-Clip Toggle Button
 local noclipToggleBtn = Instance.new("TextButton")
@@ -989,7 +1001,7 @@ importBox.FocusLost:Connect(function()
 	end
 	
 	importBox.Text = ""
-	statusSubLabel.Text = "Status: Imported " + countAdded
+	statusSubLabel.Text = "Status: Imported " .. countAdded
 	updateRoomListDisplay()
 	saveToDevice()
 end)
@@ -1078,6 +1090,7 @@ RunService.Heartbeat:Connect(function(dt)
 		targetLabel.Text = "Target: Restarting"
 		countLabel.Text = "Mobs: 0"
 		statusSubLabel.Text = "Status: Clicking Run again (" .. preClickRemaining .. "s)"
+		dropsCountLabel.Text = "#Drops: 0"
 		
 		if elapsedPreClick >= 5 then
 			triggerRunAgainButton()
@@ -1090,6 +1103,7 @@ RunService.Heartbeat:Connect(function(dt)
 		targetLabel.Text = "Target: Restarting"
 		countLabel.Text = "Mobs: 0"
 		statusSubLabel.Text = "Status: Cooldown"
+		dropsCountLabel.Text = "#Drops: 0"
 		return
 	end
 	
@@ -1110,31 +1124,63 @@ RunService.Heartbeat:Connect(function(dt)
 	local shortestDist = math.huge
 	local hasBossPresent = false
 	
-	-- Worldbits drop items detection (Tied to configured DetectionRadius)
+	-- Worldbits drop items detection targeting ItemAura / DropAura parts
+	local detectedDropsCount = 0
 	local nearestDropPart = nil
 	local shortestDropDist = math.huge
 	
-	if isAutoLootEnabled and worldbitsFolder and myHrp then
+	if worldbitsFolder and myHrp then
 		for _, drop in ipairs(worldbitsFolder:GetChildren()) do
 			if drop:IsA("Model") then
-				local dropPart = drop.PrimaryPart or drop:FindFirstChild("HumanoidRootPart") or drop:FindFirstChildWhichIsA("BasePart")
+				local dropPart = nil
+				-- Specifically search for ItemAura or DropAura part
+				for _, desc in ipairs(drop:GetDescendants()) do
+					if desc:IsA("BasePart") then
+						local lowerName = desc.Name:lower()
+						if string.find(lowerName, "itemaura") or string.find(lowerName, "dropaura") then
+							dropPart = desc
+							break
+						end
+					end
+				end
+				
+				-- Fallback to PrimaryPart or any BasePart if specific aura part isn't named explicitly
+				if not dropPart then
+					dropPart = drop.PrimaryPart or drop:FindFirstChild("HumanoidRootPart")
+					if not dropPart then
+						for _, desc in ipairs(drop:GetDescendants()) do
+							if desc:IsA("BasePart") then
+								dropPart = desc
+								break
+							end
+						end
+					end
+				end
+				
 				if dropPart then
 					local dropDist = (myHrp.Position - dropPart.Position).Magnitude
-					if dropDist <= CONFIG.DetectionRadius and dropDist < shortestDropDist then
-						shortestDropDist = dropDist
-						nearestDropPart = dropPart
+					if dropDist <= CONFIG.DetectionRadius then
+						detectedDropsCount += 1
+						if dropDist < shortestDropDist then
+							shortestDropDist = dropDist
+							nearestDropPart = dropPart
+						end
 					end
 				end
 			end
 		end
 	end
 	
+	dropsCountLabel.Text = "#Drops: " .. detectedDropsCount
+	
 	local isBossRoomScan = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	local bossWp = isBossRoomScan and waypoints[CONFIG.BossRoomNumber] or nil
 	local shortestBossDist = math.huge
 	
 	if aggressorsFolder and myHrp then
-		for _, monster in ipairs(aggressorsFolder:GetChildren()) do
+		local aggressorsChildren = aggressorsFolder:GetChildren()
+		for i = 1, #aggressorsChildren do
+			local monster = aggressorsChildren[i]
 			if monster:IsA("Model") then
 				local hrp = monster:FindFirstChild("HumanoidRootPart") or monster.PrimaryPart or monster:FindFirstChildWhichIsA("BasePart")
 				if hrp then
@@ -1207,7 +1253,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Priority Logic & Waypoint Room Navigation (Worldbits drop items take priority when toggle is ON and within DetectionRadius)
+	-- Priority Logic & Waypoint Room Navigation (Drops take priority when Drops toggle is ON)
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
 	local heightOffset = Vector3.new(0, CONFIG.NoclipOffset, 0)
 	
