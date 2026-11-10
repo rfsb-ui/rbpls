@@ -6,30 +6,31 @@ local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Direct path verification to workspace.Animal_Live.Aggressors
-local animalLive = workspace:WaitForChild("Animal_Live", 30)
-local aggressorsFolder = animalLive:WaitForChild("Aggressors", 30)
+-- Asynchronous folder validation to eliminate startup lag
+local aggressorsFolder, worldbitsFolder
 
-if not aggressorsFolder then
-	warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
-end
+task.spawn(function()
+	local animalLive = workspace:WaitForChild("Animal_Live", 30)
+	aggressorsFolder = animalLive:WaitForChild("Aggressors", 30)
+	if not aggressorsFolder then
+		warn("CRITICAL: workspace.Animal_Live.Aggressors could not be found!")
+	end
+end)
 
--- Direct path verification to workspace.WorldBits for drop items (Case-corrected)
-local worldbitsFolder = workspace:WaitForChild("WorldBits", 30)
-
-if not worldbitsFolder then
-	-- Fallback: search workspace case-insensitively
-	for _, child in ipairs(workspace:GetChildren()) do
-		if child.Name:lower() == "worldbits" then
-			worldbitsFolder = child
-			break
+task.spawn(function()
+	worldbitsFolder = workspace:WaitForChild("WorldBits", 30)
+	if not worldbitsFolder then
+		for _, child in ipairs(workspace:GetChildren()) do
+			if child.Name:lower() == "worldbits" then
+				worldbitsFolder = child
+				break
+			end
 		end
 	end
-end
-
-if not worldbitsFolder then
-	warn("NOTICE: workspace.WorldBits folder not found yet. It will be tracked when available.")
-end
+	if not worldbitsFolder then
+		warn("NOTICE: workspace.WorldBits folder not found yet. It will be tracked when available.")
+	end
+end)
 
 -- ================= FILE-BASED CONFIG & TARGET SYSTEM =================
 local CONFIG_FOLDER = "AutoDungeonConfigs"
@@ -344,7 +345,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.69"
+titleLabel.Text = "Auto Dungeon v2.8.70"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
