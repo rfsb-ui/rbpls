@@ -1,0 +1,74 @@
+AUTO DUNGEON SCRIPT - CONFIGURATION & INTERFACE GUIDE
+====================================================
+
+1. LIVE STATUS & DASHBOARD LABELS
+- Auto Dungeon v2.8.70: Title header displaying the current script version.
+- Target: [Name]: Displays what your character is actively tracking or heading toward (e.g., None, WorldBits Drop, Mob Target, Boss Mob, or Room X).
+- Mobs: [Number]: Shows the live count of active monsters currently detected within your detection radius.
+- Runs: [Number]: Tracks your total completed dungeon run counter across active sessions.
+- Rooms: [Number]: Shows the total number of saved waypoint/room positions stored in your active route.
+- Status: [State]: Displays your character's current operational state (e.g., Ready, Attacking, Looting Drop, Moving, Waiting Gate, Boss Down, or Cooldown).
+- #Drops: [Number]: Displays a live count of item drops currently detected within range inside workspace.WorldBits.
+
+2. CORE FEATURE TOGGLES
+- FTM (Fly to Mobs): Automatically navigates and flies your character directly to the nearest active monster within your detection radius.
+- RWP (Run Waypoints): Executes automated dungeon room progression by sequentially flying through your saved room coordinates.
+- AAT (ATK Target Clicker): Simulates rapid, automated clicks on your custom on-screen "ATK" button to keep attacks firing continuously.
+- No-Clip: Disables part collisions on your character model so you can fly straight through walls, doors, and dungeon terrain.
+- Fly (Always Fly): Locks your character in persistent flight mode even when not actively tracking a target or waypoint.
+- Drops (Auto Loot): Toggles automated detection and priority collection of item drops spawning inside workspace.WorldBits.
+- Auto Pot (Auto Potion): Automatically triggers your healing keybind sequence (Key 2 followed by Key 1) whenever your health drops below your configured percentage threshold.
+- Auto Restart: Automatically detects when the dungeon boss is defeated, counts down the configured boss delay, and clicks your "Run again" target box to start a new run.
+
+3. ROOM & WAYPOINT MANAGEMENT
+- Save: Saves your character's current 3D coordinates as a new waypoint room in your active dungeon route.
+- Clear: Wipes all saved waypoint rooms and resets your progress back to Room 1.
+- Skip WP: Manually forces the script to skip to the next waypoint room in your route list.
+- Export Rooms: Generates and copies your saved waypoint coordinate list directly to your device clipboard.
+
+4. CONFIGURABLE NUMERIC INPUTS
+- Speed: Sets your character's flight movement speed.
+- Radius: Sets the maximum distance range for detecting mobs and WorldBits item drops.
+- StopDistance: Defines how close your character stops to a target mob or drop location.
+- GateSec: Maximum timeout duration in seconds to wait for a room gate to unseal before forcing progression.
+- Boss#: Designates which saved waypoint room number corresponds to the final boss room.
+- Height: Vertical offset distance above targets for noclip flight positioning.
+- PotHP%: Health percentage threshold that triggers your automated healing potions.
+- BossSec: Delay duration in seconds to wait after defeating the boss before triggering the auto-restart sequence.
+]]AUTO DUNGEON SCRIPT - CONFIGURATION & INTERFACE GUIDE
+====================================================
+
+1. LIVE STATUS & DASHBOARD LABELS
+- Auto Dungeon v2.8.70: Title header displaying the current script version.
+- Target: [Name]: Displays what your character is actively tracking or heading toward (e.g., None, WorldBits Drop, Mob Target, Boss Mob, or Room X).
+- Mobs: [Number]: Shows the live count of active monsters currently detected within your detection radius.
+- Runs: [Number]: Tracks your total completed dungeon run counter across active sessions.
+- Rooms: [Number]: Shows the total number of saved waypoint/room positions stored in your active route.
+- Status: [State]: Displays your character's current operational state (e.g., Ready, Attacking, Looting Drop, Moving, Waiting Gate, Boss Down, or Cooldown).
+- #Drops: [Number]: Displays a live count of item drops currently detected within range inside workspace.WorldBits.
+
+2. CORE FEATURE TOGGLES
+- FTM (Fly to Mobs): Automatically navigates and flies your character directly to the nearest active monster within your detection radius.
+- RWP (Run Waypoints): Executes automated dungeon room progression by sequentially flying through your saved room coordinates.
+- AAT (ATK Target Clicker): Simulates rapid, automated clicks on your custom on-screen "ATK" button to keep attacks firing continuously.
+- No-Clip: Disables part collisions on your character model so you can fly straight through walls, doors, and dungeon terrain.
+- Fly (Always Fly): Locks your character in persistent flight mode even when not actively tracking a target or waypoint.
+- Drops (Auto Loot): Toggles automated detection and priority collection of item drops spawning inside workspace.WorldBits.
+- Auto Pot (Auto Potion): Automatically triggers your healing keybind sequence (Key 2 followed by Key 1) whenever your health drops below your configured percentage threshold.
+- Auto Restart: Automatically detects when the dungeon boss is defeated, counts down the configured boss delay, and clicks your "Run again" target box to start a new run.
+
+3. ROOM & WAYPOINT MANAGEMENT
+- Save: Saves your character's current 3D coordinates as a new waypoint room in your active dungeon route.
+- Clear: Wipes all saved waypoint rooms and resets your progress back to Room 1.
+- Skip WP: Manually forces the script to skip to the next waypoint room in your route list.
+- Export Rooms: Generates and copies your saved waypoint coordinate list directly to your device clipboard.
+
+4. CONFIGURABLE NUMERIC INPUTS
+- Speed: Sets your character's flight movement speed.
+- Radius: Sets the maximum distance range for detecting mobs and WorldBits item drops.
+- StopDistance: Defines how close your character stops to a target mob or drop location.
+- GateSec: Maximum timeout duration in seconds to wait for a room gate to unseal before forcing progression.
+- Boss#: Designates which saved waypoint room number corresponds to the final boss room.
+- Height: Vertical offset distance above targets for noclip flight positioning.
+- PotHP%: Health percentage threshold that triggers your automated healing potions.
+- BossSec: Delay duration in seconds to wait after defeating the boss before triggering the auto-restart sequence.
