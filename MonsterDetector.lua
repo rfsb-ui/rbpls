@@ -37,9 +37,9 @@ local CONFIG_FOLDER = "AutoDungeonConfigs"
 local CONFIG_FILE = CONFIG_FOLDER .. "/dungeon_config.json"
 
 local CONFIG = {
-	FlightSpeed = 12,
-	DetectionRadius = 200,
-	StopDistance = 5,
+	FlightSpeed = 50,
+	DetectionRadius = 500,
+	StopDistance = 4,
 	GateTimeout = 15,
 	BossRoomNumber = 19,
 	NoclipOffset = 8,
@@ -346,7 +346,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.71"
+titleLabel.Text = "Auto Dungeon v2.8.72"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -1402,8 +1402,11 @@ RunService.Heartbeat:Connect(function(dt)
 			local distance = direction.Magnitude
 			
 			if distance > CONFIG.StopDistance then
-				local moveVector = direction.Unit * math.min(CONFIG.FlightSpeed * dt, distance)
-				myHrp.CFrame = CFrame.new(currentPos + moveVector, targetPos)
+				-- Smooth Interpolation (Lerp) step to prevent rubber-banding at high speeds
+				local step = math.min(CONFIG.FlightSpeed * dt, distance)
+				local newPos = currentPos:Lerp(targetPos, step / distance)
+				
+				myHrp.CFrame = CFrame.new(newPos, targetPos)
 				myHrp.AssemblyLinearVelocity = Vector3.zero
 			else
 				local lookDownTarget = targetPos - Vector3.new(0, 5, 0)
