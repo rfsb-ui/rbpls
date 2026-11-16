@@ -346,7 +346,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.72"
+titleLabel.Text = "Auto Dungeon v2.8.73"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -1402,19 +1402,15 @@ RunService.Heartbeat:Connect(function(dt)
 			local distance = direction.Magnitude
 			
 			if distance > CONFIG.StopDistance then
-				-- Smooth Interpolation (Lerp) step to prevent rubber-banding at high speeds
-				local step = math.min(CONFIG.FlightSpeed * dt, distance)
-				local newPos = currentPos:Lerp(targetPos, step / distance)
-				
-				myHrp.CFrame = CFrame.new(newPos, targetPos)
-				myHrp.AssemblyLinearVelocity = Vector3.zero
+				-- Physics-based velocity push to bypass server position validation
+				myHrp.AssemblyLinearVelocity = direction.Unit * CONFIG.FlightSpeed
+				myHrp.CFrame = CFrame.new(currentPos, targetPos)
 			else
+				myHrp.AssemblyLinearVelocity = Vector3.zero
 				local lookDownTarget = targetPos - Vector3.new(0, 5, 0)
 				myHrp.CFrame = CFrame.new(currentPos, lookDownTarget)
-				myHrp.AssemblyLinearVelocity = Vector3.zero
 			end
 		else
-			myHrp.CFrame = CFrame.new(currentPos)
 			myHrp.AssemblyLinearVelocity = Vector3.zero
 			myHrp.AssemblyAngularVelocity = Vector3.zero
 		end
