@@ -37,9 +37,9 @@ local CONFIG_FOLDER = "AutoDungeonConfigs"
 local CONFIG_FILE = CONFIG_FOLDER .. "/dungeon_config.json"
 
 local CONFIG = {
-	FlightSpeed = 50,
-	DetectionRadius = 500,
-	StopDistance = 4,
+	FlightSpeed = 12,
+	DetectionRadius = 200,
+	StopDistance = 5,
 	GateTimeout = 15,
 	BossRoomNumber = 19,
 	NoclipOffset = 8,
