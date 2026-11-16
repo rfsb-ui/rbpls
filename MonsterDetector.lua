@@ -125,6 +125,7 @@ local isAatEnabled = false
 local isAutoPotEnabled = false
 local isAlwaysFlyEnabled = false
 local isAutoLootEnabled = false
+local isBossCenterEnabled = true
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastPotionTime = 0
@@ -345,7 +346,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "RF Hub v2.8.70"
+titleLabel.Text = "Auto Dungeon v2.8.71"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -550,11 +551,11 @@ dropsCountLabel.Parent = statusFrame
 
 -- No-Clip Toggle Button
 local noclipToggleBtn = Instance.new("TextButton")
-noclipToggleBtn.Size = UDim2.new(0.32, 0, 0, 26)
+noclipToggleBtn.Size = UDim2.new(0.24, 0, 0, 26)
 noclipToggleBtn.Position = UDim2.new(0, 8, 0, 98)
 noclipToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 noclipToggleBtn.BackgroundTransparency = 0.3
-noclipToggleBtn.Text = "No-Clip: OFF"
+noclipToggleBtn.Text = "No-Clip"
 noclipToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 noclipToggleBtn.TextSize = 9
 noclipToggleBtn.Font = Enum.Font.SourceSansBold
@@ -567,8 +568,8 @@ nclCorner.Parent = noclipToggleBtn
 
 -- Always Fly Toggle Button
 local alwaysFlyBtn = Instance.new("TextButton")
-alwaysFlyBtn.Size = UDim2.new(0.32, 0, 0, 26)
-alwaysFlyBtn.Position = UDim2.new(0.34, 0, 0, 98)
+alwaysFlyBtn.Size = UDim2.new(0.24, 0, 0, 26)
+alwaysFlyBtn.Position = UDim2.new(0.26, 0, 0, 98)
 alwaysFlyBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 alwaysFlyBtn.BackgroundTransparency = 0.3
 alwaysFlyBtn.Text = "Fly: OFF"
@@ -584,13 +585,13 @@ afCorner.Parent = alwaysFlyBtn
 
 -- Auto Loot Toggle Button
 local autoLootBtn = Instance.new("TextButton")
-autoLootBtn.Size = UDim2.new(0.32, 0, 0, 26)
-autoLootBtn.Position = UDim2.new(0.68, 0, 0, 98)
+autoLootBtn.Size = UDim2.new(0.23, 0, 0, 26)
+autoLootBtn.Position = UDim2.new(0.51, 0, 0, 98)
 autoLootBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 autoLootBtn.BackgroundTransparency = 0.3
 autoLootBtn.Text = "Drops: OFF"
 autoLootBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-autoLootBtn.TextSize = 9
+autoLootBtn.TextSize = 8
 autoLootBtn.Font = Enum.Font.SourceSansBold
 autoLootBtn.Visible = true
 autoLootBtn.Parent = mainFrame
@@ -598,6 +599,23 @@ autoLootBtn.Parent = mainFrame
 local altCorner = Instance.new("UICorner")
 altCorner.CornerRadius = UDim.new(0, 4)
 altCorner.Parent = autoLootBtn
+
+-- Boss Center Toggle Button
+local bossCenterBtn = Instance.new("TextButton")
+bossCenterBtn.Size = UDim2.new(0.23, 0, 0, 26)
+bossCenterBtn.Position = UDim2.new(0.76, 0, 0, 98)
+bossCenterBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+bossCenterBtn.BackgroundTransparency = 0.3
+bossCenterBtn.Text = "Center: ON"
+bossCenterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+bossCenterBtn.TextSize = 8
+bossCenterBtn.Font = Enum.Font.SourceSansBold
+bossCenterBtn.Visible = true
+bossCenterBtn.Parent = mainFrame
+
+local bcCorner = Instance.new("UICorner")
+bcCorner.CornerRadius = UDim.new(0, 4)
+bcCorner.Parent = bossCenterBtn
 
 -- Dungeon Room Controls Row
 local saveWpBtn = Instance.new("TextButton")
@@ -830,6 +848,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		noclipToggleBtn.Visible = false
 		alwaysFlyBtn.Visible = false
 		autoLootBtn.Visible = false
+		bossCenterBtn.Visible = false
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
 		skipWpBtn.Visible = false
@@ -847,6 +866,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		noclipToggleBtn.Visible = true
 		alwaysFlyBtn.Visible = true
 		autoLootBtn.Visible = true
+		bossCenterBtn.Visible = true
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
 		skipWpBtn.Visible = true
@@ -995,6 +1015,17 @@ autoLootBtn.MouseButton1Click:Connect(function()
 	else
 		autoLootBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 		autoLootBtn.Text = "Drops: OFF"
+	end
+end)
+
+bossCenterBtn.MouseButton1Click:Connect(function()
+	isBossCenterEnabled = not isBossCenterEnabled
+	if isBossCenterEnabled then
+		bossCenterBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		bossCenterBtn.Text = "Center: ON"
+	else
+		bossCenterBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		bossCenterBtn.Text = "Center: OFF"
 	end
 end)
 
@@ -1287,13 +1318,19 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 			
 			if isBossRoom and waypoints[CONFIG.BossRoomNumber] then
-				local bossCenterPos = waypoints[CONFIG.BossRoomNumber]
-				local centerDist = (myHrp.Position - bossCenterPos).Magnitude
-				
-				if centerDist > 15 then
-					targetPos = bossCenterPos + heightOffset
-					targetName = "Boss Center"
-					statusMsg = "Centering"
+				if isBossCenterEnabled then
+					local bossCenterPos = waypoints[CONFIG.BossRoomNumber]
+					local centerDist = (myHrp.Position - bossCenterPos).Magnitude
+					
+					if centerDist > 15 then
+						targetPos = bossCenterPos + heightOffset
+						targetName = "Boss Center"
+						statusMsg = "Centering"
+					else
+						targetPos = nearestMonsterPart.Position + heightOffset
+						targetName = "Boss Mob"
+						statusMsg = "Fighting"
+					end
 				else
 					targetPos = nearestMonsterPart.Position + heightOffset
 					targetName = "Boss Mob"
