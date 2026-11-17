@@ -46,6 +46,7 @@ local CONFIG = {
 	MobArrivalDelay = 2,
 	PotThreshold = 40,
 	BossDelay = 10,
+	AbilityInterval = 5,
 	TargetPosX = 0,
 	TargetPosY = 0,
 	UseDefaultPos = true,
@@ -126,10 +127,12 @@ local isAutoPotEnabled = false
 local isAlwaysFlyEnabled = false
 local isAutoLootEnabled = false
 local isBossCenterEnabled = true
+local isAbilityEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastPotionTime = 0
 local lastAtkClickTime = 0
+local lastAbilityTime = 0
 
 local bossWasPresent = false
 local bossDefeatedTimer = 0
@@ -346,7 +349,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Dungeon v2.8.73"
+titleLabel.Text = "F2p Auto Dungeon v2.8.74"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -666,22 +669,22 @@ local skpCorner = Instance.new("UICorner")
 skpCorner.CornerRadius = UDim.new(0, 4)
 skpCorner.Parent = skipWpBtn
 
--- Auto Pot Toggle Button
-local autoPotBtn = Instance.new("TextButton")
-autoPotBtn.Size = UDim2.new(0, 48, 0, 26)
-autoPotBtn.Position = UDim2.new(0, 178, 0, 130)
-autoPotBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-autoPotBtn.BackgroundTransparency = 0.3
-autoPotBtn.Text = "Auto Pot"
-autoPotBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-autoPotBtn.TextSize = 9
-autoPotBtn.Font = Enum.Font.SourceSansBold
-autoPotBtn.Visible = true
-autoPotBtn.Parent = mainFrame
+-- Ability Toggle Button
+local abilityToggleBtn = Instance.new("TextButton")
+abilityToggleBtn.Size = UDim2.new(0, 48, 0, 26)
+abilityToggleBtn.Position = UDim2.new(0, 178, 0, 130)
+abilityToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+abilityToggleBtn.BackgroundTransparency = 0.3
+abilityToggleBtn.Text = "Ability: OFF"
+abilityToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+abilityToggleBtn.TextSize = 8
+abilityToggleBtn.Font = Enum.Font.SourceSansBold
+abilityToggleBtn.Visible = true
+abilityToggleBtn.Parent = mainFrame
 
-local aptCorner = Instance.new("UICorner")
-aptCorner.CornerRadius = UDim.new(0, 4)
-aptCorner.Parent = autoPotBtn
+local abtCorner = Instance.new("UICorner")
+abtCorner.CornerRadius = UDim.new(0, 4)
+abtCorner.Parent = abilityToggleBtn
 
 -- Auto Restart Toggle Button
 local restartToggleBtn = Instance.new("TextButton")
@@ -787,8 +790,8 @@ createLabeledInput(60, 264, 25, "Stop", CONFIG.StopDistance, function(v) CONFIG.
 createLabeledInput(87, 264, 25, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
 createLabeledInput(114, 264, 25, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
 createLabeledInput(141, 264, 27, "Height", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
-createLabeledInput(170, 264, 30, "PotHP%", CONFIG.PotThreshold, function(v) CONFIG.PotThreshold = v end)
-createLabeledInput(202, 264, 32, "BossSec", CONFIG.BossDelay, function(v) CONFIG.BossDelay = v end)
+createLabeledInput(170, 264, 25, "PotHP%", CONFIG.PotThreshold, function(v) CONFIG.PotThreshold = v end)
+createLabeledInput(197, 264, 37, "Q /s", CONFIG.AbilityInterval, function(v) CONFIG.AbilityInterval = v end)
 
 -- Scrollable Room List Viewer below UI (70% Opacity)
 local roomListFrame = Instance.new("ScrollingFrame")
@@ -852,7 +855,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
 		skipWpBtn.Visible = false
-		autoPotBtn.Visible = false
+		abilityToggleBtn.Visible = false
 		restartToggleBtn.Visible = false
 		importBox.Visible = false
 		exportWpBtn.Visible = false
@@ -870,7 +873,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
 		skipWpBtn.Visible = true
-		autoPotBtn.Visible = true
+		abilityToggleBtn.Visible = true
 		restartToggleBtn.Visible = true
 		importBox.Visible = true
 		exportWpBtn.Visible = true
@@ -974,14 +977,14 @@ aatToggleBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
-autoPotBtn.MouseButton1Click:Connect(function()
-	isAutoPotEnabled = not isAutoPotEnabled
-	if isAutoPotEnabled then
-		autoPotBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		autoPotBtn.Text = "Pot ON"
+abilityToggleBtn.MouseButton1Click:Connect(function()
+	isAbilityEnabled = not isAbilityEnabled
+	if isAbilityEnabled then
+		abilityToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		abilityToggleBtn.Text = "Ability: ON"
 	else
-		autoPotBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		autoPotBtn.Text = "Auto Pot"
+		abilityToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		abilityToggleBtn.Text = "Ability: OFF"
 	end
 end)
 
@@ -1082,6 +1085,16 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
+	-- Ability Key Presser Loop (Presses 'Q' based on configured interval)
+	if isAbilityEnabled and (tick() - lastAbilityTime >= CONFIG.AbilityInterval) then
+		lastAbilityTime = tick()
+		task.spawn(function()
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
+			task.wait(0.05)
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
+		end)
+	end
+	
 	-- AAT Target Box Click Simulation Loop
 	local isPreClickActive = (preClickCountdownTimer > 0)
 	if isAatEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
@@ -1098,13 +1111,13 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Auto Potion / HP Monitor Logic
+	-- Auto Potion / HP Monitor Logic (Includes +4 height safety buffer)
 	if isAutoPotEnabled and humanoid and humanoid.Health > 0 then
 		local hpPercent = (humanoid.Health / humanoid.MaxHealth) * 100
 		if hpPercent <= CONFIG.PotThreshold then
 			if tick() - lastPotionTime >= 3 then
 				lastPotionTime = tick()
-				print("HP dropped below " .. CONFIG.PotThreshold .. "%. Using potion (Key 2 -> Key 1)...")
+				print("HP dropped below " .. CONFIG.PotThreshold .. "%. Using potion (Key 2 -> Key 1) with +4 height buffer...")
 				
 				task.spawn(function()
 					VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Two, false, game)
@@ -1301,9 +1314,15 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 	
-	-- Priority Logic & Waypoint Room Navigation (Drops take priority when Drops toggle is ON)
+	-- Calculate dynamic height offset (Adds +4 extra height buffer when healing)
+	local effectiveHeightOffset = CONFIG.NoclipOffset
+	if tick() - lastPotionTime < 3.5 then
+		effectiveHeightOffset += 4
+	end
+	local heightOffsetVec = Vector3.new(0, effectiveHeightOffset, 0)
+	
+	-- Priority Logic & Waypoint Room Navigation
 	local isBossRoom = (isLoopingWaypoints and #waypoints > 0 and currentWaypointIndex >= CONFIG.BossRoomNumber)
-	local heightOffset = Vector3.new(0, CONFIG.NoclipOffset, 0)
 	
 	if bossDefeatedTimer == 0 and preClickCountdownTimer == 0 then
 		if mobArrivalTimer == 0 and isAutoLootEnabled and nearestDropPart then
@@ -1323,21 +1342,21 @@ RunService.Heartbeat:Connect(function(dt)
 					local centerDist = (myHrp.Position - bossCenterPos).Magnitude
 					
 					if centerDist > 15 then
-						targetPos = bossCenterPos + heightOffset
+						targetPos = bossCenterPos + heightOffsetVec
 						targetName = "Boss Center"
 						statusMsg = "Centering"
 					else
-						targetPos = nearestMonsterPart.Position + heightOffset
+						targetPos = nearestMonsterPart.Position + heightOffsetVec
 						targetName = "Boss Mob"
 						statusMsg = "Fighting"
 					end
 				else
-					targetPos = nearestMonsterPart.Position + heightOffset
+					targetPos = nearestMonsterPart.Position + heightOffsetVec
 					targetName = "Boss Mob"
 					statusMsg = "Fighting"
 				end
 			else
-				targetPos = nearestMonsterPart.Position + heightOffset
+				targetPos = nearestMonsterPart.Position + heightOffsetVec
 				targetName = "Mob Target"
 				statusMsg = "Attacking"
 			end
@@ -1357,7 +1376,7 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 			
 			if roomClearedConfirmed then
-				targetPos = currentWp + heightOffset
+				targetPos = currentWp + heightOffsetVec
 				local isBoss = (currentWaypointIndex >= CONFIG.BossRoomNumber)
 				targetName = (isBoss and "Boss " or "") .. "Room " .. currentWaypointIndex .. "/" .. #waypoints
 				statusMsg = "Moving (" .. math.floor(wpDist) .. "m)"
@@ -1374,7 +1393,7 @@ RunService.Heartbeat:Connect(function(dt)
 				statusMsg = "Waiting Gate"
 			end
 		elseif mobArrivalTimer == 0 and (isTrackingAll and nearestMonsterPart) then
-			targetPos = nearestMonsterPart.Position + heightOffset
+			targetPos = nearestMonsterPart.Position + heightOffsetVec
 			targetName = "All Mobs"
 			statusMsg = "Tracking"
 		else
