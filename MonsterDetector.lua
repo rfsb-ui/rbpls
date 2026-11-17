@@ -349,7 +349,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.74"
+titleLabel.Text = "RF Auto Dungeon v2.8.75"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -669,15 +669,32 @@ local skpCorner = Instance.new("UICorner")
 skpCorner.CornerRadius = UDim.new(0, 4)
 skpCorner.Parent = skipWpBtn
 
+-- Auto Pot Toggle Button (Restored)
+local autoPotBtn = Instance.new("TextButton")
+autoPotBtn.Size = UDim2.new(0, 48, 0, 26)
+autoPotBtn.Position = UDim2.new(0, 178, 0, 130)
+autoPotBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+autoPotBtn.BackgroundTransparency = 0.3
+autoPotBtn.Text = "Auto Pot"
+autoPotBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoPotBtn.TextSize = 9
+autoPotBtn.Font = Enum.Font.SourceSansBold
+autoPotBtn.Visible = true
+autoPotBtn.Parent = mainFrame
+
+local aptCorner = Instance.new("UICorner")
+aptCorner.CornerRadius = UDim.new(0, 4)
+aptCorner.Parent = autoPotBtn
+
 -- Ability Toggle Button
 local abilityToggleBtn = Instance.new("TextButton")
-abilityToggleBtn.Size = UDim2.new(0, 48, 0, 26)
-abilityToggleBtn.Position = UDim2.new(0, 178, 0, 130)
+abilityToggleBtn.Size = UDim2.new(1, -16, 0, 26)
+abilityToggleBtn.Position = UDim2.new(0, 8, 0, 164)
 abilityToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 abilityToggleBtn.BackgroundTransparency = 0.3
 abilityToggleBtn.Text = "Ability: OFF"
 abilityToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-abilityToggleBtn.TextSize = 8
+abilityToggleBtn.TextSize = 11
 abilityToggleBtn.Font = Enum.Font.SourceSansBold
 abilityToggleBtn.Visible = true
 abilityToggleBtn.Parent = mainFrame
@@ -689,7 +706,7 @@ abtCorner.Parent = abilityToggleBtn
 -- Auto Restart Toggle Button
 local restartToggleBtn = Instance.new("TextButton")
 restartToggleBtn.Size = UDim2.new(1, -16, 0, 26)
-restartToggleBtn.Position = UDim2.new(0, 8, 0, 164)
+restartToggleBtn.Position = UDim2.new(0, 8, 0, 196)
 restartToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 restartToggleBtn.BackgroundTransparency = 0.3
 restartToggleBtn.Text = "Auto Restart: OFF"
@@ -706,7 +723,7 @@ rstCorner.Parent = restartToggleBtn
 -- Waypoint Import Box
 local importBox = Instance.new("TextBox")
 importBox.Size = UDim2.new(1, -16, 0, 26)
-importBox.Position = UDim2.new(0, 8, 0, 198)
+importBox.Position = UDim2.new(0, 8, 0, 230)
 importBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 importBox.BackgroundTransparency = 0.3
 importBox.PlaceholderText = "Paste Waypoints/Coordinates..."
@@ -724,7 +741,7 @@ impCorner.Parent = importBox
 -- Export Rooms Button
 local exportWpBtn = Instance.new("TextButton")
 exportWpBtn.Size = UDim2.new(1, -16, 0, 26)
-exportWpBtn.Position = UDim2.new(0, 8, 0, 230)
+exportWpBtn.Position = UDim2.new(0, 8, 0, 262)
 exportWpBtn.BackgroundColor3 = Color3.fromRGB(50, 140, 100)
 exportWpBtn.BackgroundTransparency = 0.3
 exportWpBtn.Text = "Export Rooms"
@@ -784,19 +801,19 @@ local function createLabeledInput(posX, posY, width, labelText, defaultVal, call
 	return box
 end
 
-createLabeledInput(6, 264, 25, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
-createLabeledInput(33, 264, 25, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
-createLabeledInput(60, 264, 25, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
-createLabeledInput(87, 264, 25, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
-createLabeledInput(114, 264, 25, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
-createLabeledInput(141, 264, 27, "Height", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
-createLabeledInput(170, 264, 25, "PotHP%", CONFIG.PotThreshold, function(v) CONFIG.PotThreshold = v end)
-createLabeledInput(197, 264, 37, "Q /s", CONFIG.AbilityInterval, function(v) CONFIG.AbilityInterval = v end)
+createLabeledInput(6, 296, 25, "Speed", CONFIG.FlightSpeed, function(v) CONFIG.FlightSpeed = v end)
+createLabeledInput(33, 296, 25, "Radius", CONFIG.DetectionRadius, function(v) CONFIG.DetectionRadius = v end)
+createLabeledInput(60, 296, 25, "Stop", CONFIG.StopDistance, function(v) CONFIG.StopDistance = v end)
+createLabeledInput(87, 296, 25, "GateSec", CONFIG.GateTimeout, function(v) CONFIG.GateTimeout = v end)
+createLabeledInput(114, 296, 25, "Boss#", CONFIG.BossRoomNumber, function(v) CONFIG.BossRoomNumber = v end)
+createLabeledInput(141, 296, 27, "Height", CONFIG.NoclipOffset, function(v) CONFIG.NoclipOffset = v end)
+createLabeledInput(170, 296, 25, "PotHP%", CONFIG.PotThreshold, function(v) CONFIG.PotThreshold = v end)
+createLabeledInput(197, 296, 37, "Q /s", CONFIG.AbilityInterval, function(v) CONFIG.AbilityInterval = v end)
 
 -- Scrollable Room List Viewer below UI (70% Opacity)
 local roomListFrame = Instance.new("ScrollingFrame")
-roomListFrame.Size = UDim2.new(1, -16, 0, 165)
-roomListFrame.Position = UDim2.new(0, 8, 0, 336)
+roomListFrame.Size = UDim2.new(1, -16, 0, 135)
+roomListFrame.Position = UDim2.new(0, 8, 0, 368)
 roomListFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 roomListFrame.BackgroundTransparency = 0.3
 roomListFrame.BorderSizePixel = 0
@@ -855,6 +872,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		saveWpBtn.Visible = false
 		clearWpBtn.Visible = false
 		skipWpBtn.Visible = false
+		autoPotBtn.Visible = false
 		abilityToggleBtn.Visible = false
 		restartToggleBtn.Visible = false
 		importBox.Visible = false
@@ -873,6 +891,7 @@ minimizeButton.MouseButton1Click:Connect(function()
 		saveWpBtn.Visible = true
 		clearWpBtn.Visible = true
 		skipWpBtn.Visible = true
+		autoPotBtn.Visible = true
 		abilityToggleBtn.Visible = true
 		restartToggleBtn.Visible = true
 		importBox.Visible = true
@@ -974,6 +993,17 @@ aatToggleBtn.MouseButton1Click:Connect(function()
 	else
 		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 		aatToggleBtn.Text = "AAT ▶ [OFF]"
+	end
+end)
+
+autoPotBtn.MouseButton1Click:Connect(function()
+	isAutoPotEnabled = not isAutoPotEnabled
+	if isAutoPotEnabled then
+		autoPotBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		autoPotBtn.Text = "Pot ON"
+	else
+		autoPotBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		autoPotBtn.Text = "Auto Pot"
 	end
 end)
 
