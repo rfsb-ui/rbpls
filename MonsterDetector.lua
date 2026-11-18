@@ -130,9 +130,9 @@ local isHideNameEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastPotionTime = 0
+local lastAtkClickTime = 0
 local lastAbilityTime = 0
 
-local isAttackHolding = false
 local bossWasPresent = false
 local bossDefeatedTimer = 0
 local postRestartCooldown = 0
@@ -246,27 +246,21 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- Precision Viewport-Centered Clicker for Run Again
+-- Precision Multi-Clicker for Run Again
 local function triggerRunAgainButton()
-	if isAttackHolding then
-		isAttackHolding = false
-		pcall(function()
-			VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-		end)
-	end
-
-	local viewportSize = workspace.CurrentCamera.ViewportSize
-	local targetX = viewportSize.X / 2
-	local targetY = viewportSize.Y / 2
+	local absPos = clickTargetFrame.AbsolutePosition
+	local absSize = clickTargetFrame.AbsoluteSize
+	local centerX = absPos.X + absSize.X / 2
+	local centerY = absPos.Y + absSize.Y / 2
 	
 	task.spawn(function()
 		for i = 1, 3 do
-			VirtualUser:Button1Down(Vector2.new(targetX, targetY), workspace.CurrentCamera.CFrame)
-			task.wait(0.04)
-			VirtualUser:Button1Up(Vector2.new(targetX, targetY), workspace.CurrentCamera.CFrame)
-			task.wait(0.04)
+			VirtualUser:Button1Down(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
+			task.wait(0.03)
+			VirtualUser:Button1Up(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
+			task.wait(0.03)
 		end
-		print("Fired 3 precision clicks on 'Run again' via Viewport Center:", targetX, targetY)
+		print("Fired 3 rapid clicks on 'Run again' via Target Box at coordinates:", centerX, centerY)
 	end)
 	
 	resetToRoomOne()
@@ -290,7 +284,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.92"
+titleLabel.Text = "F2p Auto Dungeon v2.8.81"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -453,7 +447,7 @@ local lwpCorner = Instance.new("UICorner")
 lwpCorner.CornerRadius = UDim.new(0, 3)
 lwpCorner.Parent = loopWpBtn
 
--- Column 3 Bottom: AAT (Continuous Button Hold) Toggle Button
+-- Column 3 Bottom: AAT (Dynamic Coordinate Touch Simulation) Toggle Button
 local aatToggleBtn = Instance.new("TextButton")
 aatToggleBtn.Size = UDim2.new(0.33, -4, 0, 13)
 aatToggleBtn.Position = UDim2.new(0.66, 1, 0, 30)
@@ -464,23 +458,6 @@ aatToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 aatToggleBtn.TextSize = 7
 aatToggleBtn.Font = Enum.Font.SourceSansBold
 aatToggleBtn.Parent = statusFrame
-
-aatToggleBtn.MouseButton1Click:Connect(function()
-	isAatEnabled = not isAatEnabled
-	if isAatEnabled then
-		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		aatToggleBtn.Text = "AAT ⏸ [ON]"
-	else
-		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		aatToggleBtn.Text = "AAT ▶ [OFF]"
-		if isAttackHolding then
-			isAttackHolding = false
-			pcall(function()
-				VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-			end)
-		end
-	end
-end)
 
 local aatCorner = Instance.new("UICorner")
 aatCorner.CornerRadius = UDim.new(0, 3)
@@ -962,6 +939,17 @@ toggleButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+aatToggleBtn.MouseButton1Click:Connect(function()
+	isAatEnabled = not isAatEnabled
+	if isAatEnabled then
+		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		aatToggleBtn.Text = "AAT ⏸ [ON]"
+	else
+		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		aatToggleBtn.Text = "AAT ▶ [OFF]"
+	end
+end)
+
 autoPotBtn.MouseButton1Click:Connect(function()
 	isAutoPotEnabled = not isAutoPotEnabled
 	if isAutoPotEnabled then
@@ -1094,14 +1082,11 @@ RunService.Heartbeat:Connect(function(dt)
 	
 	-- Hide Name & Clan Tag execution loop
 	if char then
-		local function setBillboardEnabled(parentObj)
-			for _, desc in ipairs(parentObj:GetDescendants()) do
-				if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
-					desc.Enabled = not isHideNameEnabled
-				end
+		for _, desc in ipairs(char:GetDescendants()) do
+			if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
+				desc.Enabled = not isHideNameEnabled
 			end
 		end
-		setBillboardEnabled(char)
 	end
 	
 	-- Ability Key Presser Loop (Presses 'Q' based on configured interval)
@@ -1113,6 +1098,32 @@ RunService.Heartbeat:Connect(function(dt)
 			task.wait(0.05)
 			vim:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
 		end)
+	end
+	
+	-- AAT Dynamic Username Path Coordinate Touch Simulation Loop (v2.8.81 original)
+	local isPreClickActive = (preClickCountdownTimer > 0)
+	if isAatEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
+		if tick() - lastAtkClickTime >= 0.15 then
+			lastAtkClickTime = tick()
+			
+			local pGui = player:FindFirstChild("PlayerGui")
+			local mobileCombat = pGui and pGui:FindFirstChild("MobileCombat")
+			local attackBtn = mobileCombat and mobileCombat:FindFirstChild("AttackButton")
+			
+			if attackBtn and attackBtn:IsA("GuiObject") then
+				local absPos = attackBtn.AbsolutePosition
+				local absSize = attackBtn.AbsoluteSize
+				
+				if absSize.X > 0 and absSize.Y > 0 then
+					local centerX = absPos.X + absSize.X / 2
+					local centerY = absPos.Y + absSize.Y / 2
+					
+					VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+					task.wait(0.02)
+					VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+				end
+			end
+		end
 	end
 	
 	-- Auto Potion / HP Monitor Logic (Includes +4 height safety buffer)
@@ -1304,39 +1315,6 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 	
 	countLabel.Text = "Mobs: " .. detectedCount
-	
-	-- AAT Button Hold Loop (Locked Coordinate Check & Auto-Stop on Restart)
-	local shouldHoldAttack = isAatEnabled and bossDefeatedTimer == 0 and preClickCountdownTimer == 0 and (tick() - postRestartCooldown >= 10)
-	
-	if shouldHoldAttack then
-		local pGui = player:FindFirstChild("PlayerGui")
-		local mobileCombat = pGui and pGui:FindFirstChild("MobileCombat")
-		local attackBtn = mobileCombat and mobileCombat:FindFirstChild("AttackButton")
-		
-		if attackBtn and attackBtn:IsA("GuiObject") then
-			local absPos = attackBtn.AbsolutePosition
-			local absSize = attackBtn.AbsoluteSize
-			
-			if absSize.X > 0 and absSize.Y > 0 then
-				local centerX = absPos.X + absSize.X / 2
-				local centerY = absPos.Y + absSize.Y / 2
-				
-				if not isAttackHolding then
-					isAttackHolding = true
-					pcall(function()
-						VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
-					end)
-				end
-			end
-		end
-	else
-		if isAttackHolding then
-			isAttackHolding = false
-			pcall(function()
-				VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-			end)
-		end
-	end
 	
 	local targetPos = nil
 	local targetName = "None"
