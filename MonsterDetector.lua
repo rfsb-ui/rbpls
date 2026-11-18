@@ -290,7 +290,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.91"
+titleLabel.Text = "F2p Auto Dungeon v2.8.92"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -1305,7 +1305,7 @@ RunService.Heartbeat:Connect(function(dt)
 	
 	countLabel.Text = "Mobs: " .. detectedCount
 	
-	-- AAT Button Hold Loop (Strictly blocked when restart countdowns are active)
+	-- AAT Button Hold Loop (Locked Coordinate Check & Auto-Stop on Restart)
 	local shouldHoldAttack = isAatEnabled and bossDefeatedTimer == 0 and preClickCountdownTimer == 0 and (tick() - postRestartCooldown >= 10)
 	
 	if shouldHoldAttack then
