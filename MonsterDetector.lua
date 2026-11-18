@@ -284,7 +284,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.82"
+titleLabel.Text = "F2p Auto Dungeon v2.8.83"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -447,7 +447,7 @@ local lwpCorner = Instance.new("UICorner")
 lwpCorner.CornerRadius = UDim.new(0, 3)
 lwpCorner.Parent = loopWpBtn
 
--- Column 3 Bottom: AAT (Non-Disruptive Touch Simulation) Toggle Button
+-- Column 3 Bottom: AAT (Synchronized Micro-Touch Loop) Toggle Button
 local aatToggleBtn = Instance.new("TextButton")
 aatToggleBtn.Size = UDim2.new(0.33, -4, 0, 13)
 aatToggleBtn.Position = UDim2.new(0.66, 1, 0, 30)
@@ -1100,10 +1100,10 @@ RunService.Heartbeat:Connect(function(dt)
 		end)
 	end
 	
-	-- AAT Non-Disruptive Touch Simulation Loop (Preserves movement controls & jump/roll)
+	-- AAT Synchronized Micro-Touch Loop (Attacks instantly without hiding joystick/roll/jump)
 	local isPreClickActive = (preClickCountdownTimer > 0)
 	if isAatEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
-		if tick() - lastAtkClickTime >= 0.15 then
+		if tick() - lastAtkClickTime >= 0.18 then
 			lastAtkClickTime = tick()
 			
 			local pGui = player:FindFirstChild("PlayerGui")
@@ -1118,10 +1118,10 @@ RunService.Heartbeat:Connect(function(dt)
 					local centerX = absPos.X + absSize.X / 2
 					local centerY = absPos.Y + absSize.Y / 2
 					
-					-- Fires isolated touch event with unique ID 55 to prevent UI hiding
-					VirtualInputManager:SendTouchEvent(55, Enum.UserInputState.Begin, centerX, centerY, game)
-					task.wait(0.01)
-					VirtualInputManager:SendTouchEvent(55, Enum.UserInputState.End, centerX, centerY, game)
+					VirtualInputManager:SendTouchEvent(77, Enum.UserInputState.Begin, centerX, centerY, game)
+					task.defer(function()
+						VirtualInputManager:SendTouchEvent(77, Enum.UserInputState.End, centerX, centerY, game)
+					end)
 				end
 			end
 		end
