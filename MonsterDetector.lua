@@ -241,15 +241,13 @@ end)
 
 UserInputService.InputChanged:Connect(function(input)
 	if input == targetDragInput and targetDragging then
-		valDelta = input.Position - targetDragStart
 		local delta = input.Position - targetDragStart
 		clickTargetFrame.Position = UDim2.new(targetStartPos.X.Scale, targetStartPos.X.Offset + delta.X, targetStartPos.Y.Scale, targetStartPos.Y.Offset + delta.Y)
 	end
 end)
 
--- Precision Multi-Clicker for Run Again (Using VirtualUser targeting the Draggable Box coordinates)
+-- Precision Viewport-Centered Clicker for Run Again
 local function triggerRunAgainButton()
-	-- Release attack hold immediately so it doesn't block the click event
 	if isAttackHolding then
 		isAttackHolding = false
 		pcall(function()
@@ -257,19 +255,18 @@ local function triggerRunAgainButton()
 		end)
 	end
 
-	local absPos = clickTargetFrame.AbsolutePosition
-	local absSize = clickTargetFrame.AbsoluteSize
-	local centerX = absPos.X + absSize.X / 2
-	local centerY = absPos.Y + absSize.Y / 2
+	local viewportSize = workspace.CurrentCamera.ViewportSize
+	local targetX = viewportSize.X / 2
+	local targetY = viewportSize.Y / 2
 	
 	task.spawn(function()
 		for i = 1, 3 do
-			VirtualUser:Button1Down(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
+			VirtualUser:Button1Down(Vector2.new(targetX, targetY), workspace.CurrentCamera.CFrame)
 			task.wait(0.04)
-			VirtualUser:Button1Up(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
+			VirtualUser:Button1Up(Vector2.new(targetX, targetY), workspace.CurrentCamera.CFrame)
 			task.wait(0.04)
 		end
-		print("Fired 3 precision clicks on 'Run again' via Target Box at coordinates:", centerX, centerY)
+		print("Fired 3 precision clicks on 'Run again' via Viewport Center:", targetX, targetY)
 	end)
 	
 	resetToRoomOne()
@@ -293,7 +290,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.90"
+titleLabel.Text = "F2p Auto Dungeon v2.8.91"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
