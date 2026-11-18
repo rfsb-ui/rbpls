@@ -245,7 +245,7 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- Precision Multi-Clicker (Fires 3 clicks in quick succession)
+-- Precision Multi-Clicker for Run Again
 local function triggerRunAgainButton()
 	local absPos = clickTargetFrame.AbsolutePosition
 	local absSize = clickTargetFrame.AbsoluteSize
@@ -283,7 +283,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.78"
+titleLabel.Text = "F2p Auto Dungeon v2.8.79"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -446,7 +446,7 @@ local lwpCorner = Instance.new("UICorner")
 lwpCorner.CornerRadius = UDim.new(0, 3)
 lwpCorner.Parent = loopWpBtn
 
--- Column 3 Bottom: AAT (PlayerGui AttackButton Clicker) Toggle Button
+-- Column 3 Bottom: AAT (Direct Event Firing Clicker) Toggle Button
 local aatToggleBtn = Instance.new("TextButton")
 aatToggleBtn.Size = UDim2.new(0.33, -4, 0, 13)
 aatToggleBtn.Position = UDim2.new(0.66, 1, 0, 30)
@@ -1051,7 +1051,7 @@ exportWpBtn.MouseButton1Click:Connect(function()
 		return
 	end
 	
-	local exportStr = ""
+	exportStr = ""
 	for _, pos in ipairs(waypoints) do
 		exportStr = exportStr .. string.format("%.2f, %.2f, %.2f\n", pos.X, pos.Y, pos.Z)
 	end
@@ -1099,7 +1099,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end)
 	end
 	
-	-- AAT Native AttackButton Click Simulation Loop (With Safety Check)
+	-- AAT Direct Event Firing Loop (Bypasses coordinate simulation entirely)
 	local isPreClickActive = (preClickCountdownTimer > 0)
 	if isAatEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
 		if tick() - lastAtkClickTime >= 0.15 then
@@ -1108,17 +1108,14 @@ RunService.Heartbeat:Connect(function(dt)
 			local attackBtn = mobileCombat and mobileCombat:FindFirstChild("AttackButton")
 			
 			if attackBtn and attackBtn:IsA("GuiObject") then
-				local absPos = attackBtn.AbsolutePosition
-				local absSize = attackBtn.AbsoluteSize
-				
-				if absSize.X > 0 and absSize.Y > 0 then
-					local centerX = absPos.X + absSize.X / 2
-					local centerY = absPos.Y + absSize.Y / 2
-					
-					VirtualUser:Button1Down(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
-					task.wait(0.02)
-					VirtualUser:Button1Up(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
-				end
+				pcall(function()
+					for _, connection in ipairs(getconnections(attackBtn.MouseButton1Click) or {}) do
+						connection:Fire()
+					end
+					if attackBtn.Activated then
+						attackBtn.Activated:Fire()
+					end
+				end)
 			end
 		end
 	end
