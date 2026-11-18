@@ -123,7 +123,7 @@ local isAatEnabled = false
 local isAutoPotEnabled = false
 local isAlwaysFlyEnabled = false
 local isAutoLootEnabled = false
-local isBossCenterEnabled = true
+local isBossCenterEnabled = false
 local isAbilityEnabled = false
 local isHideNameEnabled = false
 local roomClearedConfirmed = true
@@ -284,7 +284,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.88"
+titleLabel.Text = "F2p Auto Dungeon v2.8.89"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -1088,11 +1088,14 @@ RunService.Heartbeat:Connect(function(dt)
 	
 	-- Hide Name & Clan Tag execution loop
 	if char then
-		for _, desc in ipairs(char:GetDescendants()) do
-			if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
-				desc.Enabled = not isHideNameEnabled
+		local function setBillboardEnabled(parentObj)
+			for _, desc in ipairs(parentObj:GetDescendants()) do
+				if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
+					desc.Enabled = not isHideNameEnabled
+				end
 			end
 		end
+		setBillboardEnabled(char)
 	end
 	
 	-- Ability Key Presser Loop (Presses 'Q' based on configured interval)
@@ -1104,38 +1107,6 @@ RunService.Heartbeat:Connect(function(dt)
 			task.wait(0.05)
 			vim:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
 		end)
-	end
-	
-	-- AAT Button Hold Loop (Clean & Functional)
-	local isPreClickActive = (preClickCountdownTimer > 0)
-	if isAatEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
-		local pGui = player:FindFirstChild("PlayerGui")
-		local mobileCombat = pGui and pGui:FindFirstChild("MobileCombat")
-		local attackBtn = mobileCombat and mobileCombat:FindFirstChild("AttackButton")
-		
-		if attackBtn and attackBtn:IsA("GuiObject") then
-			local absPos = attackBtn.AbsolutePosition
-			local absSize = attackBtn.AbsoluteSize
-			
-			if absSize.X > 0 and absSize.Y > 0 then
-				local centerX = absPos.X + absSize.X / 2
-				local centerY = absPos.Y + absSize.Y / 2
-				
-				if not isAttackHolding then
-					isAttackHolding = true
-					pcall(function()
-						VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
-					end)
-				end
-			end
-		end
-	else
-		if isAttackHolding then
-			isAttackHolding = false
-			pcall(function()
-				VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-			end)
-		end
 	end
 	
 	-- Auto Potion / HP Monitor Logic (Includes +4 height safety buffer)
@@ -1327,6 +1298,39 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 	
 	countLabel.Text = "Mobs: " .. detectedCount
+	
+	-- AAT Button Hold Loop (Strictly blocked when restart countdowns are active)
+	local shouldHoldAttack = isAatEnabled and bossDefeatedTimer == 0 and preClickCountdownTimer == 0 and (tick() - postRestartCooldown >= 10)
+	
+	if shouldHoldAttack then
+		local pGui = player:FindFirstChild("PlayerGui")
+		local mobileCombat = pGui and pGui:FindFirstChild("MobileCombat")
+		local attackBtn = mobileCombat and mobileCombat:FindFirstChild("AttackButton")
+		
+		if attackBtn and attackBtn:IsA("GuiObject") then
+			local absPos = attackBtn.AbsolutePosition
+			local absSize = attackBtn.AbsoluteSize
+			
+			if absSize.X > 0 and absSize.Y > 0 then
+				local centerX = absPos.X + absSize.X / 2
+				local centerY = absPos.Y + absSize.Y / 2
+				
+				if not isAttackHolding then
+					isAttackHolding = true
+					pcall(function()
+						VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+					end)
+				end
+			end
+		end
+	else
+		if isAttackHolding then
+			isAttackHolding = false
+			pcall(function()
+				VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+			end)
+		end
+	end
 	
 	local targetPos = nil
 	local targetName = "None"
