@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -50,7 +49,10 @@ local CONFIG = {
 	AbilityInterval = 5,
 	TargetPosX = 0,
 	TargetPosY = 0,
-	UseDefaultPos = true
+	UseDefaultPos = true,
+	AtkPosX = 0,
+	AtkPosY = 0,
+	AtkUseDefaultPos = true
 }
 
 local waypoints = {}
@@ -246,7 +248,71 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- Precision Multi-Clicker for Run Again
+
+-- ================= COMPACT DRAGGABLE ATK TARGET BOX ("ATK") =================
+local atkTargetFrame = Instance.new("Frame")
+atkTargetFrame.Size = UDim2.new(0, 48, 0, 15)
+
+if CONFIG.AtkUseDefaultPos then
+	atkTargetFrame.Position = UDim2.new(0.5, -24, 0.5, 15)
+else
+	atkTargetFrame.Position = UDim2.new(0, CONFIG.AtkPosX, 0, CONFIG.AtkPosY)
+end
+
+atkTargetFrame.BackgroundColor3 = Color3.fromRGB(50, 150, 220)
+atkTargetFrame.BackgroundTransparency = 0.4
+atkTargetFrame.BorderSizePixel = 1
+atkTargetFrame.BorderColor3 = Color3.fromRGB(255, 255, 255)
+atkTargetFrame.Active = true
+atkTargetFrame.Parent = screenGui
+
+local atkCorner = Instance.new("UICorner")
+atkCorner.CornerRadius = UDim.new(0, 4)
+atkCorner.Parent = atkTargetFrame
+
+local atkText = Instance.new("TextLabel")
+atkText.Size = UDim2.new(1, 0, 1, 0)
+atkText.BackgroundTransparency = 1
+atkText.Text = "ATK"
+atkText.TextColor3 = Color3.fromRGB(255, 255, 255)
+atkText.TextSize = 8
+atkText.Font = Enum.Font.SourceSansBold
+atkText.Parent = atkTargetFrame
+
+-- Drag logic for ATK target box with auto-save persistence
+local atkDragging, atkDragInput, atkDragStart, atkStartPos
+atkTargetFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		atkDragging = true
+		atkDragStart = input.Position
+		atkStartPos = atkTargetFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				atkDragging = false
+				CONFIG.AtkPosX = atkTargetFrame.AbsolutePosition.X
+				CONFIG.AtkPosY = atkTargetFrame.AbsolutePosition.Y
+				CONFIG.AtkUseDefaultPos = false
+				saveToDevice()
+			end
+		end)
+	end
+end)
+
+atkTargetFrame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		atkDragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == atkDragInput and atkDragging then
+		local delta = input.Position - atkDragStart
+		atkTargetFrame.Position = UDim2.new(atkStartPos.X.Scale, atkStartPos.X.Offset + delta.X, atkStartPos.Y.Scale, atkStartPos.Y.Offset + delta.Y)
+	end
+end)
+-- ============================================================================
+
+-- Precision Multi-Clicker (Fires 3 clicks in quick succession)
 local function triggerRunAgainButton()
 	local absPos = clickTargetFrame.AbsolutePosition
 	local absSize = clickTargetFrame.AbsoluteSize
@@ -255,9 +321,9 @@ local function triggerRunAgainButton()
 	
 	task.spawn(function()
 		for i = 1, 3 do
-			VirtualUser:Button1Down(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
+			VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
 			task.wait(0.03)
-			VirtualUser:Button1Up(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
+			VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
 			task.wait(0.03)
 		end
 		print("Fired 3 rapid clicks on 'Run again' via Target Box at coordinates:", centerX, centerY)
@@ -284,9 +350,9 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.81"
+titleLabel.Text = "F2p Auto Dungeon v2.8.76"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 12
+titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = mainFrame
@@ -447,7 +513,7 @@ local lwpCorner = Instance.new("UICorner")
 lwpCorner.CornerRadius = UDim.new(0, 3)
 lwpCorner.Parent = loopWpBtn
 
--- Column 3 Bottom: AAT (Dynamic Coordinate Touch Simulation) Toggle Button
+-- Column 3 Bottom: AAT (ATK Target Box Clicker) Toggle Button
 local aatToggleBtn = Instance.new("TextButton")
 aatToggleBtn.Size = UDim2.new(0.33, -4, 0, 13)
 aatToggleBtn.Position = UDim2.new(0.66, 1, 0, 30)
@@ -1041,7 +1107,7 @@ importBox.FocusLost:Connect(function()
 	end
 	
 	importBox.Text = ""
-	statusSubLabel.Text = "Status: Imported " .. countAdded
+	statusSubLabel.Text = "Status: Imported " + countAdded
 	updateRoomListDisplay()
 	saveToDevice()
 end)
@@ -1093,36 +1159,25 @@ RunService.Heartbeat:Connect(function(dt)
 	if isAbilityEnabled and (tick() - lastAbilityTime >= CONFIG.AbilityInterval) then
 		lastAbilityTime = tick()
 		task.spawn(function()
-			local vim = game:GetService("VirtualInputManager")
-			vim:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
 			task.wait(0.05)
-			vim:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
 		end)
 	end
 	
-	-- AAT Dynamic Username Path Coordinate Touch Simulation Loop (v2.8.81 original)
+	-- AAT Target Box Click Simulation Loop
 	local isPreClickActive = (preClickCountdownTimer > 0)
 	if isAatEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
 		if tick() - lastAtkClickTime >= 0.15 then
 			lastAtkClickTime = tick()
+			local absPos = atkTargetFrame.AbsolutePosition
+			local absSize = atkTargetFrame.AbsoluteSize
+			local centerX = absPos.X + absSize.X / 2
+			local centerY = absPos.Y + absSize.Y / 2
 			
-			local pGui = player:FindFirstChild("PlayerGui")
-			local mobileCombat = pGui and pGui:FindFirstChild("MobileCombat")
-			local attackBtn = mobileCombat and mobileCombat:FindFirstChild("AttackButton")
-			
-			if attackBtn and attackBtn:IsA("GuiObject") then
-				local absPos = attackBtn.AbsolutePosition
-				local absSize = attackBtn.AbsoluteSize
-				
-				if absSize.X > 0 and absSize.Y > 0 then
-					local centerX = absPos.X + absSize.X / 2
-					local centerY = absPos.Y + absSize.Y / 2
-					
-					VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
-					task.wait(0.02)
-					VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
-				end
-			end
+			VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+			task.wait(0.02)
+			VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
 		end
 	end
 	
@@ -1135,16 +1190,15 @@ RunService.Heartbeat:Connect(function(dt)
 				print("HP dropped below " .. CONFIG.PotThreshold .. "%. Using potion (Key 2 -> Key 1) with +4 height buffer...")
 				
 				task.spawn(function()
-					local vim = game:GetService("VirtualInputManager")
-					vim:SendKeyEvent(true, Enum.KeyCode.Two, false, game)
+					VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Two, false, game)
 					task.wait(0.05)
-					vim:SendKeyEvent(false, Enum.KeyCode.Two, false, game)
+					VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Two, false, game)
 					
 					task.wait(1.0)
 					
-					vim:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+					VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.One, false, game)
 					task.wait(0.05)
-					vim:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+					VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.One, false, game)
 				end)
 			end
 		end
