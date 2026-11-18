@@ -128,7 +128,6 @@ local isAlwaysFlyEnabled = false
 local isAutoLootEnabled = false
 local isBossCenterEnabled = true
 local isAbilityEnabled = false
-local isHideNameEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastPotionTime = 0
@@ -350,7 +349,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.76"
+titleLabel.Text = "RF Auto Dungeon v2.8.75"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 13
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -670,7 +669,7 @@ local skpCorner = Instance.new("UICorner")
 skpCorner.CornerRadius = UDim.new(0, 4)
 skpCorner.Parent = skipWpBtn
 
--- Auto Pot Toggle Button
+-- Auto Pot Toggle Button (Restored)
 local autoPotBtn = Instance.new("TextButton")
 autoPotBtn.Size = UDim2.new(0, 48, 0, 26)
 autoPotBtn.Position = UDim2.new(0, 178, 0, 130)
@@ -689,13 +688,13 @@ aptCorner.Parent = autoPotBtn
 
 -- Ability Toggle Button
 local abilityToggleBtn = Instance.new("TextButton")
-abilityToggleBtn.Size = UDim2.new(0.48, 0, 0, 26)
+abilityToggleBtn.Size = UDim2.new(1, -16, 0, 26)
 abilityToggleBtn.Position = UDim2.new(0, 8, 0, 164)
 abilityToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 abilityToggleBtn.BackgroundTransparency = 0.3
 abilityToggleBtn.Text = "Ability: OFF"
 abilityToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-abilityToggleBtn.TextSize = 10
+abilityToggleBtn.TextSize = 11
 abilityToggleBtn.Font = Enum.Font.SourceSansBold
 abilityToggleBtn.Visible = true
 abilityToggleBtn.Parent = mainFrame
@@ -703,23 +702,6 @@ abilityToggleBtn.Parent = mainFrame
 local abtCorner = Instance.new("UICorner")
 abtCorner.CornerRadius = UDim.new(0, 4)
 abtCorner.Parent = abilityToggleBtn
-
--- Hide Name Toggle Button
-local hideNameBtn = Instance.new("TextButton")
-hideNameBtn.Size = UDim2.new(0.49, 0, 0, 26)
-hideNameBtn.Position = UDim2.new(0.51, 0, 0, 164)
-hideNameBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-hideNameBtn.BackgroundTransparency = 0.3
-hideNameBtn.Text = "Hide Name: OFF"
-hideNameBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-hideNameBtn.TextSize = 9
-hideNameBtn.Font = Enum.Font.SourceSansBold
-hideNameBtn.Visible = true
-hideNameBtn.Parent = mainFrame
-
-local hdnCorner = Instance.new("UICorner")
-hdnCorner.CornerRadius = UDim.new(0, 4)
-hdnCorner.Parent = hideNameBtn
 
 -- Auto Restart Toggle Button
 local restartToggleBtn = Instance.new("TextButton")
@@ -892,7 +874,6 @@ minimizeButton.MouseButton1Click:Connect(function()
 		skipWpBtn.Visible = false
 		autoPotBtn.Visible = false
 		abilityToggleBtn.Visible = false
-		hideNameBtn.Visible = false
 		restartToggleBtn.Visible = false
 		importBox.Visible = false
 		exportWpBtn.Visible = false
@@ -912,7 +893,6 @@ minimizeButton.MouseButton1Click:Connect(function()
 		skipWpBtn.Visible = true
 		autoPotBtn.Visible = true
 		abilityToggleBtn.Visible = true
-		hideNameBtn.Visible = true
 		restartToggleBtn.Visible = true
 		importBox.Visible = true
 		exportWpBtn.Visible = true
@@ -1038,17 +1018,6 @@ abilityToggleBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
-hideNameBtn.MouseButton1Click:Connect(function()
-	isHideNameEnabled = not isHideNameEnabled
-	if isHideNameEnabled then
-		hideNameBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		hideNameBtn.Text = "Hide Name: ON"
-	else
-		hideNameBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		hideNameBtn.Text = "Hide Name: OFF"
-	end
-end)
-
 noclipToggleBtn.MouseButton1Click:Connect(function()
 	isNoClipEnabled = not isNoClipEnabled
 	if isNoClipEnabled then
@@ -1107,7 +1076,7 @@ importBox.FocusLost:Connect(function()
 	end
 	
 	importBox.Text = ""
-	statusSubLabel.Text = "Status: Imported " + countAdded
+	statusSubLabel.Text = "Status: Imported " .. countAdded
 	updateRoomListDisplay()
 	saveToDevice()
 end)
@@ -1142,15 +1111,6 @@ RunService.Heartbeat:Connect(function(dt)
 		for _, part in ipairs(char:GetDescendants()) do
 			if part:IsA("BasePart") then
 				part.CanCollide = false
-			end
-		end
-	end
-	
-	-- Hide Name & Clan Tag execution loop
-	if char then
-		for _, desc in ipairs(char:GetDescendants()) do
-			if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
-				desc.Enabled = not isHideNameEnabled
 			end
 		end
 	end
