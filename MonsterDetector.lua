@@ -2,10 +2,19 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local VirtualUser = game:GetService("VirtualUser")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+
+-- Direct Weapon Attack Remote Resolver for Atk Aura
+local weaponsFolder = ReplicatedStorage:WaitForChild("Weapon_Engine", 10)
+local remotesFolder = weaponsFolder and weaponsFolder:WaitForChild("Remotes", 10)
+local weaponAttackRemote = remotesFolder and remotesFolder:WaitForChild("WeaponAttack", 10)
+
+if not weaponAttackRemote then
+	warn("NOTICE: ReplicatedStorage.Weapon_Engine.Remotes.WeaponAttack not found immediately. It will be bound when available.")
+end
 
 -- Asynchronous folder validation to eliminate startup lag
 local aggressorsFolder, worldbitsFolder
@@ -121,6 +130,7 @@ local isTrackingAll = false
 local isAutoRestartEnabled = false
 local isNoClipEnabled = false
 local isAatEnabled = false
+local isAtkAuraEnabled = false
 local isAutoPotEnabled = false
 local isAlwaysFlyEnabled = false
 local isAutoLootEnabled = false
@@ -130,6 +140,7 @@ local isHideNameEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastPotionTime = 0
+local lastAtkTime = 0
 local lastAbilityTime = 0
 
 local isAttackHolding = false
@@ -254,6 +265,7 @@ local function triggerRunAgainButton()
 	local centerY = absPos.Y + absSize.Y / 2
 	
 	task.spawn(function()
+		local VirtualUser = game:GetService("VirtualUser")
 		for i = 1, 3 do
 			VirtualUser:Button1Down(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
 			task.wait(0.03)
@@ -284,7 +296,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.84"
+titleLabel.Text = "F2p Auto Dungeon v2.8.87"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -447,15 +459,15 @@ local lwpCorner = Instance.new("UICorner")
 lwpCorner.CornerRadius = UDim.new(0, 3)
 lwpCorner.Parent = loopWpBtn
 
--- Column 3 Bottom: AAT (Continuous Button Hold) Toggle Button
+-- Column 3 Bottom (Split): AAT & Atk Aura Toggles
 local aatToggleBtn = Instance.new("TextButton")
-aatToggleBtn.Size = UDim2.new(0.33, -4, 0, 13)
+aatToggleBtn.Size = UDim2.new(0.16, -2, 0, 13)
 aatToggleBtn.Position = UDim2.new(0.66, 1, 0, 30)
 aatToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 aatToggleBtn.BackgroundTransparency = 0.3
-aatToggleBtn.Text = "AAT ▶ [OFF]"
+aatToggleBtn.Text = "AAT:OFF"
 aatToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-aatToggleBtn.TextSize = 7
+aatToggleBtn.TextSize = 6
 aatToggleBtn.Font = Enum.Font.SourceSansBold
 aatToggleBtn.Parent = statusFrame
 
@@ -463,11 +475,10 @@ aatToggleBtn.MouseButton1Click:Connect(function()
 	isAatEnabled = not isAatEnabled
 	if isAatEnabled then
 		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		aatToggleBtn.Text = "AAT ⏸ [ON]"
+		aatToggleBtn.Text = "AAT:ON"
 	else
 		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		aatToggleBtn.Text = "AAT ▶ [OFF]"
-		-- Release touch hold immediately when toggled OFF
+		aatToggleBtn.Text = "AAT:OFF"
 		if isAttackHolding then
 			isAttackHolding = false
 			pcall(function()
@@ -480,6 +491,32 @@ end)
 local aatCorner = Instance.new("UICorner")
 aatCorner.CornerRadius = UDim.new(0, 3)
 aatCorner.Parent = aatToggleBtn
+
+local atkAuraToggleBtn = Instance.new("TextButton")
+atkAuraToggleBtn.Size = UDim2.new(0.17, -2, 0, 13)
+atkAuraToggleBtn.Position = UDim2.new(0.83, 0, 0, 30)
+atkAuraToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+atkAuraToggleBtn.BackgroundTransparency = 0.3
+atkAuraToggleBtn.Text = "Aura:OFF"
+atkAuraToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+atkAuraToggleBtn.TextSize = 6
+atkAuraToggleBtn.Font = Enum.Font.SourceSansBold
+atkAuraToggleBtn.Parent = statusFrame
+
+atkAuraToggleBtn.MouseButton1Click:Connect(function()
+	isAtkAuraEnabled = not isAtkAuraEnabled
+	if isAtkAuraEnabled then
+		atkAuraToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		atkAuraToggleBtn.Text = "Aura:ON"
+	else
+		atkAuraToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		atkAuraToggleBtn.Text = "Aura:OFF"
+	end
+end)
+
+local atkCorner = Instance.new("UICorner")
+atkCorner.CornerRadius = UDim.new(0, 3)
+atkCorner.Parent = atkAuraToggleBtn
 
 -- Status Bottom Sub-label (Left side of bottom row)
 local statusSubLabel = Instance.new("TextLabel")
@@ -1107,7 +1144,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end)
 	end
 	
-	-- AAT Continuous Button Hold Loop (Optimized version 2.8.84)
+	-- AAT Button Hold Loop
 	local isPreClickActive = (preClickCountdownTimer > 0)
 	if isAatEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
 		local pGui = player:FindFirstChild("PlayerGui")
@@ -1136,6 +1173,26 @@ RunService.Heartbeat:Connect(function(dt)
 			pcall(function()
 				VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
 			end)
+		end
+	end
+	
+	-- Atk Aura Direct Remote Firing Loop (Static 1.0 second interval)
+	if isAtkAuraEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
+		if tick() - lastAtkTime >= 1.0 then
+			lastAtkTime = tick()
+			
+			if not weaponAttackRemote then
+				local rs = ReplicatedStorage
+				local we = rs:FindFirstChild("Weapon_Engine")
+				local rem = we and we:FindFirstChild("Remotes")
+				weaponAttackRemote = rem and rem:FindFirstChild("WeaponAttack")
+			end
+			
+			if weaponAttackRemote and weaponAttackRemote:IsA("RemoteEvent") then
+				pcall(function()
+					weaponAttackRemote:FireServer()
+				end)
+			end
 		end
 	end
 	
