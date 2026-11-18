@@ -283,7 +283,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.77"
+titleLabel.Text = "F2p Auto Dungeon v2.8.78"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -1092,7 +1092,6 @@ RunService.Heartbeat:Connect(function(dt)
 	if isAbilityEnabled and (tick() - lastAbilityTime >= CONFIG.AbilityInterval) then
 		lastAbilityTime = tick()
 		task.spawn(function()
-			VirtualUser:Button1Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame) -- Placeholder fallback
 			local vim = game:GetService("VirtualInputManager")
 			vim:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
 			task.wait(0.05)
@@ -1100,7 +1099,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end)
 	end
 	
-	-- AAT Native AttackButton Click Simulation Loop
+	-- AAT Native AttackButton Click Simulation Loop (With Safety Check)
 	local isPreClickActive = (preClickCountdownTimer > 0)
 	if isAatEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
 		if tick() - lastAtkClickTime >= 0.15 then
@@ -1111,12 +1110,15 @@ RunService.Heartbeat:Connect(function(dt)
 			if attackBtn and attackBtn:IsA("GuiObject") then
 				local absPos = attackBtn.AbsolutePosition
 				local absSize = attackBtn.AbsoluteSize
-				local centerX = absPos.X + absSize.X / 2
-				local centerY = absPos.Y + absSize.Y / 2
 				
-				VirtualUser:Button1Down(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
-				task.wait(0.02)
-				VirtualUser:Button1Up(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
+				if absSize.X > 0 and absSize.Y > 0 then
+					local centerX = absPos.X + absSize.X / 2
+					local centerY = absPos.Y + absSize.Y / 2
+					
+					VirtualUser:Button1Down(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
+					task.wait(0.02)
+					VirtualUser:Button1Up(Vector2.new(centerX, centerY), workspace.CurrentCamera.CFrame)
+				end
 			end
 		end
 	end
