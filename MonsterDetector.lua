@@ -130,9 +130,9 @@ local isHideNameEnabled = false
 local roomClearedConfirmed = true
 local gateTimer = 0
 local lastPotionTime = 0
-local lastAtkClickTime = 0
 local lastAbilityTime = 0
 
+local isAttackHolding = false
 local bossWasPresent = false
 local bossDefeatedTimer = 0
 local postRestartCooldown = 0
@@ -284,7 +284,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.83"
+titleLabel.Text = "F2p Auto Dungeon v2.8.84"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -447,7 +447,7 @@ local lwpCorner = Instance.new("UICorner")
 lwpCorner.CornerRadius = UDim.new(0, 3)
 lwpCorner.Parent = loopWpBtn
 
--- Column 3 Bottom: AAT (Synchronized Micro-Touch Loop) Toggle Button
+-- Column 3 Bottom: AAT (Continuous Button Hold) Toggle Button
 local aatToggleBtn = Instance.new("TextButton")
 aatToggleBtn.Size = UDim2.new(0.33, -4, 0, 13)
 aatToggleBtn.Position = UDim2.new(0.66, 1, 0, 30)
@@ -458,6 +458,24 @@ aatToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 aatToggleBtn.TextSize = 7
 aatToggleBtn.Font = Enum.Font.SourceSansBold
 aatToggleBtn.Parent = statusFrame
+
+aatToggleBtn.MouseButton1Click:Connect(function()
+	isAatEnabled = not isAatEnabled
+	if isAatEnabled then
+		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		aatToggleBtn.Text = "AAT ⏸ [ON]"
+	else
+		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		aatToggleBtn.Text = "AAT ▶ [OFF]"
+		-- Release touch hold immediately when toggled OFF
+		if isAttackHolding then
+			isAttackHolding = false
+			pcall(function()
+				VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+			end)
+		end
+	end
+end)
 
 local aatCorner = Instance.new("UICorner")
 aatCorner.CornerRadius = UDim.new(0, 3)
@@ -939,17 +957,6 @@ toggleButton.MouseButton1Click:Connect(function()
 	end
 end)
 
-aatToggleBtn.MouseButton1Click:Connect(function()
-	isAatEnabled = not isAatEnabled
-	if isAatEnabled then
-		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		aatToggleBtn.Text = "AAT ⏸ [ON]"
-	else
-		aatToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-		aatToggleBtn.Text = "AAT ▶ [OFF]"
-	end
-end)
-
 autoPotBtn.MouseButton1Click:Connect(function()
 	isAutoPotEnabled = not isAutoPotEnabled
 	if isAutoPotEnabled then
@@ -1100,30 +1107,35 @@ RunService.Heartbeat:Connect(function(dt)
 		end)
 	end
 	
-	-- AAT Synchronized Micro-Touch Loop (Attacks instantly without hiding joystick/roll/jump)
+	-- AAT Continuous Button Hold Loop (Optimized version 2.8.84)
 	local isPreClickActive = (preClickCountdownTimer > 0)
 	if isAatEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
-		if tick() - lastAtkClickTime >= 0.18 then
-			lastAtkClickTime = tick()
+		local pGui = player:FindFirstChild("PlayerGui")
+		local mobileCombat = pGui and pGui:FindFirstChild("MobileCombat")
+		local attackBtn = mobileCombat and mobileCombat:FindFirstChild("AttackButton")
+		
+		if attackBtn and attackBtn:IsA("GuiObject") then
+			local absPos = attackBtn.AbsolutePosition
+			local absSize = attackBtn.AbsoluteSize
 			
-			local pGui = player:FindFirstChild("PlayerGui")
-			local mobileCombat = pGui and pGui:FindFirstChild("MobileCombat")
-			local attackBtn = mobileCombat and mobileCombat:FindFirstChild("AttackButton")
-			
-			if attackBtn and attackBtn:IsA("GuiObject") then
-				local absPos = attackBtn.AbsolutePosition
-				local absSize = attackBtn.AbsoluteSize
+			if absSize.X > 0 and absSize.Y > 0 then
+				local centerX = absPos.X + absSize.X / 2
+				local centerY = absPos.Y + absSize.Y / 2
 				
-				if absSize.X > 0 and absSize.Y > 0 then
-					local centerX = absPos.X + absSize.X / 2
-					local centerY = absPos.Y + absSize.Y / 2
-					
-					VirtualInputManager:SendTouchEvent(77, Enum.UserInputState.Begin, centerX, centerY, game)
-					task.defer(function()
-						VirtualInputManager:SendTouchEvent(77, Enum.UserInputState.End, centerX, centerY, game)
+				if not isAttackHolding then
+					isAttackHolding = true
+					pcall(function()
+						VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
 					end)
 				end
 			end
+		end
+	else
+		if isAttackHolding then
+			isAttackHolding = false
+			pcall(function()
+				VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+			end)
 		end
 	end
 	
