@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
@@ -283,7 +284,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -65, 0, 32)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "F2p Auto Dungeon v2.8.80"
+titleLabel.Text = "F2p Auto Dungeon v2.8.81"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.SourceSansBold
@@ -446,7 +447,7 @@ local lwpCorner = Instance.new("UICorner")
 lwpCorner.CornerRadius = UDim.new(0, 3)
 lwpCorner.Parent = loopWpBtn
 
--- Column 3 Bottom: AAT (Dynamic Username Path Clicker) Toggle Button
+-- Column 3 Bottom: AAT (Precise Coordinate Touch Simulation) Toggle Button
 local aatToggleBtn = Instance.new("TextButton")
 aatToggleBtn.Size = UDim2.new(0.33, -4, 0, 13)
 aatToggleBtn.Position = UDim2.new(0.66, 1, 0, 30)
@@ -1099,26 +1100,28 @@ RunService.Heartbeat:Connect(function(dt)
 		end)
 	end
 	
-	-- AAT Dynamic Username Path Clicker Loop
+	-- AAT Dynamic Username Path Coordinate Touch Simulation Loop
 	local isPreClickActive = (preClickCountdownTimer > 0)
 	if isAatEnabled and bossDefeatedTimer == 0 and not isPreClickActive and (tick() - postRestartCooldown >= 10) then
 		if tick() - lastAtkClickTime >= 0.15 then
 			lastAtkClickTime = tick()
 			
-			-- Dynamically resolve user container path using player.Name
 			local pGui = player:FindFirstChild("PlayerGui")
 			local mobileCombat = pGui and pGui:FindFirstChild("MobileCombat")
 			local attackBtn = mobileCombat and mobileCombat:FindFirstChild("AttackButton")
 			
 			if attackBtn and attackBtn:IsA("GuiObject") then
-				pcall(function()
-					for _, connection in ipairs(getconnections(attackBtn.MouseButton1Click) or {}) do
-						connection:Fire()
-					end
-					if attackBtn.Activated then
-						attackBtn.Activated:Fire()
-					end
-				end)
+				local absPos = attackBtn.AbsolutePosition
+				local absSize = attackBtn.AbsoluteSize
+				
+				if absSize.X > 0 and absSize.Y > 0 then
+					local centerX = absPos.X + absSize.X / 2
+					local centerY = absPos.Y + absSize.Y / 2
+					
+					VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+					task.wait(0.02)
+					VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+				end
 			end
 		end
 	end
